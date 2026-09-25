@@ -1,7 +1,8 @@
-// one oc's page: about, relationships, gallery, moodboard, page style.
+// one oc's page: about, relationships, gallery, moodboard, page style (+ their music, see music.js).
 // the same page shows at #/oc/<id> (on their own) and #/w/<world>/ocs/<id> (inside a world).
 
-import { store, MAX_VIDEO } from '../store.js';
+import { store, MAX_VIDEO, MAX_SONG } from '../store.js';
+import { music } from '../music.js';
 import { h, s, fill, uid, toast, openModal, confirmDialog, swatches, segmented, autosize, pickFile, pickFiles, shrinkImage } from '../ui.js';
 import { portrait, nameOf, emptyState, worldIcon } from '../parts.js';
 import { seenFrom, openRelEditor } from '../rels.js';
@@ -425,6 +426,51 @@ export function render(el, { char, tab, base, world, go }) {
 
     const tabs = tabOrder(page).map(id => ({ id, label: TAB_NAMES[id] }));
 
+    // their playlist
+    const songList = h('div', { class: 'order-list' });
+    const probe = document.createElement('audio');
+    const songsChanged = () => { save(); drawSongs(); music.refresh(); };
+    function drawSongs() {
+      fill(songList, char.playlist.map((song, i) => {
+        const move = d => { char.playlist.splice(i + d, 0, char.playlist.splice(i, 1)[0]); songsChanged(); };
+        return h('div', { class: 'order-row song-row' },
+          h('input', { type: 'text', class: 'song-title', value: song.title, maxLength: 120, placeholder: 'song name', oninput: e => { song.title = e.target.value; save(); music.refresh(); } }),
+          h('button', { type: 'button', class: 'icon-btn sm', title: 'move up', disabled: i === 0, onclick: () => move(-1) }, '↑'),
+          h('button', { type: 'button', class: 'icon-btn sm', title: 'move down', disabled: i === char.playlist.length - 1, onclick: () => move(1) }, '↓'),
+          h('button', {
+            type: 'button', class: 'icon-btn sm', title: 'delete', onclick: async () => {
+              if (!await confirmDialog(`delete "${song.title || 'this song'}"?`, { okLabel: 'delete', danger: true })) return;
+              store.deleteImage(song.imageId);
+              char.playlist = char.playlist.filter(x => x !== song);
+              songsChanged();
+            },
+          }, '✕'));
+      }));
+    }
+    async function addSongs() {
+      const files = await pickFiles('audio/*');
+      let added = 0;
+      for (const file of files) {
+        if (!file.type.startsWith('audio/') || !probe.canPlayType(file.type)) {
+          toast(`${file.name} isn't a song this browser can play`, 'bad');
+          continue;
+        }
+        if (file.size > MAX_SONG) {
+          toast(`${file.name} is too big (${MAX_SONG / 1e6} mb max)`, 'bad');
+          continue;
+        }
+        try {
+          char.playlist.push({ id: 's_' + uid(), imageId: await store.putImage(file), title: file.name.replace(/\.[^.]+$/, '') });
+          added++;
+        } catch (err) {
+          console.error(err);
+          toast(`couldn't save ${file.name}`, 'bad');
+        }
+      }
+      if (added) songsChanged();
+    }
+    drawSongs();
+
     fill(wrap,
       group('colors + fonts'),
       card('their color', null, swatches(char.color, c => { char.color = c; changed(); drawPfp(); })),
@@ -437,6 +483,11 @@ export function render(el, { char, tab, base, world, go }) {
       pick('name + pfp', 'heroAlign', ['left', 'center']),
       pick('pfp shape', 'pfpShape', ['rounded', 'circle', 'square']),
       pick('pfp size', 'pfpSize', ['small', 'normal', 'big']),
+
+      group('music'),
+      card('songs', null, songList, h('button', { class: 'btn ghost sm', onclick: addSongs }, '+ add songs')),
+      card('when the page opens', null, h('label', { class: 'check' },
+        h('input', { type: 'checkbox', checked: page.musicAutoplay, onchange: e => { page.musicAutoplay = e.target.checked; save(); } }), ' start playing')),
 
       group('layout'),
       card('tabs', null, orderList(tabs, page.hiddenTabs, () => { page.tabs = tabs.map(t => t.id); rebuild(); })),
@@ -478,6 +529,7 @@ export function render(el, { char, tab, base, world, go }) {
 
   drawCounts();
   applyPageStyle();
+  music.show(char);
   drawPfp();
   drawMeta();
   if (!char.name) requestAnimationFrame(() => el.querySelector('.profile-name')?.focus());

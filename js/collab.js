@@ -14,7 +14,7 @@
 //   - a guest who isn't connected can look at their copy but not change the world
 // every change is sent as small path ops (see sync.js), always through the host, who passes it on.
 
-import { store, imageIdsIn, MAX_VIDEO } from './store.js';
+import { store, imageIdsIn, MAX_VIDEO, MAX_SONG } from './store.js';
 import { me } from './me.js';
 import { diff, apply, sanitize, clone, replaceInPlace } from './sync.js';
 import { fixWorld, fixChar, fixRel } from './model.js';
@@ -39,7 +39,9 @@ const KINDS = ['world', 'char', 'rel'];
 const IMAGE_TYPES = ['image/webp', 'image/png', 'image/jpeg', 'image/gif'];
 // moodboard videos travel the same way pictures do, just bigger
 const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime', 'video/ogg', 'video/x-m4v'];
-const maxBytes = type => (VIDEO_TYPES.includes(type) ? MAX_VIDEO : 16e6);
+// + playlist songs
+const AUDIO_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/ogg', 'audio/mp4', 'audio/x-m4a', 'audio/aac', 'audio/flac', 'audio/x-flac', 'audio/webm'];
+const maxBytes = type => (VIDEO_TYPES.includes(type) ? MAX_VIDEO : AUDIO_TYPES.includes(type) ? MAX_SONG : 16e6);
 
 const sessions = new Map(); // world id -> Session
 const statusListeners = new Set();
@@ -516,7 +518,7 @@ class Session {
 
   async keepPicture(msg) {
     const buf = ArrayBuffer.isView(msg.buf) ? msg.buf.buffer.slice(msg.buf.byteOffset, msg.buf.byteOffset + msg.buf.byteLength) : msg.buf;
-    if (typeof msg.id !== 'string' || ![...IMAGE_TYPES, ...VIDEO_TYPES].includes(msg.type) || !(buf instanceof ArrayBuffer) || buf.byteLength > maxBytes(msg.type)) return;
+    if (typeof msg.id !== 'string' || ![...IMAGE_TYPES, ...VIDEO_TYPES, ...AUDIO_TYPES].includes(msg.type) || !(buf instanceof ArrayBuffer) || buf.byteLength > maxBytes(msg.type)) return;
     if (!this.asked.has(msg.id)) return; // only pictures we asked for
     const rec = { id: msg.id, type: msg.type, buf };
     await store.keepImageRecord(rec);

@@ -1,10 +1,10 @@
 // what the saved things look like, and how to make new ones.
 //
 //   world = { id, name, blurb, emoji, icon, color, charIds, boards, maps, lore }
-//   char  = { id, name, tagline, color, imageId, tags, basics, sections, gallery, moodboard, page }
+//   char  = { id, name, tagline, color, imageId, tags, basics, sections, gallery, moodboard, playlist, page }
 //   home  = the home page's layout (blankHome below)
 //
-// moodboard items are videos: { id, imageId, caption }. the video file is kept with the pictures, so it's
+// moodboard items are videos: { id, imageId, caption }. playlist items are songs: { id, imageId, title }. the video file is kept with the pictures, so it's
 // still under a key called imageId (store.js finds every file by that name for backups + deleting).
 //   rel   = { id, a, b, bName, label, back, color, line, arrow, note }
 //
@@ -31,6 +31,7 @@ export const blankPage = () => ({
   banner: null, bannerFade: false, bannerPic: { imageId: null }, bannerSize: 'normal',
   heroAlign: 'left', pfpShape: 'rounded', pfpSize: 'normal', width: 'normal',
   tabs: null, hiddenTabs: [], moodLayout: 'grid', videoBg: null,
+  musicAutoplay: true, musicShuffle: false,
 });
 
 // the home page's layout. it lives on this device only (it's not part of any oc or world).
@@ -68,6 +69,7 @@ export function fixChar(c) {
   c.sections ||= [];
   c.gallery ||= [];
   c.moodboard ||= [];
+  c.playlist ||= [];
   c.page = { ...blankPage(), ...c.page };
   c.page.wallpaper = { imageId: null, tile: false, ...c.page.wallpaper };
   c.page.bannerPic = { imageId: null, ...c.page.bannerPic };

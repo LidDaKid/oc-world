@@ -8,6 +8,7 @@
 //   #/join/<code>                       an invite link to someone's collab world
 
 import { store } from './store.js';
+import { music } from './music.js';
 import { collab } from './collab.js';
 import { openCollabModal, openJoinModal } from './collab-ui.js';
 import { h, clear, fill, toast, openModal, hasOpenModal, onModalsClosed, swatches, field } from './ui.js';
@@ -107,6 +108,8 @@ async function route() {
   view = {};
   await store.flush();
   if (token !== routeToken) return;
+  // an oc's music keeps going between their own tabs, and stops anywhere else
+  music.keepOnly(parts[0] === 'oc' ? parts[1] : parts[0] === 'w' && parts[2] === 'ocs' ? parts[3] : null);
   const right = h('div', { class: 'topbar-right' }, saveBadge, themeButton());
   const body = h('main', { class: 'world-body' });
   shownWorld = null;

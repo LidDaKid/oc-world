@@ -15,6 +15,7 @@ const DB_VERSION = 3;
 const FORMAT_VERSION = 2;
 const STORES = { world: 'worlds', char: 'chars', rel: 'rels' };
 export const MAX_VIDEO = 100e6; // biggest moodboard video (bytes)
+export const MAX_SONG = 50e6; // biggest playlist song (bytes)
 
 // ---- local adapter (IndexedDB) ----
 

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en" data-theme="midnight">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>oc world</title>
+  <meta name="description" content="map out your ocs, who they are to each other, and the whole world they live in.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪐</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Pixelify+Sans:wght@400;600;700&family=VT323&family=Caveat:wght@400;700&family=Special+Elite&family=Fredoka:wght@400;600;700&family=Playfair+Display:wght@400;700&family=Creepster&family=Rubik+Glitch&family=Sedgwick+Ave+Display&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    // pick the theme before anything paints so it doesn't flash
+    try { document.documentElement.dataset.theme = localStorage.getItem('ocw-theme') || 'midnight'; } catch (e) {}
+  </script>
+</head>
+<body>
+  <div id="app"><p class="boot">loading…</p></div>
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+  <script>
+    // browsers block the scripts when the file is opened straight off the disk
+    if (location.protocol === 'file:') {
+      document.querySelector('.boot').textContent =
+        "this page can't run by double-clicking index.html. double-click start.bat in the same folder instead and it'll open properly.";
+    }
+  </script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

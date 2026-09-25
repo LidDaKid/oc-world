@@ -1,0 +1,17 @@
+# netlify cli
+.netlify/
+
+# node stuff (nothing needs installing, but just in case)
+node_modules/
+
+# backups of worlds are personal, keep them out of the repo
+*.ocworld.json
+
+# os + editor junk
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+
+# the exact files that go up to netlify (copied from the root right before a deploy)
+_deploy/

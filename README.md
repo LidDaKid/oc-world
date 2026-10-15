@@ -79,5 +79,8 @@ js/diary/sketch.js     drawing on a page (pens, highlighter, glitter, eraser, un
 js/diary/stickers.js   every sticker (3d ones, word stickers, washi tape, extras)
 stickers/              the 3d sticker pictures (Microsoft Fluent Emoji, MIT license). moving stickers = Google Noto Animated Emoji (CC BY 4.0), loaded from fonts.gstatic.com
 js/diary/doodles.js    hand-drawn doodle stickers
+js/diary/gem-list.js   the gem, bling, pressed flower + spill stickers and their sizes
+gems/                  3d gems, rhinestones, pearls + pave shapes. made for this site: rendered with three.js (MIT) by the scripts in oc-world-tests/gem-render
+flowers/, spills/      pressed flowers + spills, drawn with canvas for this site (no outside pictures)
 tools/dev-server.js    the little local server start.bat runs
 ```

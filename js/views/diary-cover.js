@@ -3,15 +3,21 @@
 
 import { store } from '../store.js';
 import { h, fill, toast, segmented, swatches, pickFile, shrinkImage } from '../ui.js';
-import { SIZES, dims, PRESETS, TITLE_STYLES, COVER_FONTS, coverFace, preset } from '../diary/covers.js';
+import { SIZES, dims, PRESETS, TITLE_STYLES, COVER_FONTS, coverFace, preset, book3d, nameTag } from '../diary/covers.js';
 import { itemsLayer, newItem, sizeSlider } from '../diary/items.js';
 import { STICKER_TABS, stickerNode, TAPES } from '../diary/stickers.js';
-import { PAPERS, PAPER_COLORS, fixInks } from './diary.js';
+import { PAPERS, PAPER_COLORS, WRITE_FONTS, INKS, fixInks } from './diary.js';
 import { nameOf } from '../parts.js';
+import { guard, askCode, setCode, padlock, LOCK_STYLES } from '../diary/lock.js';
+import { peel } from '../diary/fx.js';
 
 const RIBBONS = ['#d81e5b', '#141114', '#ff8ac4', '#8a3ffc', '#e0323f', '#f6eefb', '#ffd84d', '#2bb38a'];
 
-export function renderCover(el, { diary, go }) {
+export function renderCover(el, ctx) {
+  return guard(el, ctx.diary, ctx.go, e => coverView(e, ctx), book3d);
+}
+
+function coverView(el, { diary, go }) {
   const c = diary.cover;
   let stickerTab = STICKER_TABS[0][0];
   let picked = null;
@@ -78,7 +84,7 @@ export function renderCover(el, { diary, go }) {
         class: 'stk-tab' + (name === stickerTab ? ' on' : ''), title: name,
         onclick: () => { stickerTab = name; drawStickers(); },
       }, h('span', { class: 'stk-tab-icon' }, stickerNode(icon)))));
-      fill(grid, tab[2].map(s => h('button', { class: 'stk-cell', onclick: () => stick(s) }, stickerNode(s))));
+      fill(grid, tab[2].map(s => h('button', { class: 'stk-cell', onclick: e => stick(s, e.currentTarget) }, stickerNode(s))));
     };
     drawStickers();
 
@@ -127,11 +133,74 @@ export function renderCover(el, { diary, go }) {
             e.currentTarget.classList.add('on');
             save();
           },
-        })))),
+        }))),
+        h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: diary.aged, onchange: e => { diary.aged = e.target.checked; changed(); } }), ' 📜 old diary')),
+      lockCard(),
       ocs.length ? card('whose diary',
-        h('select', { onchange: e => { diary.charId = e.target.value || null; save(); } },
+        h('select', { class: 'owner-pick', onchange: e => { diary.charId = e.target.value || null; save(); drawPanel(); } },
           h('option', { value: '' }, '—'),
-          ocs.map(o => h('option', { value: o.id, selected: diary.charId === o.id }, nameOf(o))))) : null);
+          ocs.map(o => h('option', { value: o.id, selected: diary.charId === o.id }, nameOf(o)))),
+        voiceRow()) : null);
+  }
+
+  // the oc's own handwriting: new pages (and the empty ones) use it
+  function voiceRow() {
+    const owner = diary.charId ? store.char(diary.charId) : null;
+    if (!owner) return null;
+    const v = diary.voice;
+    const apply = () => {
+      for (const p of diary.pages) if (!p.text && !p.date) { if (v.font) p.font = v.font; if (v.ink) p.ink = v.ink; }
+      save();
+      drawSample();
+    };
+    const sample = h('div', { class: 'voice-sample' });
+    const drawSample = () => {
+      const f = WRITE_FONTS.find(x => x.id === v.font) || WRITE_FONTS[0];
+      fill(sample, nameTag(owner, 'voice-tag'), h('span', { style: { fontFamily: f.css, fontSize: f.size * .9 + 'px', color: v.ink || '#27306b' } }, owner.name || nameOf(owner)));
+    };
+    drawSample();
+    return h('div', { class: 'voice' },
+      sample,
+      h('select', { class: 'voice-font', onchange: e => { v.font = e.target.value || null; apply(); } },
+        h('option', { value: '' }, 'handwriting'),
+        WRITE_FONTS.map(f => h('option', { value: f.id, selected: v.font === f.id, style: { fontFamily: f.css } }, f.label))),
+      swatches(v.ink || '', ink => { v.ink = ink; apply(); }, INKS));
+  }
+
+  // a padlock on the cover
+  function lockCard() {
+    const L = diary.lock;
+    const styles = h('div', { class: 'lock-picks', hidden: !L.on }, LOCK_STYLES.map(st => h('button', {
+      type: 'button', class: 'lock-pick' + (L.style === st.id ? ' on' : ''), title: st.label,
+      onclick: e => { L.style = st.id; styles.querySelectorAll('.on').forEach(x => x.classList.remove('on')); e.currentTarget.classList.add('on'); save(); },
+    }, padlock(st.id))));
+    return card('lock',
+      h('label', { class: 'check' }, h('input', {
+        type: 'checkbox', checked: L.on, class: 'lock-toggle',
+        onchange: async e => {
+          if (e.target.checked) {
+            const code = await askCode(diary, { mode: 'set' });
+            if (!code) { e.target.checked = false; return; }
+            await setCode(diary, code);
+            toast('🔒 locked');
+          } else {
+            L.on = false;
+            L.hash = L.salt = null;
+          }
+          save();
+          drawPanel();
+        },
+      }), ' 🔒 lock with a code'),
+      styles,
+      L.on ? h('button', {
+        class: 'btn ghost sm', onclick: async () => {
+          const code = await askCode(diary, { mode: 'set' });
+          if (!code) return;
+          await setCode(diary, code);
+          save();
+          toast('🔒 new code');
+        },
+      }, 'change code') : null);
   }
   const bandColors = h('div', { hidden: !c.band }, swatches(c.bandColor, v => { c.bandColor = v; changed(); }, RIBBONS));
   const ribbonColors = h('div', { hidden: !c.ribbon }, swatches(c.ribbonColor, v => { c.ribbonColor = v; save(); }, RIBBONS));
@@ -149,15 +218,17 @@ export function renderCover(el, { diary, go }) {
     fit();
   }
 
-  function stick(s) {
+  function stick(s, cell) {
     const { w: W, h: H } = dims(diary);
-    layer.add(newItem({
+    const item = newItem({
       kind: 'sticker', s,
       x: Math.round(W / 2 + (Math.random() - .5) * 200),
       y: Math.round(H / 2 + (Math.random() - .5) * 300),
       r: Math.round((Math.random() - .5) * (s.startsWith('t:') ? 50 : 24)),
       k: s.startsWith('e:') ? 1 : 1.1,
-    }));
+    });
+    layer.add(item);
+    peel(cell, layer.node(item.id));
   }
 
   async function uploadCover() {

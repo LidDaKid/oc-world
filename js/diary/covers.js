@@ -6,6 +6,7 @@ import { h } from '../ui.js';
 import { store } from '../store.js';
 import { svgTile } from './stickers.js';
 import { itemNode } from './items.js';
+import { hasLock, padlock } from './lock.js';
 
 // how big the book is. w x h = one page (and the front cover) in page pixels
 export const SIZES = [
@@ -21,10 +22,10 @@ export const BIGGEST = { w: 520, h: 680 };
 export const sizeVars = diary => ({ '--w': dims(diary).w + 'px', '--h': dims(diary).h + 'px' });
 
 const noise = (alpha, freq = .9) => svgTile(220, 220,
-  `<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='${freq}' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 ${alpha} 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/>`);
+  `<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='${freq}' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 ${alpha} 0'/></filter><rect width='100%' height='100%' filter='url%28%23n%29'/>`);
 const sparkle = (a, b) => `radial-gradient(circle, ${a} .7px, transparent 1.3px) 0 0 / 7px 7px, radial-gradient(circle, ${b} 1px, transparent 1.6px) 3px 4px / 11px 11px, radial-gradient(circle, #fff 1.1px, transparent 1.8px) 6px 2px / 17px 17px`;
 const marble = svgTile(260, 260,
-  "<filter id='m' x='0' y='0' width='100%' height='100%'><feTurbulence type='turbulence' baseFrequency='.06 .09' numOctaves='3' seed='7' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  2.6 2.6 2.6 0 -2.05'/><feComponentTransfer><feFuncA type='discrete' tableValues='0 1'/></feComponentTransfer></filter><rect width='100%' height='100%' fill='%23111'/><rect width='100%' height='100%' filter='url(%23m)'/>");
+  "<filter id='m' x='0' y='0' width='100%' height='100%'><feTurbulence type='turbulence' baseFrequency='.06 .09' numOctaves='3' seed='7' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  2.6 2.6 2.6 0 -2.05'/><feComponentTransfer><feFuncA type='discrete' tableValues='0 1'/></feComponentTransfer></filter><rect width='100%' height='100%' fill='%23111'/><rect width='100%' height='100%' filter='url%28%23m%29'/>");
 const leopard = svgTile(100, 100,
   "<g transform='translate(14 16) rotate(0)'><ellipse rx='7' ry='5.5' fill='%23b8732f'/><path d='M-8 -3 Q-9 -8 -3 -8.5 M2 -8.5 Q8 -8 8.5 -2 M8 3 Q6 8 0 8.4 M-4 8 Q-9 6 -9 1' stroke='%23231208' stroke-width='3.2' fill='none' stroke-linecap='round'/></g><g transform='translate(52 10) rotate(40)'><ellipse rx='7' ry='5.5' fill='%23b8732f'/><path d='M-8 -3 Q-9 -8 -3 -8.5 M2 -8.5 Q8 -8 8.5 -2 M8 3 Q6 8 0 8.4 M-4 8 Q-9 6 -9 1' stroke='%23231208' stroke-width='3.2' fill='none' stroke-linecap='round'/></g><g transform='translate(80 40) rotate(100)'><ellipse rx='7' ry='5.5' fill='%23b8732f'/><path d='M-8 -3 Q-9 -8 -3 -8.5 M2 -8.5 Q8 -8 8.5 -2 M8 3 Q6 8 0 8.4 M-4 8 Q-9 6 -9 1' stroke='%23231208' stroke-width='3.2' fill='none' stroke-linecap='round'/></g><g transform='translate(34 48) rotate(200)'><ellipse rx='7' ry='5.5' fill='%23b8732f'/><path d='M-8 -3 Q-9 -8 -3 -8.5 M2 -8.5 Q8 -8 8.5 -2 M8 3 Q6 8 0 8.4 M-4 8 Q-9 6 -9 1' stroke='%23231208' stroke-width='3.2' fill='none' stroke-linecap='round'/></g><g transform='translate(66 74) rotate(300)'><ellipse rx='7' ry='5.5' fill='%23b8732f'/><path d='M-8 -3 Q-9 -8 -3 -8.5 M2 -8.5 Q8 -8 8.5 -2 M8 3 Q6 8 0 8.4 M-4 8 Q-9 6 -9 1' stroke='%23231208' stroke-width='3.2' fill='none' stroke-linecap='round'/></g><g transform='translate(14 78) rotate(60)'><ellipse rx='7' ry='5.5' fill='%23b8732f'/><path d='M-8 -3 Q-9 -8 -3 -8.5 M2 -8.5 Q8 -8 8.5 -2 M8 3 Q6 8 0 8.4 M-4 8 Q-9 6 -9 1' stroke='%23231208' stroke-width='3.2' fill='none' stroke-linecap='round'/></g><g transform='translate(44 92) rotate(150)'><ellipse rx='7' ry='5.5' fill='%23b8732f'/><path d='M-8 -3 Q-9 -8 -3 -8.5 M2 -8.5 Q8 -8 8.5 -2 M8 3 Q6 8 0 8.4 M-4 8 Q-9 6 -9 1' stroke='%23231208' stroke-width='3.2' fill='none' stroke-linecap='round'/></g><g transform='translate(92 92) rotate(20)'><ellipse rx='7' ry='5.5' fill='%23b8732f'/><path d='M-8 -3 Q-9 -8 -3 -8.5 M2 -8.5 Q8 -8 8.5 -2 M8 3 Q6 8 0 8.4 M-4 8 Q-9 6 -9 1' stroke='%23231208' stroke-width='3.2' fill='none' stroke-linecap='round'/></g><g transform='translate(-4 40) rotate(250)'><ellipse rx='7' ry='5.5' fill='%23b8732f'/><path d='M-8 -3 Q-9 -8 -3 -8.5 M2 -8.5 Q8 -8 8.5 -2 M8 3 Q6 8 0 8.4 M-4 8 Q-9 6 -9 1' stroke='%23231208' stroke-width='3.2' fill='none' stroke-linecap='round'/></g><g fill='%23231208'><circle cx='30' cy='26' r='2.4'/><circle cx='70' cy='22' r='2'/><circle cx='88' cy='62' r='2.2'/><circle cx='24' cy='62' r='1.8'/><circle cx='56' cy='56' r='2'/><circle cx='4' cy='96' r='2'/></g>", '#d9a35c');
 const web = svgTile(120, 120,
@@ -139,6 +140,7 @@ export function coverFace(diary, layer) {
   }
   if (c.stitch && opts.stitch !== null) face.append(h('div', { class: 'cover-stitch', style: { '--stitch': opts.stitch || '#ffffffaa' } }));
   face.append(h('div', { class: 'cover-shine' }));
+  if (diary.aged) face.append(h('div', { class: 'cover-wear' }));
   if (c.corners) face.append(...['tl', 'tr', 'bl', 'br'].map(k => h('i', { class: 'cover-corner ' + k })));
   face.append(layer || staticItems(c.items, diary));
   if (c.band) face.append(h('div', { class: 'cover-band', style: { '--band': c.bandColor } }));
@@ -158,10 +160,13 @@ export function book3d(diary, { scale = 1 } = {}) {
   const [, , , opts] = preset(c.preset);
   const bg = material(c);
   const font = coverFont(c.title.font);
-  const box = h('div', { class: 'b3d', style: { '--t': T + 'px' } });
+  const box = h('div', { class: 'b3d' + (diary.aged ? ' worn' : ''), style: { '--t': T + 'px' } });
   const front = h('div', { class: 'b3d-front' }, coverFace(diary));
-  const inside = h('div', { class: 'b3d-inside', style: { background: bg } });
+  const owner = diary.charId ? store.char(diary.charId) : null;
+  const inside = h('div', { class: 'b3d-inside', style: { background: bg } }, owner ? nameTag(owner, 'b3d-nameplate') : null);
   front.append(inside);
+  // whose diary: a round pin badge of the oc on the front
+  if (owner) front.append(h('div', { class: 'b3d-owner', title: owner.name || '' }, pfp(owner)));
   const firstPage = h('div', { class: `b3d-firstpage paper paper-${diary.paper.kind} paper-${diary.paper.color}` });
   const spine = h('div', { class: 'b3d-spine', style: { background: opts.spine || bg } },
     h('span', { class: 'b3d-spine-title', style: { fontFamily: font.css, color: c.title.color || opts.ink || '#fff' } }, c.title.text));
@@ -172,10 +177,35 @@ export function book3d(diary, { scale = 1 } = {}) {
     h('div', { class: 'b3d-pages top' }),
     h('div', { class: 'b3d-pages bottom' }),
     spine, front,
-    c.ribbon ? h('div', { class: 'b3d-ribbon', style: { '--ribbon': c.ribbonColor } }) : null);
+    c.ribbon ? h('div', { class: 'b3d-ribbon', style: { '--ribbon': c.ribbonColor } }) : null,
+    ...(hasLock(diary) ? clasp(diary.lock.style) : []));
   const { w, h: ht } = dims(diary);
   const scene = h('div', { class: 'b3d-scene', style: { ...sizeVars(diary), '--s': scale, width: w * scale + 'px', height: ht * scale + 'px' } }, box);
   scene.box = box;
   scene.front = front;
   return scene;
+}
+
+// the strap + padlock that keep a locked diary shut (front, over the page edges, back)
+function clasp(style = 'gold') {
+  const strap = side => h('div', { class: `b3d-clasp ${side} cl-${style}` }, h('i', { class: 'cl-stitch' }));
+  return [strap('front'), strap('edge'), strap('back'),
+    h('div', { class: `b3d-hasp cl-${style}` }),
+    h('div', { class: 'b3d-lock' }, padlock(style))];
+}
+
+// an oc's little round picture (their pfp, or their initials on their color)
+export function pfp(char) {
+  const el = h('span', { class: 'oc-pfp', style: { '--c': char.color || '#ff4fa3' } }, (char.name || '?').trim().slice(0, 1).toUpperCase());
+  if (char.imageId) {
+    store.imageURL(char.imageId).then(url => {
+      if (url) el.replaceChildren(h('img', { src: url, alt: '', draggable: false }));
+    });
+  }
+  return el;
+}
+
+// "whose diary": a tiny label with their pfp + name
+export function nameTag(char, cls = '') {
+  return h('div', { class: 'name-tag ' + cls }, pfp(char), h('span', {}, char.name || ''));
 }

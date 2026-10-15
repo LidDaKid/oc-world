@@ -1,1 +1,106 @@
-/* diaries */
+/* diaries: a shelf in their room */
+
+.dy-room {
+  position: relative; border-radius: 26px; overflow: hidden; padding: 4.2rem clamp(.6rem, 3vw, 1.6rem) 0; isolation: isolate;
+  background:
+    radial-gradient(60% 50% at 50% 0%, rgba(255, 79, 163, .16), transparent 70%),
+    radial-gradient(circle, rgba(255, 138, 196, .09) 1.5px, transparent 2px) 0 0 / 26px 26px,
+    radial-gradient(circle, rgba(177, 140, 255, .07) 1.5px, transparent 2px) 13px 13px / 26px 26px,
+    linear-gradient(180deg, #1a1419, #0e0a0d);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .06), 0 20px 40px -24px rgba(0, 0, 0, .7);
+}
+
+/* string lights */
+.dy-lights {
+  position: absolute; left: -2%; right: -2%; top: .4rem; height: 2.6rem; display: flex; justify-content: space-between; padding: 0 1rem; pointer-events: none;
+}
+.dy-lights::before {
+  content: ''; position: absolute; left: 0; right: 0; top: -1.6rem; height: 3rem; border-radius: 0 0 50% 50% / 0 0 100% 100%;
+  border-bottom: 1.5px solid rgba(255, 255, 255, .25);
+}
+.dy-bulb {
+  position: relative; width: 9px; height: 13px; border-radius: 50% 50% 45% 45%; margin-top: .6rem;
+  background: radial-gradient(circle at 40% 35%, #fff 0 18%, var(--c) 50%); box-shadow: 0 0 10px 2px var(--c), 0 0 22px var(--c);
+  animation: dy-twinkle 2.2s ease-in-out infinite; animation-delay: var(--d);
+}
+.dy-bulb:nth-child(odd) { margin-top: 1.05rem; }
+.dy-bulb:nth-child(3n) { margin-top: 1.25rem; }
+.dy-bulb::before { content: ''; position: absolute; left: 2px; right: 2px; top: -4px; height: 5px; border-radius: 2px; background: #3a3540; }
+@keyframes dy-twinkle { 50% { opacity: .45; box-shadow: 0 0 4px var(--c); } }
+
+/* a little polaroid of them on the wall */
+.dy-poster {
+  position: absolute; right: clamp(.8rem, 4vw, 2.4rem); top: 2.6rem; z-index: 0; display: flex; flex-direction: column; align-items: center; gap: .1rem;
+  padding: .35rem .35rem .25rem; background: #fdfaf4; border-radius: 3px; rotate: 6deg; box-shadow: 0 6px 14px rgba(0, 0, 0, .5);
+}
+.dy-poster::before { content: ''; position: absolute; top: -7px; left: 50%; width: 34px; height: 13px; margin-left: -17px; background: rgba(255, 138, 196, .7); rotate: -4deg; }
+.portrait.dy-poster-pic { width: 3.4rem; height: 3.4rem; border-radius: 2px; font-size: 1rem; }
+.dy-poster-name { font: 700 .9rem 'Caveat', cursive; color: #2a1a2e; max-width: 4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dy-cat { position: absolute; left: clamp(.6rem, 4vw, 2rem); top: 3rem; width: 46px; height: 46px; z-index: 0; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .6)); animation: dy-cat 6s ease-in-out infinite; transform-origin: 50% 100%; }
+@keyframes dy-cat { 0%, 80%, 100% { rotate: 0deg; } 85% { rotate: -7deg; } 90% { rotate: 5deg; } }
+
+/* the shelf: every row of books gets its own wooden plank */
+.dy-shelf {
+  --rowh: 236px; --plank: 20px;
+  position: relative; z-index: 1; margin-top: 2.4rem;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, 40%), 1fr)); grid-auto-rows: var(--rowh); column-gap: .6rem;
+  padding: 0 .4rem;
+  background:
+    linear-gradient(180deg, transparent calc(var(--rowh) - var(--plank)), rgba(0, 0, 0, .45) calc(var(--rowh) - var(--plank)), transparent calc(var(--rowh) - var(--plank) + 1px)) 0 0 / 100% var(--rowh),
+    repeating-linear-gradient(180deg, transparent 0 calc(var(--rowh) - var(--plank)),
+      #b77a4c calc(var(--rowh) - var(--plank)), #9a6038 calc(var(--rowh) - var(--plank) + 6px), #7a4728 calc(var(--rowh) - 4px), #4e2c18 var(--rowh));
+  margin-left: calc(-1 * clamp(.6rem, 3vw, 1.6rem)); margin-right: calc(-1 * clamp(.6rem, 3vw, 1.6rem));
+  padding-left: clamp(1rem, 4vw, 2.2rem); padding-right: clamp(1rem, 4vw, 2.2rem);
+}
+.dy-slot {
+  position: relative; display: flex; align-items: flex-end; justify-content: center; padding-bottom: calc(var(--plank) - 2px); min-width: 0;
+  animation: dy-in .6s calc(var(--i, 0) * 70ms) cubic-bezier(.2, .9, .3, 1.3) backwards;
+}
+@keyframes dy-in { from { opacity: 0; translate: 0 -30px; } }
+.dy-book { display: block; text-decoration: none; position: relative; }
+.dy-book::after { /* shadow on the plank */
+  content: ''; position: absolute; left: 6%; right: -6%; bottom: -5px; height: 10px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, .6), transparent); z-index: -1;
+}
+.dy-book .b3d { transform: rotateY(-30deg) rotateX(3deg); transition: transform .55s cubic-bezier(.2, .9, .3, 1.3); }
+.dy-book:hover .b3d, .dy-book:focus-visible .b3d { transform: rotateY(-6deg) rotateX(6deg) translateY(-18px) translateZ(40px) rotateZ(-3deg); }
+.dy-slot:nth-child(even) .dy-book:hover .b3d { transform: rotateY(-6deg) rotateX(6deg) translateY(-18px) translateZ(40px) rotateZ(3deg); }
+.dy-x {
+  position: absolute; top: 18px; right: 8px; z-index: 3; width: 1.6rem; height: 1.6rem; border-radius: 50%; border: 0; cursor: pointer;
+  background: rgba(20, 14, 20, .75); color: #fff; font-weight: 800; opacity: 0; transition: opacity .15s;
+}
+.dy-slot:hover .dy-x, .dy-x:focus-visible { opacity: 1; }
+.dy-x:hover { background: var(--danger, #ff5d6c); }
+@media (hover: none) { .dy-x { opacity: .8; } }
+
+.dy-new {
+  width: min(120px, 80%); aspect-ratio: 7 / 10; border-radius: 4px 12px 12px 4px; cursor: pointer; display: grid; place-items: center;
+  border: 2px dashed rgba(255, 138, 196, .55); background: rgba(255, 79, 163, .06); color: #ff8ac4; font: 800 2.6rem var(--font-body);
+  transition: transform .25s cubic-bezier(.2, .9, .3, 1.4), background .2s;
+}
+.dy-new:hover { transform: translateY(-8px) rotate(-3deg); background: rgba(255, 79, 163, .16); }
+.dy-new span { animation: dy-plus 2.4s ease-in-out infinite; }
+@keyframes dy-plus { 50% { scale: 1.15; } }
+
+.dy-slot.deco { pointer-events: none; }
+.dy-deco-stk { width: min(84px, 70%); filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .6)); }
+.dy-deco-stk.ghost { opacity: .35; filter: grayscale(1); }
+.dy-slot.plant .dy-deco-stk { width: min(100px, 80%); }
+.dy-glow {
+  position: absolute; left: 50%; bottom: 36px; width: 150px; height: 150px; margin-left: -75px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(255, 196, 110, .35), transparent); animation: dy-flicker 1.8s ease-in-out infinite;
+}
+@keyframes dy-flicker { 30% { opacity: .7; scale: .95; } 60% { opacity: 1; scale: 1.05; } 80% { opacity: .85; } }
+
+/* picking an existing diary */
+.dy-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 1rem; max-height: 60vh; overflow-y: auto; padding: .4rem; }
+.dy-pick-book {
+  display: flex; flex-direction: column; align-items: center; gap: .3rem; padding: .7rem .4rem; border-radius: 16px; cursor: pointer;
+  border: 1.5px solid transparent; background: color-mix(in srgb, var(--ink) 5%, transparent); color: var(--ink); font: inherit;
+  transition: transform .2s, border-color .2s;
+}
+.dy-pick-book:hover { transform: translateY(-4px); border-color: var(--accent); }
+.dy-pick-3d { height: 140px; display: flex; align-items: flex-end; margin-bottom: .9rem; }
+.dy-pick-3d .b3d { transform: rotateY(-24deg); }
+.dy-pick-title { font: 700 1rem 'Caveat', cursive; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dy-pick-owner { display: inline-flex; align-items: center; gap: .3rem; font-size: .76rem; color: var(--ink2); font-weight: 700; }

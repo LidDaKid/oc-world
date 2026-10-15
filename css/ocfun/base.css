@@ -23,3 +23,7 @@
 .fun-bar-right { margin-left: auto; display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
 .fun-soon { padding: 3rem 1rem; text-align: center; color: var(--ink2); }
 .oc-select { width: auto; min-width: 10rem; }
+
+/* the mood ring's color, glowing behind an oc's page */
+.profile-bleed.has-mood { background-image: radial-gradient(70% 45% at 50% 0%, color-mix(in srgb, var(--mood) 30%, transparent), transparent 70%); }
+.profile-bleed.has-mood.has-wallpaper { background-image: none; }

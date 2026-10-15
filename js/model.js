@@ -126,11 +126,15 @@ export function newRel(fields = {}) {
 }
 
 // a diary: its cover, what paper it has, and its pages. diaries live on this device (not in collab).
-//   diary = { id, charId, cover, paper: { kind, color }, pages }
+//   diary = { id, charId, cover, paper: { kind, color }, pages, lock, aged, voice }
+//   lock  = { on, hash, salt, style }  on = asks for the code before opening. hash = sha-256 of salt + code (never the code itself)
+//   aged  = true for the old-diary look (yellowed, stained, dog-eared). voice = { font, ink }: the oc's own handwriting for new pages
 //   cover = { preset, color, pic: { imageId }, title: { text, font, style, color }, items, stitch, corners, band, bandColor, ribbon, ribbonColor }
-//   page  = { id, text, date, font, ink, items, drawing: { imageId } }
+//   page  = { id, text, date, font, ink, items, drawing: { imageId }, tab, song }
+//   tab   = null | { label, color }   a sticky index tab on the page edge
+//   song  = null | { imageId, title, look: 'cassette' | 'vinyl' }   plays while the page is open (the audio is kept with the pictures)
 // items on a page / cover are stickers + photos (see diary/items.js)
-export const newPage = (from = {}) => ({ id: 'p_' + uid(), text: '', date: '', font: from.font || 'caveat', ink: from.ink || '#27306b', items: [], drawing: { imageId: null } });
+export const newPage = (from = {}) => ({ id: 'p_' + uid(), text: '', date: '', font: from.font || 'caveat', ink: from.ink || '#27306b', items: [], drawing: { imageId: null }, tab: null, song: null });
 
 export function fixDiary(d) {
   d.charId ??= null;
@@ -144,7 +148,11 @@ export function fixDiary(d) {
   c.title = { text: '', font: 'fancy', style: 'foil', color: null, ...c.title };
   d.pages ||= [];
   if (d.pages.length < 2) d.pages.push(...Array.from({ length: 2 - d.pages.length }, () => newPage()));
-  for (const p of d.pages) { p.items ||= []; p.drawing = { imageId: null, ...p.drawing }; p.text ||= ''; p.date ||= ''; }
+  for (const p of d.pages) { p.items ||= []; p.drawing = { imageId: null, ...p.drawing }; p.text ||= ''; p.date ||= ''; p.tab ??= null; p.song ??= null; }
+  d.lock = { on: false, hash: null, salt: null, style: 'gold', ...d.lock };
+  if (!d.lock.hash) d.lock.on = false;
+  d.aged = !!d.aged;
+  d.voice = { font: null, ink: null, ...d.voice };
   d.createdAt ||= Date.now();
   return d;
 }

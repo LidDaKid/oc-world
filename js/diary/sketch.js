@@ -8,17 +8,40 @@ import { dims } from './covers.js';
 const DPR = 2;
 
 // what's in your hand. shared by every page so switching pages keeps your pen.
-export const pen = { tool: 'pen', color: '#27306b', size: 1 };
+export const pen = { tool: 'pen', color: '#27306b', size: 1, last: {} };
+
+// gel pens come with their own colors
+const GEL = {
+  metallic: ['#c0c4cc', '#d4a62a', '#e8a2a0', '#ff5fa8', '#b04cff', '#4f8be0', '#2fbf8a', '#d6203a', '#4a4a56'],
+  neon: ['#ff2fa0', '#39ff14', '#00e5ff', '#ffe600', '#ff6a00', '#b026ff', '#ff3131', '#ffffff'],
+  milky: ['#ffd1e6', '#ffe9a8', '#c7f0d8', '#c9e4ff', '#e3d1ff', '#ffffff', '#ffc7b8', '#bdf3f0'],
+};
 
 export const TOOLS = [
   { id: 'pen', icon: '🖊️', width: 2.4, alpha: 1 },
   { id: 'marker', icon: '🖍️', width: 7, alpha: 1 },
   { id: 'highlighter', icon: '🖌️', width: 18, alpha: .35, flat: true },
   { id: 'glitter', icon: '✨', width: 9 },
+  { id: 'metallic', icon: '🌟', width: 4.2, alpha: 1, gel: true, palette: GEL.metallic },
+  { id: 'neon', icon: '💡', width: 4.2, alpha: 1, gel: true, palette: GEL.neon },
+  { id: 'milky', icon: '🍦', width: 5, alpha: 1, gel: true, palette: GEL.milky },
   { id: 'eraser', icon: '🧽', width: 20 },
 ];
 
 const tool = () => TOOLS.find(t => t.id === pen.tool) || TOOLS[0];
+
+// the colors to show for the pen in your hand (null = the normal inks)
+export const paletteFor = id => (TOOLS.find(t => t.id === id) || {}).palette || null;
+
+// switching pens: gel pens remember their own color, the normal pens share one
+export function pickTool(id, inks) {
+  const group = t => (paletteFor(t) ? t : 'ink');
+  pen.last[group(pen.tool)] = pen.color;
+  pen.tool = id;
+  const pal = paletteFor(id) || inks;
+  const remembered = pen.last[group(id)];
+  pen.color = remembered || (pal.includes(pen.color) ? pen.color : pal[0]);
+}
 
 export class Sketch {
   constructor(page, diary, onSaved) {
@@ -106,21 +129,74 @@ export class Sketch {
     ctx.lineWidth = width;
     ctx.lineCap = t.flat ? 'square' : 'round';
     ctx.lineJoin = 'round';
+    if (t.gel) return this.gel(ctx, pts, width, t.id);
     if (pts.length === 1) {
       ctx.beginPath();
       ctx.arc(pts[0].x, pts[0].y, width / 2, 0, Math.PI * 2);
       ctx.fill();
       return;
     }
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < pts.length - 1; i++) {
-      const mx = (pts[i].x + pts[i + 1].x) / 2, my = (pts[i].y + pts[i + 1].y) / 2;
-      ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
-    }
-    const end = pts[pts.length - 1];
-    ctx.lineTo(end.x, end.y);
+    trace(ctx, pts);
     ctx.stroke();
+  }
+
+  // gel pens: shiny metallic, glowing neon, thick milky pastel
+  gel(ctx, pts, width, id) {
+    const c = pen.color;
+    const line = (dx = 0, dy = 0) => {
+      ctx.save();
+      ctx.translate(dx, dy);
+      if (pts.length === 1) { ctx.beginPath(); ctx.arc(pts[0].x, pts[0].y, ctx.lineWidth / 2, 0, Math.PI * 2); ctx.fill(); } else { trace(ctx, pts); ctx.stroke(); }
+      ctx.restore();
+    };
+    if (id === 'metallic') {
+      // light + dark bands along the line, so it shimmers like metal ink
+      const g = ctx.createLinearGradient(0, 0, this.W, this.H);
+      const bands = 26;
+      for (let i = 0; i <= bands; i++) {
+        const f = i / bands;
+        g.addColorStop(f, [shade(c, 85), c, shade(c, -55), c][i % 4]);
+      }
+      ctx.strokeStyle = ctx.fillStyle = g;
+      line();
+      ctx.lineWidth = Math.max(.8, width * .3);
+      ctx.strokeStyle = ctx.fillStyle = 'rgba(255, 255, 255, .6)';
+      line(-width * .18, -width * .2);
+      ctx.fillStyle = '#fff';
+      for (let i = 2; i < pts.length; i += 5) {
+        const r = ((i * 7919) % 13) / 13;
+        if (r < .45) continue;
+        ctx.beginPath();
+        ctx.arc(pts[i].x + (r - .7) * width, pts[i].y - (r - .5) * width, .45 + r * .5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (id === 'neon') {
+      ctx.shadowColor = c;
+      ctx.shadowBlur = width * 3.2;
+      line();
+      line();
+      ctx.shadowBlur = width * 1.2;
+      ctx.lineWidth = Math.max(1, width * .42);
+      ctx.strokeStyle = ctx.fillStyle = mixWhite(c, .75);
+      line();
+      ctx.shadowBlur = 0;
+    } else {
+      // milky: opaque pastel that sits up off the paper a little
+      ctx.strokeStyle = ctx.fillStyle = 'rgba(20, 10, 20, .3)';
+      line(width * .16, width * .3);
+      // a slightly darker rim so the pastel still reads on white paper
+      ctx.lineWidth = width + 1.2;
+      ctx.strokeStyle = ctx.fillStyle = shade(c, -55);
+      ctx.globalAlpha = .55;
+      line();
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = width;
+      ctx.strokeStyle = ctx.fillStyle = c;
+      line();
+      ctx.lineWidth = Math.max(.8, width * .3);
+      ctx.strokeStyle = ctx.fillStyle = 'rgba(255, 255, 255, .7)';
+      line(-width * .14, -width * .2);
+    }
   }
 
   erase(a, b, width) {
@@ -197,6 +273,23 @@ export class Sketch {
     this.onSaved();
     if (old) store.deleteImage(old);
   }
+}
+
+function trace(ctx, pts) {
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length - 1; i++) {
+    const mx = (pts[i].x + pts[i + 1].x) / 2, my = (pts[i].y + pts[i + 1].y) / 2;
+    ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+  }
+  const end = pts[pts.length - 1];
+  ctx.lineTo(end.x, end.y);
+}
+
+function mixWhite(hex, f) {
+  const n = parseInt(hex.slice(1), 16);
+  const m = v => Math.round(v + (255 - v) * f);
+  return `rgb(${m(n >> 16)}, ${m((n >> 8) & 255)}, ${m(n & 255)})`;
 }
 
 function shade(hex, amt) {

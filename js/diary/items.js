@@ -5,11 +5,14 @@
 //     sticker: s = the sticker id (see stickers.js)
 //     photo:   imageId, ar (width / height), frame: 'polaroid' | 'tape' | 'plain' | 'sticker'
 //     title:   reads the words + style from diary.cover.title
+//     envelope / pocket: a hidden note + picture (see letters.js)
+//     pop: true on a sticker or photo = it stands up out of the page like a pop-up book
 
 import { h, uid } from '../ui.js';
 import { store } from '../store.js';
 import { stickerNode, TAPES } from './stickers.js';
 import { coverFont, preset } from './covers.js';
+import { letterNode } from './letters.js';
 
 export const newItem = fields => ({ id: 'i_' + uid(), x: 210, y: 300, r: 0, k: 1, ...fields });
 
@@ -23,6 +26,7 @@ function inner(item, diary) {
     return h('div', { class: 'ph ph-' + frame }, pic,
       frame === 'tape' ? [h('span', { class: 'ph-tape a', style: { background: TAPES[item.tape] || TAPES.pink } }), h('span', { class: 'ph-tape b', style: { background: TAPES[item.tape] || TAPES.pink } })] : null);
   }
+  if (item.kind === 'envelope' || item.kind === 'pocket') return letterNode(item);
   if (item.kind === 'title') {
     const t = diary.cover.title;
     const font = coverFont(t.font);
@@ -47,8 +51,14 @@ export function sizeSlider(item, layer, onDone) {
 }
 
 // one item, placed
+export const canPop = item => item.kind === 'sticker' || item.kind === 'photo';
+
 export function itemNode(item, diary) {
-  const el = h('div', { class: 'it it-' + item.kind, dataset: { id: item.id } }, inner(item, diary));
+  const pop = item.pop && canPop(item);
+  const body = pop
+    ? [h('i', { class: 'pop-shadow' }), h('div', { class: 'pop-wrap' }, h('i', { class: 'pop-base' }), h('div', { class: 'pop-card' }, inner(item, diary)))]
+    : inner(item, diary);
+  const el = h('div', { class: 'it it-' + item.kind + (pop ? ' it-pop' : ''), dataset: { id: item.id } }, body);
   place(el, item);
   return el;
 }
@@ -141,7 +151,7 @@ export function itemsLayer({ items, diary, onChange, onPick }) {
     const i = items.findIndex(it => it.id === id);
     if (i < 0) return;
     const [gone] = items.splice(i, 1);
-    if (gone.kind === 'photo') store.deleteImage(gone.imageId);
+    if (gone.imageId) store.deleteImage(gone.imageId);
     selected = null;
     draw();
     onChange();
@@ -165,6 +175,7 @@ export function itemsLayer({ items, diary, onChange, onPick }) {
     draw,
     select,
     get selected() { return items.find(i => i.id === selected) || null; },
+    node: id => nodes.get(id),
     add(item) {
       items.push(item);
       selected = item.id;

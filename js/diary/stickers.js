@@ -7,10 +7,14 @@
 //   'x:paperclip'        a little drawn thing
 //   'a:1f987'            a sticker that moves (google's animated emoji)
 //   'd:heart:#ff3d8b'    a hand-drawn doodle in a color
+//   'g:heart-pink'       a 3d gem, rhinestones, pearls or pave bling in /gems
+//   'f:pansy-purple'     a pressed flower in /flowers
+//   's:coffee-ring'      a spill in /spills
 
 import { h } from '../ui.js';
 import { EMOJI_STICKERS, MORE_STICKERS, MOVING_STICKERS } from './sticker-list.js';
 import { DOODLES, DOODLE_COLORS } from './doodles.js';
+import { GEMS, BLING, FLOWERS, SPILLS, RAISED_SPILLS } from './gem-list.js';
 
 const WORDS = [
   ['label', 'keep out'], ['label', 'private'], ['label', 'dear diary'], ['label', 'today'], ['label', 'secret'],
@@ -77,8 +81,14 @@ export function svgTile(w, h, inner, bg) {
 }
 
 // the tabs in the sticker drawer: [name, icon, sticker ids]
+const emojiTabs = Object.entries(EMOJI_STICKERS).map(([name, codes]) => [name, `e:${codes[0]}`, codes.map(c => 'e:' + c)]);
 export const STICKER_TABS = [
-  ...Object.entries(EMOJI_STICKERS).map(([name, codes]) => [name, `e:${codes[0]}`, codes.map(c => 'e:' + c)]),
+  ...emojiTabs.slice(0, 2),
+  ['gems', 'g:heart-pink', Object.keys(GEMS).map(g => 'g:' + g)],
+  ['bling', 'g:pave-heart-pink', Object.keys(BLING).map(g => 'g:' + g)],
+  ...emojiTabs.slice(2),
+  ['pressed flowers', 'f:pansy-purple', Object.keys(FLOWERS).map(f => 'f:' + f)],
+  ['spills', 's:polish-pink', Object.keys(SPILLS).map(f => 's:' + f)],
   ['moving', 'e:2728', MOVING_STICKERS.map(c => 'a:' + c)],
   ['doodles', 'e:270f-fe0f', Object.keys(DOODLES).flatMap(name => DOODLE_COLORS.map(c => `d:${name}:${c}`))],
   ['words', 'e:1f4ac', WORDS.map(([style, text]) => `w:${style}:${text}`)],
@@ -88,6 +98,9 @@ export const STICKER_TABS = [
 ];
 
 export const emojiURL = code => `stickers/${code}.webp`;
+export const gemURL = name => `gems/${name}.webp`;
+export const flowerURL = name => `flowers/${name}.webp`;
+export const spillURL = name => `spills/${name}.webp`;
 export const movingURL = code => `https://fonts.gstatic.com/s/e/notoemoji/latest/${code.replace(/-/g, '_')}/512.webp`;
 
 // the sticker itself (not placed anywhere yet)
@@ -96,6 +109,9 @@ export function stickerNode(id) {
   const value = rest.join(':');
   if (kind === 'e') return h('img', { class: 'stk stk-emoji', src: emojiURL(value), alt: '', draggable: false, loading: 'lazy' });
   if (kind === 'a') return h('img', { class: 'stk stk-emoji stk-moving', src: movingURL(value), alt: '', draggable: false, loading: 'lazy' });
+  if (kind === 'g') return gemNode(value);
+  if (kind === 'f') return picNode('stk-flower', flowerURL(value), FLOWERS[value]);
+  if (kind === 's') return picNode('stk-spill' + (RAISED_SPILLS.has(value) ? ' raised' : ''), spillURL(value), SPILLS[value]);
   if (kind === 'd') {
     const [name, color] = value.split(':');
     return h('span', { class: 'stk stk-doodle', style: { color }, innerHTML: `<svg viewBox='0 0 100 100' width='90' height='90'>${DOODLES[name] || ''}</svg>` });
@@ -108,6 +124,28 @@ export function stickerNode(id) {
   if (kind === 't') return h('span', { class: 'stk stk-tape', style: { background: TAPES[value] || TAPES.pink } });
   if (kind === 'x') return extra(value);
   return h('span', { class: 'stk' });
+}
+
+// a picture sticker at its own size. --sz lets the drawer shrink it to fit
+function picNode(cls, src, size = [96, 96]) {
+  const [w, ht] = size;
+  return h('img', { class: 'stk ' + cls, src, alt: '', draggable: false, loading: 'lazy', style: { width: w + 'px', height: ht + 'px', '--sz': Math.max(w, ht) } });
+}
+
+// a gem glued on. two little glints that flash now and then, each gem on its own timing
+function gemNode(name) {
+  const size = GEMS[name] || BLING[name] || [74, 74];
+  const [w, ht] = size;
+  const r = (a, b) => (a + Math.random() * (b - a)).toFixed(2);
+  const bling = !GEMS[name];
+  return h('span', {
+    class: 'stk stk-gem' + (bling ? ' stk-bling' : ''),
+    style: {
+      width: w + 'px', height: ht + 'px', '--sz': Math.max(w, ht),
+      '--tw-x': r(22, 62) + '%', '--tw-y': r(18, 48) + '%', '--tw-d': r(0, 7) + 's', '--tw-t': r(4.5, 8) + 's',
+      '--tw-x2': r(40, 78) + '%', '--tw-y2': r(45, 75) + '%', '--tw-d2': r(1, 9) + 's', '--tw-t2': r(6, 11) + 's',
+    },
+  }, h('img', { src: gemURL(name), alt: '', draggable: false, loading: 'lazy' }));
 }
 
 // a drawn sticker. plain = no white die-cut edge

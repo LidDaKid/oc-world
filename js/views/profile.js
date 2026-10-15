@@ -10,6 +10,7 @@ import { blankPage } from '../model.js';
 import { paint, lookCards, card, colorCard, choiceCard, pictureCard, orderList } from '../look.js';
 import { FEATURES } from '../ocfun/index.js';
 import { dataFor, sticker } from '../ocfun/kit.js';
+import * as mood from '../ocfun/mood.js';
 
 // the tabs you can move around / hide. page style is always last (and only for whoever made the oc).
 const TAB_NAMES = { about: 'about', relationships: 'relationships', gallery: 'gallery', moodboard: 'moodboard', fun: 'more' };
@@ -47,6 +48,10 @@ export function render(el, { char, tab, sub, base, world, go }) {
   async function applyPageStyle() {
     await paint(bleed, { ...page, accent: null }, char.color);
     if (page.banner) bleed.style.setProperty('--banner', page.banner);
+    // their mood ring's color glows softly behind the page
+    const tint = mood.moodTint?.(char);
+    bleed.classList.toggle('has-mood', !!tint);
+    if (tint) bleed.style.setProperty('--mood', tint);
     bleed.classList.toggle('banner-fade', !!page.bannerFade);
     for (const [key, values] of Object.entries(LAYOUT_CLASSES)) {
       for (const v of values) bleed.classList.toggle(`${key}-${v}`, page[key] === v);
@@ -90,6 +95,7 @@ export function render(el, { char, tab, sub, base, world, go }) {
   function drawMeta() {
     const worlds = store.worldsOf(char.id);
     fill(meta,
+      mood.moodBadge?.(char) || null,
       mine ? null : h('span', { class: 'owner-tag' }, char.ownerName || 'someone else'),
       worlds.map(w => h('a', { class: 'chip', href: `#/w/${w.id}/ocs`, style: { '--c': w.color } }, worldIcon(w), ' ', w.name)),
       mine && store.worlds.length ? h('button', { class: 'chip dashed', onclick: pickWorlds }, worlds.length ? '＋' : '＋ add to a world') : null,

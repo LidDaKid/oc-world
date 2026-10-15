@@ -1,1 +1,58 @@
 /* gems, rhinestones, pressed flowers, spills (stickers round 3) */
+
+/* ---- gems: stones glued on, no die-cut edge, just a tight shadow */
+.stk-gem { position: relative; display: inline-block; line-height: 0; }
+.stk-gem img {
+  display: block; width: 100%; height: 100%;
+  -webkit-user-drag: none; user-select: none;
+  filter: drop-shadow(0 1px .6px rgba(25, 10, 25, .5)) drop-shadow(1px 2.5px 2px rgba(25, 10, 25, .22));
+}
+
+/* a little glint that flashes now and then (times are set per gem in stickers.js) */
+.it .stk-gem::before, .it .stk-gem::after {
+  content: '\2726';
+  position: absolute; left: var(--tw-x, 40%); top: var(--tw-y, 30%);
+  font: 400 min(calc(var(--sz, 74) * .26px), 22px)/1 sans-serif;
+  color: #fff;
+  text-shadow: 0 0 4px #fff, 0 0 9px rgba(255, 255, 255, .9), 0 0 14px rgba(255, 220, 245, .8);
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  pointer-events: none;
+  animation: gem-glint var(--tw-t, 6s) ease-in-out var(--tw-d, 0s) infinite;
+}
+.it .stk-gem::after {
+  left: var(--tw-x2, 65%); top: var(--tw-y2, 60%);
+  font-size: min(calc(var(--sz, 74) * .18px), 15px);
+  animation-duration: var(--tw-t2, 8s); animation-delay: var(--tw-d2, 2s);
+}
+@keyframes gem-glint {
+  0%, 78%, 100% { transform: translate(-50%, -50%) scale(0) rotate(0deg); opacity: 0; }
+  85% { transform: translate(-50%, -50%) scale(1) rotate(45deg); opacity: 1; }
+  92% { transform: translate(-50%, -50%) scale(.25) rotate(90deg); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .it .stk-gem::before, .it .stk-gem::after { animation: none; }
+}
+
+/* ---- pressed flowers: thin and flat, barely any shadow */
+.stk-flower { filter: drop-shadow(0 .6px .4px rgba(70, 45, 25, .22)); }
+
+/* ---- spills soak into the paper */
+.stk-spill { filter: none; }
+.it:has(> .stk-spill:not(.raised)) { mix-blend-mode: multiply; }
+.stk-spill.raised { filter: drop-shadow(0 1px .8px rgba(25, 10, 25, .3)); }
+
+/* ---- shrink to fit in the drawer + tab icons (taken out of the layout so wide ones stay centered) */
+.stk-cell:has(> .stk-gem, > .stk-flower, > .stk-spill), .stk-tab-icon:has(> .stk-gem, > .stk-flower, > .stk-spill) { position: relative; }
+.stk-cell .stk.stk-gem, .stk-cell .stk.stk-flower, .stk-cell .stk.stk-spill {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%) scale(min(1, calc(62 / var(--sz, 74))));
+}
+.stk-tab-icon .stk.stk-gem, .stk-tab-icon .stk.stk-flower, .stk-tab-icon .stk.stk-spill {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%) scale(calc(32 / var(--sz, 74))); filter: none;
+}
+.stk-tab-icon .stk-gem img { filter: none; }
+.stk-cell .stk-spill:not(.raised) { mix-blend-mode: multiply; }
+/* stains need paper behind them to show up in the dark drawer */
+.stk-cell:has(> .stk-spill:not(.raised)), .stk-cell:has(> .stk-spill:not(.raised)):hover { background: #f7f1e6; }

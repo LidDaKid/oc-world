@@ -11,6 +11,7 @@ import { paint, lookCards, card, colorCard, choiceCard, pictureCard, orderList }
 import { FEATURES } from '../ocfun/index.js';
 import { dataFor, sticker } from '../ocfun/kit.js';
 import * as mood from '../ocfun/mood.js';
+import { pickAndCrop, cropAll } from '../crop.js';
 
 // the tabs you can move around / hide. page style is always last (and only for whoever made the oc).
 const TAB_NAMES = { about: 'about', relationships: 'relationships', gallery: 'gallery', moodboard: 'moodboard', fun: 'more' };
@@ -76,7 +77,7 @@ export function render(el, { char, tab, sub, base, world, go }) {
   const drawPfp = () => fill(pfp, portrait(char, 'pfp'), mine ? h('span', { class: 'pfp-badge' }, '📷') : null);
 
   async function changePic() {
-    const file = await pickFile('image/*');
+    const file = await pickAndCrop({ aspect: 1 });
     if (!file) return;
     try {
       const { blob } = await shrinkImage(file, 640);
@@ -257,7 +258,7 @@ export function render(el, { char, tab, sub, base, world, go }) {
     const grid = h('div', { class: 'gallery' });
 
     async function addPics() {
-      const files = await pickFiles('image/*');
+      const files = await cropAll(await pickFiles('image/*'));
       for (const file of files) {
         try {
           const { blob } = await shrinkImage(file, 1600);

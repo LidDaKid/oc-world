@@ -10,6 +10,7 @@ import { PAPERS, PAPER_COLORS, WRITE_FONTS, INKS, fixInks } from './diary.js';
 import { nameOf } from '../parts.js';
 import { guard, askCode, setCode, padlock, LOCK_STYLES } from '../diary/lock.js';
 import { peel } from '../diary/fx.js';
+import { pickAndCrop } from '../crop.js';
 
 const RIBBONS = ['#d81e5b', '#141114', '#ff8ac4', '#8a3ffc', '#e0323f', '#f6eefb', '#ffd84d', '#2bb38a'];
 
@@ -232,7 +233,7 @@ function coverView(el, { diary, go }) {
   }
 
   async function uploadCover() {
-    const file = await pickFile('image/*', false);
+    const file = await pickAndCrop({ aspect: dims(diary).w / dims(diary).h });
     if (!file) return;
     try {
       const { blob } = await shrinkImage(file, 1600);
@@ -248,7 +249,7 @@ function coverView(el, { diary, go }) {
   }
 
   async function addPhoto(frame = 'polaroid') {
-    const file = await pickFile('image/*', false);
+    const file = await pickAndCrop();
     if (!file) return;
     try {
       const { blob, width, height } = await shrinkImage(file, 1400);

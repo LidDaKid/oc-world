@@ -6,6 +6,7 @@
 import { h, fill, openModal, swatches, pickFile, shrinkImage, toast } from '../ui.js';
 import { store } from '../store.js';
 import { sound } from './sound.js';
+import { pickAndCrop } from '../crop.js';
 
 export const ENV_COLORS = ['#ffb3d1', '#ff5fa8', '#241f26', '#d9c6ff', '#f6ecd9', '#d6203a', '#bfeedd', '#c9a77c', '#ffffff'];
 export const SEALS = [
@@ -104,7 +105,7 @@ export function editLetter(item) {
       h('button', { type: 'button', class: 'btn sm', onclick: addPic }, draft.imageId ? 'change picture' : '+ picture'),
       draft.imageId ? h('button', { type: 'button', class: 'btn ghost sm', onclick: () => { draft.imageId = null; drawPic(); drawPreview(); } }, 'remove picture') : null);
     async function addPic() {
-      const file = await pickFile('image/*');
+      const file = await pickAndCrop();
       if (!file) return;
       try {
         const { blob, width, height } = await shrinkImage(file, 1200);

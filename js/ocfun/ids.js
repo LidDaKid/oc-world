@@ -472,7 +472,7 @@ export function render(el, ctx) {
     const drawPhoto = () => fill(photoBox,
       segmented([{ value: 'pfp', label: 'pfp' }, { value: 'upload', label: 'upload' }], it.photo.from, async v => {
         if (v === 'upload') {
-          const up = await uploadPic(900);
+          const up = await uploadPic(900, { aspect: 3 / 4 });
           if (!up) { drawPhoto(); return; }
           if (it.photo.imageId) store.deleteImage(it.photo.imageId);
           it.photo.imageId = up.imageId;
@@ -480,7 +480,7 @@ export function render(el, ctx) {
         it.photo.from = v; changed(); drawPhoto();
       }),
       it.photo.from === 'upload' ? h('button', { class: 'btn sm ghost', onclick: async () => {
-        const up = await uploadPic(900);
+        const up = await uploadPic(900, { aspect: 3 / 4 });
         if (!up) return;
         if (it.photo.imageId) store.deleteImage(it.photo.imageId);
         it.photo.imageId = up.imageId; changed();

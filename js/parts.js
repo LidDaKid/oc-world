@@ -2,6 +2,7 @@
 
 import { h, clear, fill, initials, toast, downloadBlob, pickFile, shrinkImage } from './ui.js';
 import { store } from './store.js';
+import { pickAndCrop } from './crop.js';
 
 // picture of an oc. falls back to their initials. the class decides the shape + size.
 // also works for someone who's only a typed name: portrait({ name: 'her mom' })
@@ -78,7 +79,7 @@ export function iconPicker(draft, oldId) {
     h('button', { type: 'button', class: 'btn ghost sm', onclick: upload }, draft.iconId ? 'change picture' : '+ upload your own'),
     draft.iconId ? h('button', { type: 'button', class: 'link-btn', onclick: () => { draft.iconId = null; drawPic(); } }, 'use the emoji') : null);
   async function upload() {
-    const file = await pickFile('image/*');
+    const file = await pickAndCrop({ aspect: 1 });
     if (!file) return;
     try {
       const { blob } = await shrinkImage(file, 256);

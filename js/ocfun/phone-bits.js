@@ -6,6 +6,7 @@
 import { h, openModal, pickFiles, shrinkImage, toast } from '../ui.js';
 import { store } from '../store.js';
 import { portrait, nameOf, allOcs, ocById } from './kit.js';
+import { cropAll } from '../crop.js';
 
 export function who(ref) {
   const c = ref?.id ? ocById(ref.id) : null;
@@ -74,7 +75,7 @@ export const shortDate = ts => (dayStart(ts) === dayStart(Date.now()) ? hmA(ts) 
 
 // pick one or more pictures; resolves with [{ imageId, width, height }]
 export async function addPhotos(multiple = true, maxDim = 1400) {
-  const files = await pickFiles('image/*', multiple);
+  const files = await cropAll(await pickFiles('image/*', multiple));
   const out = [];
   for (const file of files) {
     try {

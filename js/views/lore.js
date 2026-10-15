@@ -4,6 +4,7 @@
 
 import { store } from '../store.js';
 import { h, clear, uid, toast, confirmDialog, autosize, pickFile, shrinkImage } from '../ui.js';
+import { pickAndCrop } from '../crop.js';
 
 const KINDS = [
   ['place', '🏠', 'places'], ['group', '👥', 'groups'], ['history', '📜', 'history'], ['magic', '✨', 'magic + powers'],
@@ -73,7 +74,7 @@ export function render(el, { world, sub, save, go }) {
     };
 
     async function changePic() {
-      const file = await pickFile('image/*');
+      const file = await pickAndCrop();
       if (!file) return;
       try {
         const { blob } = await shrinkImage(file, 1400);

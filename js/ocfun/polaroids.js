@@ -6,6 +6,7 @@ import { appBar, uploadPic } from './kit.js';
 import { store } from '../store.js';
 import { stickerNode, TAPES } from '../diary/stickers.js';
 import { dragLayer, fitStage, toolBar, deleteKey, defaults, newThing, picImg, chipTabs } from './room-layer.js';
+import { cropAll } from '../crop.js';
 
 export const meta = { id: 'polaroids', label: 'polaroid wall', icon: '1f4f8' };
 
@@ -257,7 +258,7 @@ export function render(el, ctx) {
   // ---- adding ----
   const scatter = () => ({ x: Math.round(200 + Math.random() * 600), y: Math.round(170 + Math.random() * 340), r: Math.round((Math.random() - .5) * 16) });
   async function addPhotos() {
-    const files = await pickFiles('image/*', true);
+    const files = await cropAll((await pickFiles('image/*', true)).slice(0, 12), { aspect: 1 });
     if (!files.length) return;
     let n = 0;
     for (const file of files.slice(0, 12)) {

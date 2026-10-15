@@ -346,7 +346,7 @@ export function render(el, ctx) {
     const photoBox = h('div');
     const drawPhoto = () => fill(photoBox, segmented([{ value: 'pfp', label: 'pfp' }, { value: 'upload', label: draft.photo.from === 'upload' ? 'change picture' : 'upload' }], draft.photo.from, async v => {
       if (v === 'upload') {
-        const up = await uploadPic(1000);
+        const up = await uploadPic(1000, { aspect: 4 / 5 });
         if (up) { uploads.push(up.imageId); draft.photo = { from: 'upload', imageId: up.imageId }; }
       } else draft.photo.from = 'pfp';
       drawPhoto();

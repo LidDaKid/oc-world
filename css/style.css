@@ -1048,3 +1048,27 @@ body.no-anim .world-body > * { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ============ cropping a picture (crop.js) ============ */
+.crop-wrap { display: flex; flex-direction: column; gap: .9rem; align-items: center; }
+.crop-stage { position: relative; display: inline-block; line-height: 0; touch-action: none; user-select: none; max-width: 100%; }
+.crop-pic { display: block; max-width: min(100%, 760px); max-height: 60vh; width: auto; height: auto; border-radius: 6px; }
+.crop-box {
+  position: absolute; cursor: move; border: 2px solid #fff; border-radius: 2px;
+  box-shadow: 0 0 0 9999px rgba(10, 6, 14, .62), 0 0 0 1px rgba(0, 0, 0, .4) inset;
+}
+.crop-stage { overflow: hidden; border-radius: 6px; }
+.crop-grid {
+  position: absolute; inset: 0; pointer-events: auto;
+  background: linear-gradient(90deg, transparent calc(33.3% - .5px), rgba(255, 255, 255, .45) calc(33.3% - .5px) calc(33.3% + .5px), transparent calc(33.3% + .5px) calc(66.6% - .5px), rgba(255, 255, 255, .45) calc(66.6% - .5px) calc(66.6% + .5px), transparent calc(66.6% + .5px)),
+              linear-gradient(180deg, transparent calc(33.3% - .5px), rgba(255, 255, 255, .45) calc(33.3% - .5px) calc(33.3% + .5px), transparent calc(33.3% + .5px) calc(66.6% - .5px), rgba(255, 255, 255, .45) calc(66.6% - .5px) calc(66.6% + .5px), transparent calc(66.6% + .5px));
+}
+.crop-h { position: absolute; width: 22px; height: 22px; z-index: 2; }
+.crop-h::after { content: ''; position: absolute; inset: 6px; background: #fff; border-radius: 50%; box-shadow: 0 1px 4px rgba(0, 0, 0, .5); }
+.crop-n, .crop-s { left: calc(50% - 11px); cursor: ns-resize; }
+.crop-e, .crop-w { top: calc(50% - 11px); cursor: ew-resize; }
+.crop-n { top: -12px; } .crop-s { bottom: -12px; } .crop-e { right: -12px; } .crop-w { left: -12px; }
+.crop-ne, .crop-nw, .crop-se, .crop-sw { width: 26px; height: 26px; }
+.crop-ne { top: -13px; right: -13px; cursor: nesw-resize; } .crop-sw { bottom: -13px; left: -13px; cursor: nesw-resize; }
+.crop-nw { top: -13px; left: -13px; cursor: nwse-resize; } .crop-se { bottom: -13px; right: -13px; cursor: nwse-resize; }
+.crop-tools { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; justify-content: center; }

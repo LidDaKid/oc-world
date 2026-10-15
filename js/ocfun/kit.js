@@ -14,6 +14,7 @@
 import { h, toast, pickFile, shrinkImage } from '../ui.js';
 import { store } from '../store.js';
 import { portrait, nameOf } from '../parts.js';
+import { pickAndCrop } from '../crop.js';
 
 export { portrait, nameOf };
 
@@ -24,9 +25,10 @@ export function dataFor(char, id, defaults = {}) {
   return d;
 }
 
-// asks for a picture, shrinks it, saves it. resolves with { imageId, width, height } or null
-export async function uploadPic(maxDim = 1400) {
-  const file = await pickFile('image/*', false);
+// asks for a picture, lets you crop it, shrinks it, saves it. resolves with { imageId, width, height } or null
+// opts.aspect = the shape it's going into (width / height), so the crop starts that shape
+export async function uploadPic(maxDim = 1400, opts = {}) {
+  const file = await pickAndCrop(opts);
   if (!file) return null;
   try {
     const { blob, width, height } = await shrinkImage(file, maxDim);

@@ -18,6 +18,7 @@ import { letterNode, openLetter, editLetter, ENV_COLORS, POCKETS } from '../diar
 import { songPlayer, songLook } from '../diary/song.js';
 import { typewriter, typewriterKeys } from '../diary/typewriter.js';
 import { sound } from '../diary/sound.js';
+import { pickAndCrop } from '../crop.js';
 
 const LINE = 30, TOP = 84; // the first line is TOP down, then one every LINE
 
@@ -384,7 +385,7 @@ function writeView(el, { diary, startAt, go }) {
   async function addOwnSticker() { await addPhoto('sticker'); }
 
   async function addPhoto(frame = photoFrame) {
-    const file = await pickFile('image/*', false);
+    const file = await pickAndCrop();
     if (!file) return;
     try {
       const { blob, width, height } = await shrinkImage(file, 1400);

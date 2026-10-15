@@ -8,6 +8,7 @@ import { store } from '../store.js';
 import { h, s, clear, fill, uid, toast, openModal, confirmDialog, hasOpenModal, swatches, field, pickFile, shrinkImage } from '../ui.js';
 import { PanZoom } from '../panzoom.js';
 import { portrait, emojiPicker, zoomButtons } from '../parts.js';
+import { pickAndCrop } from '../crop.js';
 
 const PAPERS = ['#f1e3c4', '#fbf7f0', '#bfe1ee', '#cfe6b8', '#ffd9e8', '#1d1830'];
 const INKS = ['#2b2230', '#6b4a2f', '#c0392b', '#ff4fa3', '#e6a23c', '#3f8f4f', '#2d7fb8', '#7a5cc9', '#ffffff'];
@@ -66,7 +67,7 @@ function renderList(el, { world, save, go }) {
     const make = async (close, withPicture) => {
       const map = { id: 'm_' + uid(), name: name.trim() || 'untitled map', imageId: null, paper: PAPERS[0], ...BLANK, pins: [], strokes: [] };
       if (withPicture) {
-        const file = await pickFile('image/*');
+        const file = await pickAndCrop();
         if (!file) return;
         try {
           const { blob, width, height } = await shrinkImage(file, 2400);
@@ -389,7 +390,7 @@ function renderEditor(el, { world, save, go }, map) {
   }
 
   async function changePicture(modal) {
-    const file = await pickFile('image/*');
+    const file = await pickAndCrop();
     if (!file) return;
     try {
       const { blob, width, height } = await shrinkImage(file, 2400);

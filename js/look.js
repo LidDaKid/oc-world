@@ -6,6 +6,7 @@
 
 import { h, clear, swatches, segmented, pickFile, shrinkImage, toast } from './ui.js';
 import { store } from './store.js';
+import { pickAndCrop } from './crop.js';
 
 export const PAGE_BGS = ['#15101d', '#000000', '#2a0a1b', '#1b1838', '#0f2a2a', '#3b1d4a', '#ffffff', '#fff0f6', '#ffd9e8', '#e3c6ff', '#bfe1ee', '#fff3b8'];
 export const PAGE_INKS = ['#f7effc', '#ffffff', '#1a1320', '#000000', '#ff4fa3', '#ff8ac4', '#ff5d6c', '#ffd84d', '#9be564', '#7df9d0', '#6ec6ff', '#b18cff'];
@@ -110,7 +111,7 @@ export function fontCard(label, value, onPick) {
 export function pictureCard(label, holder, changed, { maxDim = 1920, extra } = {}) {
   const wrap = h('div', { class: 'style-card' });
   async function change() {
-    const file = await pickFile('image/*');
+    const file = await pickAndCrop();
     if (!file) return;
     try {
       const { blob } = await shrinkImage(file, maxDim);

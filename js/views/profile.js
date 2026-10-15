@@ -13,7 +13,7 @@ import { dataFor, sticker } from '../ocfun/kit.js';
 import * as mood from '../ocfun/mood.js';
 
 // the tabs you can move around / hide. page style is always last (and only for whoever made the oc).
-const TAB_NAMES = { about: 'about', relationships: 'relationships', gallery: 'gallery', moodboard: 'moodboard', fun: 'more' };
+const TAB_NAMES = { about: 'about', relationships: 'relationships', gallery: 'gallery', moodboard: 'moodboard', fun: '✨ more' };
 const tabOrder = page => [...new Set([...(page.tabs || []).filter(id => id in TAB_NAMES), ...Object.keys(TAB_NAMES)])];
 
 const LAYOUT_CLASSES = {

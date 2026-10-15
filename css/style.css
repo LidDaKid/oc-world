@@ -508,7 +508,7 @@ details.more summary { cursor: pointer; font-weight: 800; font-size: .85rem; col
 .profile-tagline { font-size: 1.05rem; color: var(--ink2); padding: .1rem .4rem; margin-left: -.4rem; }
 .profile-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; margin-top: .5rem; }
 
-.profile-tabs { display: flex; gap: .3rem; margin: 1.1rem 0 .9rem; overflow-x: auto; padding-bottom: 2px; }
+.profile-tabs { display: flex; flex-wrap: wrap; gap: .3rem; margin: 1.1rem 0 .9rem; padding-bottom: 2px; }
 .profile-tab {
   display: flex; align-items: center; white-space: nowrap;
   padding: .45rem 1.05rem; border-radius: 999px;

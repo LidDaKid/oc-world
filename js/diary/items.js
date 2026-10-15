@@ -35,6 +35,17 @@ function inner(item, diary) {
   return h('span');
 }
 
+// a slider for how big the picked item is
+export function sizeSlider(item, layer, onDone) {
+  return h('label', { class: 'size-slider', title: 'size' },
+    h('span', {}, '🔍'),
+    h('input', {
+      type: 'range', min: .25, max: 4, step: .05, value: item.k,
+      oninput: e => { item.k = +e.target.value; layer.place(item); },
+      onchange: onDone,
+    }));
+}
+
 // one item, placed
 export function itemNode(item, diary) {
   const el = h('div', { class: 'it it-' + item.kind, dataset: { id: item.id } }, inner(item, diary));
@@ -162,5 +173,7 @@ export function itemsLayer({ items, diary, onChange, onPick }) {
       onPick?.(item);
     },
     removeSelected() { if (selected) remove(selected); },
+    // after changing an item's numbers from outside (like the size slider)
+    place(item) { const node = nodes.get(item.id); if (node) place(node, item); },
   };
 }

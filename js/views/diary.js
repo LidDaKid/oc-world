@@ -6,8 +6,8 @@
 import { store } from '../store.js';
 import { newPage } from '../model.js';
 import { h, fill, toast, openModal, confirmDialog, segmented, swatches, pickFile, shrinkImage } from '../ui.js';
-import { W, H, book3d, material, preset } from '../diary/covers.js';
-import { itemNode, itemsLayer, newItem } from '../diary/items.js';
+import { dims, sizeVars, BIGGEST, book3d, material, preset } from '../diary/covers.js';
+import { itemNode, itemsLayer, newItem, sizeSlider } from '../diary/items.js';
 import { STICKER_TABS, stickerNode, TAPES } from '../diary/stickers.js';
 import { Sketch, pen, TOOLS } from '../diary/sketch.js';
 
@@ -49,8 +49,10 @@ export function renderBook(el, { diary, go }) {
   let rx = -8, ry = 26;
   const stage = h('div', { class: 'book-stage' });
   const book = book3d(diary, { scale: 1 });
+  const { w: W, h: H } = dims(diary);
+  // measured against the biggest size, so a pocket diary really does look small next to a big one
   const fit = () => {
-    const s = Math.max(.35, Math.min(1, (stage.clientHeight - 40) / (H + 80), (stage.clientWidth - 40) / (W + 160)));
+    const s = Math.max(.3, Math.min(1, (stage.clientHeight - 40) / (BIGGEST.h + 80), (stage.clientWidth - 40) / (BIGGEST.w + 160)));
     book.style.setProperty('--s', s);
     book.style.width = W * s + 'px';
     book.style.height = H * s + 'px';
@@ -124,6 +126,7 @@ function pageEl(diary, page, n, side, live) {
     style: { '--ink': ink, '--lh': LINE + 'px', '--top': TOP + 'px' },
   });
   const textStyle = { fontFamily: f.css, fontSize: f.size + 'px', paddingTop: (f.dy || 0) + 'px', color: ink };
+  const H = dims(diary).h;
   const rows = Math.floor((H - 30 - (TOP - LINE)) / LINE);
   const textBox = { top: TOP - LINE + 'px', height: rows * LINE + 'px' };
   el.append(h('div', { class: 'dp-shade' }));
@@ -132,7 +135,7 @@ function pageEl(diary, page, n, side, live) {
     el.append(h('div', { class: 'dp-date' }, h('span', { class: 'dp-date-label' }, 'date'), h('span', { class: 'dp-date-val', style: { fontFamily: f.css, color: ink } }, page.date)));
     el.append(h('div', { class: 'dp-text', style: { ...textStyle, ...textBox } }, page.text));
     if (page.drawing.imageId) {
-      const img = h('img', { class: 'dp-draw', alt: '', draggable: false });
+      const img = h('img', { class: 'dp-draw', alt: '', draggable: false, onload: () => { img.style.width = img.naturalWidth / 2 + 'px'; img.style.height = img.naturalHeight / 2 + 'px'; } });
       store.imageURL(page.drawing.imageId).then(url => { if (url) img.src = url; });
       el.append(img);
     }
@@ -144,6 +147,7 @@ function pageEl(diary, page, n, side, live) {
 // ============ the open book ============
 
 export function renderWrite(el, { diary, startAt, go }) {
+  const { w: W, h: H } = dims(diary);
   const narrow = matchMedia('(max-width: 760px)');
   let single = narrow.matches;
   let at = Math.max(0, Math.min(diary.pages.length - 1, startAt || 0)); // first page showing
@@ -210,6 +214,7 @@ export function renderWrite(el, { diary, startAt, go }) {
     } else {
       const it = picked;
       fill(sub,
+        it ? sizeSlider(it, live.get(active).layer, save) : null,
         it?.kind === 'photo' ? segmented(['polaroid', 'tape', 'plain', 'sticker'].map(v => ({ value: v, label: v })), it.frame || 'polaroid', v => {
           it.frame = photoFrame = v;
           save();
@@ -251,8 +256,8 @@ export function renderWrite(el, { diary, startAt, go }) {
     const tape = s.startsWith('t:');
     p.layer.add(newItem({
       kind: 'sticker', s,
-      x: Math.round(W / 2 + (Math.random() - .5) * 160),
-      y: Math.round(H / 2 + (Math.random() - .5) * 240),
+      x: Math.round(W / 2 + (Math.random() - .5) * W * .4),
+      y: Math.round(H / 2 + (Math.random() - .5) * H * .4),
       r: Math.round((Math.random() - .5) * (tape ? 50 : 24)),
       k: s.startsWith('e:') ? .9 : 1,
     }));
@@ -269,7 +274,7 @@ export function renderWrite(el, { diary, startAt, go }) {
       const tapeNames = Object.keys(TAPES);
       if (mode !== 'decor') setMode('decor');
       live.get(active)?.layer.add(newItem({
-        kind: 'photo', imageId, ar: width / height, frame,
+        kind: 'photo', imageId, ar: width / height, frame, x: Math.round(W / 2), y: Math.round(H / 2),
         tape: tapeNames[Math.floor(Math.random() * tapeNames.length)],
         r: Math.round((Math.random() - .5) * 10),
       }));
@@ -369,7 +374,7 @@ export function renderWrite(el, { diary, startAt, go }) {
       save();
     });
     text.addEventListener('focus', () => setActive(i));
-    const sketch = new Sketch(page, save);
+    const sketch = new Sketch(page, diary, save);
     const layer = itemsLayer({ items: page.items, diary, onChange: save, onPick: it => { picked = it; setActive(i, true); drawSub(); } });
     pg.append(text, sketch.el, layer.el);
     pg.addEventListener('pointerdown', () => setActive(i), true);
@@ -465,12 +470,15 @@ export function renderWrite(el, { diary, startAt, go }) {
   function fit() {
     const pad = 28;
     const bw = (single ? W : W * 2) + pad, bh = H + pad;
-    const s = Math.max(.3, Math.min((stage.clientWidth - (single ? 16 : 110)) / bw, (stage.clientHeight - 16) / bh));
+    // on a computer, sized against the biggest diary so the sizes feel different. on a phone, as big as it fits
+    const ref = single ? { w: bw, h: bh } : { w: BIGGEST.w * 2 + pad, h: BIGGEST.h + pad };
+    const s = Math.max(.3, Math.min((stage.clientWidth - (single ? 16 : 110)) / ref.w, (stage.clientHeight - 16) / ref.h));
     scaler.style.width = bw * s + 'px';
     scaler.style.height = bh * s + 'px';
     spread.style.transform = `scale(${s})`;
   }
   spread.style.background = material(diary.cover);
+  for (const [k, v] of Object.entries(sizeVars(diary))) spread.style.setProperty(k, v);
 
   const onKey = e => {
     if (e.target.matches('input, textarea, select')) return;

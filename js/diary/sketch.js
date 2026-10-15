@@ -3,7 +3,7 @@
 
 import { h, toast } from '../ui.js';
 import { store } from '../store.js';
-import { W, H } from './covers.js';
+import { dims } from './covers.js';
 
 const DPR = 2;
 
@@ -21,7 +21,10 @@ export const TOOLS = [
 const tool = () => TOOLS.find(t => t.id === pen.tool) || TOOLS[0];
 
 export class Sketch {
-  constructor(page, onSaved) {
+  constructor(page, diary, onSaved) {
+    const { w: W, h: H } = dims(diary);
+    this.W = W;
+    this.H = H;
     this.page = page;
     this.onSaved = onSaved;
     this.undo = [];
@@ -44,12 +47,13 @@ export class Sketch {
     const img = new Image();
     img.src = url;
     try { await img.decode(); } catch { return; }
-    this.ctx.drawImage(img, 0, 0, W, H);
+    // natural size, so a drawing never gets stretched if the diary changes size
+    this.ctx.drawImage(img, 0, 0, img.naturalWidth / DPR, img.naturalHeight / DPR);
   }
 
   point(e) {
     const box = this.canvas.getBoundingClientRect();
-    return { x: (e.clientX - box.left) * W / box.width, y: (e.clientY - box.top) * H / box.height };
+    return { x: (e.clientX - box.left) * this.W / box.width, y: (e.clientY - box.top) * this.H / box.height };
   }
 
   down(e) {
@@ -57,7 +61,7 @@ export class Sketch {
     e.preventDefault();
     this.el.setPointerCapture(e.pointerId);
     const t = tool();
-    this.undo.push(this.ctx.getImageData(0, 0, W * DPR, H * DPR));
+    this.undo.push(this.ctx.getImageData(0, 0, this.W * DPR, this.H * DPR));
     if (this.undo.length > 8) this.undo.shift();
     const pts = [this.point(e)];
     const width = t.width * pen.size;
@@ -86,7 +90,7 @@ export class Sketch {
         this.ctx.globalAlpha = t.alpha ?? 1;
         this.ctx.drawImage(this.live, 0, 0);
         this.ctx.restore();
-        this.lctx.clearRect(0, 0, W, H);
+        this.lctx.clearRect(0, 0, this.W, this.H);
       }
       this.saveSoon();
     };
@@ -97,7 +101,7 @@ export class Sketch {
 
   // the whole line so far, smoothed through the midpoints
   stroke(ctx, pts, width, t) {
-    ctx.clearRect(0, 0, W, H);
+    ctx.clearRect(0, 0, this.W, this.H);
     ctx.strokeStyle = ctx.fillStyle = pen.color;
     ctx.lineWidth = width;
     ctx.lineCap = t.flat ? 'square' : 'round';
@@ -158,8 +162,8 @@ export class Sketch {
   }
 
   wipe() {
-    this.undo.push(this.ctx.getImageData(0, 0, W * DPR, H * DPR));
-    this.ctx.clearRect(0, 0, W, H);
+    this.undo.push(this.ctx.getImageData(0, 0, this.W * DPR, this.H * DPR));
+    this.ctx.clearRect(0, 0, this.W, this.H);
     this.saveSoon();
   }
 
@@ -181,7 +185,7 @@ export class Sketch {
   }
 
   async save() {
-    const px = new Uint32Array(this.ctx.getImageData(0, 0, W * DPR, H * DPR).data.buffer);
+    const px = new Uint32Array(this.ctx.getImageData(0, 0, this.W * DPR, this.H * DPR).data.buffer);
     const empty = !px.some(v => v !== 0);
     const old = this.page.drawing.imageId;
     let next = null;

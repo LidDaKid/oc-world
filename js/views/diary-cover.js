@@ -3,8 +3,8 @@
 
 import { store } from '../store.js';
 import { h, fill, toast, segmented, swatches, pickFile, shrinkImage } from '../ui.js';
-import { W, H, PRESETS, TITLE_STYLES, COVER_FONTS, coverFace, preset } from '../diary/covers.js';
-import { itemsLayer, newItem } from '../diary/items.js';
+import { SIZES, dims, PRESETS, TITLE_STYLES, COVER_FONTS, coverFace, preset } from '../diary/covers.js';
+import { itemsLayer, newItem, sizeSlider } from '../diary/items.js';
 import { STICKER_TABS, stickerNode, TAPES } from '../diary/stickers.js';
 import { PAPERS, PAPER_COLORS, fixInks } from './diary.js';
 import { nameOf } from '../parts.js';
@@ -20,7 +20,8 @@ export function renderCover(el, { diary, go }) {
   const faceBox = h('div', { class: 'cover-edit' });
   const scaler = h('div', { class: 'cover-scaler' }, faceBox);
   const pickBar = h('div', { class: 'cover-pickbar' });
-  const stage = h('div', { class: 'cover-stage' }, scaler, pickBar);
+  const stage = h('div', { class: 'cover-stage' }, scaler, pickBar,
+    h('button', { class: 'btn primary cv-done', onclick: () => go(`diary/${diary.id}`) }, '✓ done'));
   const panel = h('div', { class: 'cover-panel' });
   el.append(h('div', { class: 'cover-studio' }, stage, panel));
 
@@ -35,6 +36,7 @@ export function renderCover(el, { diary, go }) {
   function drawPickBar() {
     const it = picked;
     fill(pickBar, it ? [
+      sizeSlider(it, layer, save),
       it.kind === 'photo' ? segmented(['polaroid', 'tape', 'plain', 'sticker'].map(v => ({ value: v, label: v })), it.frame || 'polaroid', v => { it.frame = v; save(); layer.draw(); }) : null,
       h('button', { class: 'btn ghost sm', onclick: () => layer.removeSelected() }, '✕ remove'),
     ] : null);
@@ -90,11 +92,15 @@ export function renderCover(el, { diary, go }) {
         h('label', { class: 'check' }, h('input', {
           type: 'checkbox', checked: !!titleItem(),
           onchange: e => {
-            if (e.target.checked && !titleItem()) c.items.push(newItem({ kind: 'title', y: 210 }));
+            if (e.target.checked && !titleItem()) c.items.push(newItem({ kind: 'title', x: Math.round(dims(diary).w / 2), y: Math.round(dims(diary).h * .35) }));
             if (!e.target.checked) c.items.splice(c.items.indexOf(titleItem()), 1);
             changed();
           },
         }), ' show title')),
+      card('size', h('div', { class: 'size-picks' }, SIZES.map(sz => h('button', {
+        class: 'size-pick' + (dims(diary).id === sz.id ? ' on' : ''), title: sz.id,
+        onclick: () => { resize(sz.id); drawPanel(); },
+      }, h('i', { style: { width: sz.w / 14 + 'px', height: sz.h / 14 + 'px' } }), h('span', {}, sz.id))))),
       card('cover', presetGrid, solid),
       card('picture',
         h('div', { class: 'row' },
@@ -125,13 +131,26 @@ export function renderCover(el, { diary, go }) {
       ocs.length ? card('whose diary',
         h('select', { onchange: e => { diary.charId = e.target.value || null; save(); } },
           h('option', { value: '' }, '—'),
-          ocs.map(o => h('option', { value: o.id, selected: diary.charId === o.id }, nameOf(o))))) : null,
-      h('button', { class: 'btn primary cv-done', onclick: () => go(`diary/${diary.id}`) }, '✓ done'));
+          ocs.map(o => h('option', { value: o.id, selected: diary.charId === o.id }, nameOf(o))))) : null);
   }
   const bandColors = h('div', { hidden: !c.band }, swatches(c.bandColor, v => { c.bandColor = v; changed(); }, RIBBONS));
   const ribbonColors = h('div', { hidden: !c.ribbon }, swatches(c.ribbonColor, v => { c.ribbonColor = v; save(); }, RIBBONS));
 
+  // a new size: everything stuck on the cover + pages slides along so it stays where it was
+  function resize(id) {
+    const a = dims(diary);
+    diary.size = id;
+    const b = dims(diary);
+    for (const it of [...c.items, ...diary.pages.flatMap(p => p.items)]) {
+      it.x = Math.round(it.x * b.w / a.w);
+      it.y = Math.round(it.y * b.h / a.h);
+    }
+    changed();
+    fit();
+  }
+
   function stick(s) {
+    const { w: W, h: H } = dims(diary);
     layer.add(newItem({
       kind: 'sticker', s,
       x: Math.round(W / 2 + (Math.random() - .5) * 200),
@@ -165,7 +184,7 @@ export function renderCover(el, { diary, go }) {
       const tapes = Object.keys(TAPES);
       layer.add(newItem({
         kind: 'photo', imageId: await store.putImage(blob), ar: width / height, frame,
-        tape: tapes[Math.floor(Math.random() * tapes.length)], y: 330, r: Math.round((Math.random() - .5) * 10),
+        tape: tapes[Math.floor(Math.random() * tapes.length)], x: Math.round(dims(diary).w / 2), y: Math.round(dims(diary).h * .55), r: Math.round((Math.random() - .5) * 10),
       }));
     } catch (err) {
       console.error(err);
@@ -174,6 +193,7 @@ export function renderCover(el, { diary, go }) {
   }
 
   function fit() {
+    const { w: W, h: H } = dims(diary);
     const s = Math.max(.3, Math.min((stage.clientWidth - 24) / W, (stage.clientHeight - 24) / H, 1.25));
     scaler.style.width = W * s + 'px';
     scaler.style.height = H * s + 'px';

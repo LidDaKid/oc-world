@@ -133,6 +133,7 @@ export const newPage = (from = {}) => ({ id: 'p_' + uid(), text: '', date: '', f
 
 export function fixDiary(d) {
   d.charId ??= null;
+  d.size ||= 'classic';
   d.paper = { kind: 'lined', color: 'white', ...d.paper };
   const c = d.cover = {
     preset: 'leather', color: '#ff4fa3', items: [], stitch: true, corners: false,

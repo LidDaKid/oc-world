@@ -1,0 +1,113 @@
+/* phone app accounts: sign up screens, account switcher sheet, settings list */
+
+.ph-screen .pacc { background: var(--pa-bg); color: var(--pa-ink); padding-top: 46px; }
+.ph-screen .pacc-top { flex: none; display: flex; padding: 2px 12px; min-height: 34px; align-items: center; }
+.ph-screen .pacc-x { border: 0; background: none; padding: 4px 6px; font-size: 15px; font-weight: 600; color: var(--pa-ink); opacity: .75; }
+.ph-screen .pacc-scroll { padding: 6px 22px 30px; display: flex; flex-direction: column; align-items: stretch; }
+.pacc-brand { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 6px 0 4px; }
+.pacc-icon { width: 64px; height: 64px; border-radius: 16px; display: grid; place-items: center; box-shadow: 0 6px 16px rgba(0, 0, 0, .22), inset 0 1px 0 rgba(255, 255, 255, .45); }
+.pacc-icon .fun-stk { width: 44px; height: 44px; }
+.pacc-word { font: 800 26px/1.1 -apple-system, 'Segoe UI', system-ui, sans-serif; letter-spacing: -.02em; }
+.pacc-h { text-align: center; font: 700 17px/1.2 -apple-system, 'Segoe UI', system-ui, sans-serif; margin: 6px 0 12px; opacity: .9; }
+
+/* each app's wordmark */
+.pacc[data-app="insta"] .pacc-word { font: 700 34px/1 'Caveat', cursive; letter-spacing: 0; }
+.pacc[data-app="pinterest"] .pacc-word { color: #e60023; }
+.pacc[data-app="facebook"] .pacc-word { color: #0866ff; font-size: 32px; letter-spacing: -.04em; }
+.pacc[data-app="snapchat"] .pacc-word { font-size: 28px; }
+.pacc[data-app="whatsapp"] .pacc-word { color: #1daa61; }
+.pacc[data-app="bereal"] .pacc-word::after { content: '.'; }
+.pacc[data-app="tiktok"] .pacc-word { text-shadow: -2px -1px 0 #25f4ee, 2px 1px 0 #fe2c55; }
+.pacc[data-app="youtube"] .pacc-word { letter-spacing: -.05em; }
+.pacc[data-app="tumblr"] .pacc-word { font-family: Georgia, serif; font-size: 32px; }
+.pacc[data-app="reddit"] .pacc-word { color: #ff4500; }
+.pacc[data-app="twitch"] .pacc-word { color: #bf94ff; font-style: italic; }
+.pacc[data-app="spotify"] .pacc-word { color: #1ed760; }
+.pacc[data-app="netflix"] .pacc-word { color: #e50914; font-family: 'Bebas Neue', Impact, 'Arial Narrow', sans-serif; font-size: 34px; letter-spacing: .02em; text-transform: uppercase; }
+.pacc[data-app="roblox"] .pacc-word { text-transform: uppercase; letter-spacing: .04em; }
+.pacc[data-app="duolingo"] .pacc-word { color: #58cc02; font-family: 'Fredoka', 'Nunito', sans-serif; font-size: 30px; }
+.pacc[data-app="gmail"] .pacc-word { font-weight: 500; color: #5f6368; }
+.pacc[data-app="venmo"] .pacc-word { color: #008cff; font-style: italic; }
+.pacc[data-app="minecraft"] .pacc-word { font-family: 'Pixelify Sans', monospace; text-transform: uppercase; text-shadow: 3px 3px 0 #000; font-size: 28px; }
+.pacc[data-app="threads"] .pacc-word, .pacc[data-app="discord"] .pacc-word { font-size: 28px; }
+
+.pacc-tabs { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: var(--pa-field); margin-bottom: 14px; }
+.ph-screen .pacc-tabs button { flex: 1; border: 0; border-radius: 9px; padding: 7px 0; background: none; font-weight: 700; font-size: 13px; color: var(--pa-ink); opacity: .6; }
+.ph-screen .pacc-tabs button.on { background: var(--pa-btn); color: var(--pa-btn-ink); opacity: 1; }
+
+.pacc-fields { display: flex; flex-direction: column; gap: 10px; }
+.ph-screen .pacc-pfp { position: relative; align-self: center; border: 0; background: none; padding: 0; margin-bottom: 4px; }
+.ph-screen .pacc-pfp-pic { width: 84px; height: 84px; border-radius: 50%; border: 0; font-size: 1.6rem; }
+.pacc-pfp-pic img { border-radius: 50%; }
+.ph-screen .pacc-pfp i { position: absolute; right: -2px; bottom: 2px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 700 18px/1 system-ui; font-style: normal; background: var(--pa-btn); color: var(--pa-btn-ink); border: 2px solid var(--pa-bg); }
+.pacc-field { display: flex; flex-direction: column; gap: 4px; }
+.pacc-field > span { font-size: 12px; font-weight: 700; opacity: .65; }
+.pacc-wrap { display: flex; align-items: center; gap: 2px; border-radius: 10px; background: var(--pa-field); padding: 0 12px; min-height: 42px; border: 1px solid rgba(127, 127, 127, .18); }
+.pacc-wrap:focus-within { border-color: var(--pa-btn); }
+.ph-screen .pacc-in { flex: 1; min-width: 0; padding: 10px 0 !important; font-size: 15px; color: var(--pa-ink) !important; background: none; border: 0; outline: 0; }
+.ph-screen textarea.pacc-in { resize: none; height: 58px; font-family: inherit; }
+.pacc-pre, .pacc-post { font-style: normal; opacity: .55; font-size: 15px; white-space: nowrap; }
+.pacc-post { font-size: 13px; }
+.pacc-err { font-style: normal; font-size: 12px; color: #ff3b30; min-height: 0; }
+.pacc-err:empty { display: none; }
+.ph-screen .pacc-go { margin-top: 16px; width: 100%; border: 0; border-radius: 999px; padding: 12px; font-weight: 800; font-size: 15px; background: var(--pa-btn); color: var(--pa-btn-ink); transition: transform .12s, filter .12s; }
+.ph-screen .pacc-go:active { transform: scale(.97); filter: brightness(.9); }
+.pacc[data-app="facebook"] .pacc-go, .pacc[data-app="gmail"] .pacc-go, .pacc[data-app="netflix"] .pacc-go, .pacc[data-app="roblox"] .pacc-go { border-radius: 8px; }
+.pacc[data-app="duolingo"] .pacc-go { border-radius: 14px; box-shadow: 0 4px 0 #46a302; text-transform: uppercase; letter-spacing: .04em; }
+.pacc[data-app="minecraft"] .pacc-go { border-radius: 0; box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .35), 0 0 0 2px #000; font-family: 'Pixelify Sans', monospace; }
+
+.pacc-list { display: flex; flex-direction: column; gap: 8px; }
+.ph-screen .pacc-old { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; border-radius: 14px; padding: 10px 12px; background: var(--pa-field); text-align: left; color: var(--pa-ink); }
+.pacc-old .portrait { width: 40px; height: 40px; border-radius: 50%; flex: none; font-size: .8rem; }
+.pacc-old .portrait img { border-radius: 50%; }
+.pacc-old > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pacc-old b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pacc-old span { font-size: 12px; opacity: .6; }
+.pacc-chev { font-style: normal; opacity: .4; font-size: 20px; }
+
+/* switcher sheet */
+.pacc-sheet-wrap { position: absolute; inset: 0; z-index: 60; background: rgba(0, 0, 0, .35); display: flex; align-items: flex-end; animation: pacc-fade .2s ease; }
+.pacc-sheet-wrap.out { animation: pacc-fade .2s ease reverse forwards; }
+.pacc-sheet-wrap.out .pacc-sheet { animation: pacc-up .22s ease reverse forwards; }
+@keyframes pacc-fade { from { opacity: 0; } }
+@keyframes pacc-up { from { transform: translateY(100%); } }
+.pacc-sheet { width: 100%; max-height: 75%; overflow-y: auto; background: var(--card, #fff); color: var(--text, #111); border-radius: 22px 22px 0 0; padding: 8px 14px 34px; animation: pacc-up .3s cubic-bezier(.2, .9, .3, 1); }
+.pacc-grab { display: block; width: 38px; height: 5px; border-radius: 3px; background: rgba(127, 127, 127, .4); margin: 2px auto 10px; }
+.pacc-sheet-list { display: flex; flex-direction: column; margin-bottom: 6px; }
+.ph-screen .pacc-row { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; padding: 8px 4px; text-align: left; color: inherit; border-radius: 12px; }
+.ph-screen .pacc-row:active { background: rgba(127, 127, 127, .14); }
+.pacc-row .portrait { width: 44px; height: 44px; border-radius: 50%; flex: none; font-size: .8rem; }
+.pacc-row .portrait img { border-radius: 50%; }
+.pacc-row > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pacc-row b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pacc-row span { font-size: 12.5px; opacity: .6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pacc-tick { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(127, 127, 127, .45); flex: none; }
+.pacc-row.on .pacc-tick { border-color: var(--pa-btn); background: var(--pa-btn) radial-gradient(circle, #fff 0 3px, transparent 3.5px); }
+.ph-screen .pacc-sheet-btn { display: block; width: 100%; border: 0; border-top: 1px solid rgba(127, 127, 127, .2); background: none; padding: 12px 4px; text-align: left; font-weight: 600; font-size: 15px; color: inherit; }
+.ph-screen .pacc-sheet-btn.bad { color: #ff3b30; }
+
+/* the edit box (a normal site modal) */
+.pacc-modal { --pa-field: rgba(127, 127, 127, .12); --pa-ink: inherit; }
+.pacc-modal .pacc-pfp { position: relative; align-self: center; border: 0; background: none; padding: 0; }
+.pacc-modal .pacc-pfp-pic { width: 84px; height: 84px; border-radius: 50%; border: 0; }
+.pacc-modal .pacc-pfp i { position: absolute; right: -2px; bottom: 2px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 700 18px/1 system-ui; font-style: normal; background: var(--pa-btn); color: var(--pa-btn-ink); }
+.pacc-modal .pacc-in { flex: 1; min-width: 0; padding: 10px 0; border: 0; background: none; box-shadow: none; color: inherit; }
+.pacc-modal textarea.pacc-in { resize: none; height: 58px; }
+
+/* gmail's avatar wrapper + settings rows */
+.pk-gm-mewrap { display: inline-flex; cursor: pointer; }
+.pacc-set .ph-set-ico .fun-stk { width: 20px; height: 20px; }
+[data-acct-switch] { cursor: pointer; }
+
+/* status bar + home bar readable on every sign up screen */
+.ph-screen:has(.ph-view:not(.leaving) > .pacc-light) .ph-status { color: #111 !important; }
+.ph-screen:has(.ph-view:not(.leaving) > .pacc-light) .ph-homebar { background: #111 !important; }
+.ph-screen:has(.ph-view:not(.leaving) > .pacc-dark) .ph-status { color: #fff !important; }
+.ph-screen:has(.ph-view:not(.leaving) > .pacc-dark) .ph-homebar { background: #fff !important; }
+.pacc-box { padding-bottom: 10px; margin-bottom: 6px; border-bottom: 1px solid rgba(127, 127, 127, .2); --pa-field: rgba(127, 127, 127, .12); --pa-btn: var(--accent, #ff4fa3); --pa-btn-ink: #fff; }
+.pacc-box .pacc-pfp { position: relative; align-self: center; border: 0; background: none; padding: 0; }
+.pacc-box .pacc-pfp-pic { width: 76px; height: 76px; border-radius: 50%; border: 0; }
+.pacc-box .pacc-pfp-pic img { border-radius: 50%; }
+.pacc-box .pacc-pfp i { position: absolute; right: -2px; bottom: 2px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 700 17px/1 system-ui; font-style: normal; background: var(--pa-btn); color: var(--pa-btn-ink); }
+.pacc-box .pacc-in { flex: 1; min-width: 0; padding: 9px 0; border: 0; background: none; box-shadow: none; color: inherit; }
+.pacc-modal .pacc-pfp-pic img { border-radius: 50%; }

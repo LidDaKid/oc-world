@@ -20,6 +20,7 @@ import * as webApps from './phone-web.js';
 import * as socialApps from './phone-social.js';
 import * as brandApps from './phone-brands.js';
 import * as storeApps from './phone-store.js';
+import { ACCT, setApp, gateScreens, switcher, settingsGroup } from './phone-accounts.js';
 
 const EXTRA = [callsApps, lifeApps, webApps, socialApps, storeApps, brandApps];
 
@@ -60,6 +61,10 @@ const PAGE1 = ['camera', 'notes', 'contacts', 'settings', 'clock', 'calendar', '
 const PAGE2 = ['browser', 'maps', 'memos', 'wallet', 'calculator', 'screentime', 'games', 'socials', 'diaries'];
 const DOCK = ['phone', 'messages', 'photos', 'music'];
 const FIXED = ['settings', 'store']; // can't be taken off the home screen
+// a new phone only has these. everything else gets downloaded in the app store (d.installed)
+const STOCK = ['phone', 'messages', 'photos', 'camera', 'music', 'notes', 'contacts', 'settings', 'clock', 'calendar', 'weather', 'reminders', 'calculator', 'browser', 'maps', 'memos', 'wallet', 'screentime', 'store'];
+// where an app keeps its saved stuff, when that isn't just its id
+const APP_KEYS = { threads: 'threadsapp', duolingo: 'duo', doordash: 'dash', chatgpt: 'gpt', minecraft: 'mc', candycrush: 'candy', starbucks: 'sbux', stardew: 'sdv', games: 'arcade' };
 
 // little svgs for the status bar
 const signal = () => s('svg', { viewBox: '0 0 18 12', class: 'ph-ico' }, [0, 1, 2, 3].map(i => s('rect', { x: i * 4.6, y: 9 - i * 3, width: 3.2, height: 3 + i * 3, rx: 1 })));
@@ -84,11 +89,26 @@ export function render(el, ctx) {
   const { char, mine } = ctx;
   const d = dataFor(char, 'phone', DEF);
   d.case = { ...DEF.case, ...d.case };
+  d.accounts ||= {};
+  // apps used before accounts existed get an account made for them instead of a sign up wall
+  const usedBefore = Object.fromEntries(Object.entries(ACCT).map(([id, a]) => [id, id === 'insta'
+    ? !!(char.fun?.social?.handle || char.fun?.social?.posts?.length) || JSON.stringify(d.insta) !== JSON.stringify(DEF.insta)
+    : d[a.key] !== undefined && JSON.stringify(d[a.key]) !== JSON.stringify(DEF[a.key])]));
   d.lock = { imageId: null, ...d.lock };
   d.home = { imageId: null, ...d.home };
   for (const t of d.threads) { t.msgs ||= []; t.read ??= true; }
   d.hidden = (d.hidden || []).filter(id => !FIXED.includes(id));
   d.custom ||= [];
+  // phones from before downloading: stock apps + anything already used, minus what was taken off
+  if (!Array.isArray(d.installed)) {
+    const social = !!(char.fun?.social?.handle || char.fun?.social?.posts?.length);
+    const usedApp = id => (id === 'insta' || id === 'socials') && social
+      || [APP_KEYS[id] || id].some(k => k in DEF && d[k] !== undefined && JSON.stringify(d[k]) !== JSON.stringify(DEF[k]));
+    d.installed = Object.keys(APPS).filter(id => window.__allApps || STOCK.includes(id) || usedApp(id)).filter(id => !d.hidden.includes(id));
+    d.hidden = [];
+  }
+  for (const id of FIXED) if (!d.installed.includes(id)) d.installed.push(id);
+  const justGot = new Set(); // downloaded a second ago: the icon fills in on the home screen
   const save = () => ctx.save();
   const myRef = { id: char.id, name: nameOf(char) };
   const timers = [];
@@ -152,6 +172,7 @@ export function render(el, ctx) {
     const old = [...views.children].filter(v => !v.classList.contains('leaving'));
     const view = h('div', { class: 'ph-view ph-v-' + name });
     cur = { name, params, view };
+    setApp(name);
     const content = SCREENS[name](params, view);
     fill(view, content);
     screen.dataset.screen = name;
@@ -265,7 +286,7 @@ export function render(el, ctx) {
       if (!(await confirmDialog(`delete ${c.label || 'this app'}?`, { danger: true, okLabel: 'delete' }))) return;
       d.custom = d.custom.filter(x => x !== c);
       dropImage(c.imageId);
-    } else if (!d.hidden.includes(id)) d.hidden.push(id);
+    } else d.installed = d.installed.filter(x => x !== id);
     save();
     redraw();
   }
@@ -275,8 +296,10 @@ export function render(el, ctx) {
     const removable = mine && !FIXED.includes(id);
     let held = null, x0 = 0, y0 = 0;
     const startJiggle = () => { held = null; if (jiggle) return; jiggle = true; redraw(); };
+    const dl = justGot.has(id);
+    if (dl) setTimeout(() => justGot.delete(id), 50);
     const b = h('button', {
-      type: 'button', class: 'ph-app', 'data-app': id,
+      type: 'button', class: 'ph-app' + (dl ? ' dl' : ''), 'data-app': id,
       onclick: e => {
         if (jiggle) return;
         const ico = e.currentTarget.querySelector('.ph-app-ico');
@@ -296,7 +319,7 @@ export function render(el, ctx) {
     return b;
   };
   SCREENS.home = () => {
-    const shown = id => !d.hidden.includes(id) && (mine || (id !== 'settings' && id !== 'store')) && !!appOf(id);
+    const shown = id => (d.custom.some(c => c.id === id) || (d.installed.includes(id) && !d.hidden.includes(id))) && (mine || (id !== 'settings' && id !== 'store')) && !!appOf(id);
     const counts = Object.assign({ messages: unread() }, ...EXTRA.map(m => { try { return m.badges?.(api) || {}; } catch (err) { console.error(err); return {}; } }));
     const badge = id => (counts[id] ? h('span', { class: 'ph-badge' }, counts[id] > 99 ? '99+' : counts[id]) : null);
     const lastPhoto = d.photos.at(-1);
@@ -319,7 +342,7 @@ export function render(el, ctx) {
       h('div', { class: 'ph-grid' }, PAGE1.filter(shown).map(id => icon(id, badge(id)))));
     const allWidgets = EXTRA.map(m => { try { return m.widget?.(api) || null; } catch (err) { console.error(err); return null; } }).filter(Boolean);
     const placed = new Set([...PAGE1, ...PAGE2, ...DOCK]);
-    const rest = [...PAGE2, ...Object.keys(APPS).filter(id => !placed.has(id)), ...d.custom.map(c => c.id)].filter(shown);
+    const rest = [...PAGE2, ...d.installed.filter(id => !placed.has(id)), ...d.custom.map(c => c.id)].filter(shown);
     const page2 = h('div', { class: 'ph-page' },
       allWidgets.length ? h('div', { class: 'ph-widgets' }, allWidgets.slice(0, 2)) : null,
       h('div', { class: 'ph-grid' }, rest.slice(0, 12).map(id => icon(id, badge(id)))));
@@ -750,6 +773,7 @@ export function render(el, ctx) {
             }, l)))),
           d.passcode ? h('div', { class: 'ph-row static' }, h('span', { class: 'ph-set-ico', style: { background: '#8e8e93' } }, '#'), h('div', { class: 'ph-row-main' }, h('b', {}, 'code')), h('span', { class: 'ph-pass-show' }, d.passcode)) : null,
           d.passcode ? h('div', { class: 'ph-row static' }, h('span', { class: 'ph-set-ico', style: { background: '#34c759' } }, faceIdIco()), h('div', { class: 'ph-row-main' }, h('b', {}, 'face id')), toggle(d.faceId, v => { d.faceId = v; save(); })) : null),
+        settingsGroup(api),
         h('div', { class: 'ph-set-label' }, 'phone'),
         h('div', { class: 'ph-group' },
           h('label', { class: 'ph-row static' }, h('span', { class: 'ph-set-ico', style: { background: '#34c759' } }, '📶'), h('b', {}, 'carrier'),
@@ -898,10 +922,21 @@ export function render(el, ctx) {
 
   // ---- the other apps ----
   const api = {
-    d, char, mine, ctx, save, show, redraw, goHome, openApp, header, plusBtn, screen, SCREENS, drawStatus, APPS, appOf, FIXED, banner,
+    d, char, mine, ctx, save, show, redraw, goHome, openApp, header, plusBtn, screen, SCREENS, drawStatus, APPS, appOf, FIXED, STOCK, banner,
+    installed: id => d.custom.some(c => c.id === id) || d.installed.includes(id),
+    download: id => { if (!d.installed.includes(id)) d.installed.push(id); d.hidden = d.hidden.filter(x => x !== id); justGot.add(id); save(); },
     onLeave: fn => { cleanupScreen = fn; },
   };
   for (const m of EXTRA) m.install?.(api);
+  gateScreens(api, id => usedBefore[id]);
+  // tapping your own username inside an app switches accounts
+  screen.addEventListener('click', e => {
+    const el = mine && e.target.closest?.('[data-acct-switch]');
+    if (!el || !cur || !ACCT[cur.name]) return;
+    e.preventDefault();
+    e.stopPropagation();
+    switcher(api, cur.name);
+  }, true);
 
   // ---- the case box ----
   function caseBox() {
@@ -951,7 +986,7 @@ export function render(el, ctx) {
     appBar(ctx, meta, flipBtn, mine ? h('button', { type: 'button', class: 'btn sm', onclick: caseBox }, 'case') : null),
     stage);
 
-  return () => { timers.forEach(clearInterval); cleanupScreen?.(); };
+  return () => { timers.forEach(clearInterval); cleanupScreen?.(); setApp(null); };
 }
 
 // drag something around inside `area`; positions are in % of the area

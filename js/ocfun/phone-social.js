@@ -4,7 +4,9 @@
 
 import { h, s, fill, uid, confirmDialog } from '../ui.js';
 import { store } from '../store.js';
-import { pic, portrait, nameOf, ocById, allOcs } from './kit.js';
+import { pic, ocById, allOcs } from './kit.js';
+// portrait/nameOf here show an oc as their account on the open app (see phone-accounts.js)
+import { portrait, nameOf, acctId, instaSd, activeOf, updateAccount } from './phone-accounts.js';
 import { who, face, freshRef, pickWho, refOf, ago, bigNum, addPhotos, dropImage, relLabel } from './phone-bits.js';
 
 export const APPS = {
@@ -32,7 +34,7 @@ const slug = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|
 const handleOf = (c, sd) => (sd.handle || slug(nameOf(c)) || 'oc').slice(0, 30);
 const handleFor = ref => {
   const w = who(ref);
-  return w.char?.fun?.social?.handle || slug(w.name) || 'someone';
+  return w.handle || w.char?.fun?.social?.handle || slug(w.name) || 'someone';
 };
 function timeAgo(ts) {
   const a = ago(ts);
@@ -90,6 +92,9 @@ export function install(api) {
 
   // ---- whose data ----
   const own = () => {
+    // an extra account (finsta) has its own profile + posts; the main one is the socials app's
+    const extra = instaSd(char);
+    if (extra) { for (const p of extra.posts) { p.comments ||= []; p.likes ??= 0; } return extra; }
     char.fun ||= {};
     const sd = char.fun.social ||= {};
     // fill in what's missing in place, so anything holding on to sd stays the real thing
@@ -297,10 +302,10 @@ export function install(api) {
       const sd = sdOf(c);
       const edit = canEdit(c);
       const defaultAs = () => {
-        if (c.id !== char.id) return refOf(char);
+        if (c.id !== char.id) return { ...refOf(char), acct: acctId(char) };
         const rel = store.relsOf(char.id).map(r => (r.a === char.id ? r.b : r.a)).find(id => id && allOcs(char.id).some(o => o.id === id));
         const o = rel ? ocById(rel) : allOcs(char.id)[0];
-        return o ? refOf(o) : refOf(char);
+        return o ? refOf(o) : { ...refOf(char), acct: acctId(char) };
       };
       let as = defaultAs();
       const list = h('div', { class: 'ph-scroll ps-c-list' });
@@ -614,7 +619,7 @@ export function install(api) {
       };
       const link = sd.link ? h('a', { class: 'ps-link', href: /^https?:/.test(sd.link) ? sd.link : null, target: '_blank', rel: 'noopener' }, sd.link.replace(/^https?:\/\//, '')) : null;
       return h('div', { class: 'ps-page' },
-        bar(stack.length ? backBtn() : homeBtn(), h('b', { class: 'ps-bar-title handle' }, handle, sd.verified ? check() : null),
+        bar(stack.length ? backBtn() : homeBtn(), h('b', { class: 'ps-bar-title handle', 'data-acct-switch': self && mine }, handle, sd.verified ? check() : null),
           self && mine ? h('button', { type: 'button', class: 'ps-ibtn', title: 'new post', onclick: newPost }, ico.add()) : null),
         h('div', { class: 'ph-scroll ps-scroll' },
           h('div', { class: 'ps-prof-head' },
@@ -649,6 +654,21 @@ export function install(api) {
     }
 
     // ================= edit profile =================
+    // the account's own picture (the oc's page picture never changes)
+    function pfpEdit() {
+      const box = h('div', { class: 'ps-edit-pfp' });
+      const draw = () => fill(box, h('button', {
+        type: 'button', class: 'ps-edit-pfp-btn', onclick: async () => {
+          const [p] = await addPhotos(false, 600);
+          const a = activeOf(char, 'insta');
+          if (!p || !a) return;
+          updateAccount(api, 'insta', a.id, { imageId: p.imageId });
+          draw();
+        },
+      }, av(char, 'xl'), h('span', {}, 'edit picture')));
+      draw();
+      return box;
+    }
     function editPage() {
       const sd = own();
       const draft = { display: sd.display, handle: sd.handle, bio: sd.bio, link: sd.link, followers: sd.followers, following: sd.following, verified: sd.verified };
@@ -665,7 +685,7 @@ export function install(api) {
       return h('div', { class: 'ps-page ps-edit' },
         bar(h('button', { type: 'button', class: 'ps-text-btn plain', onclick: pop }, 'cancel'), h('b', { class: 'ps-bar-title' }, 'edit profile'), h('button', { type: 'button', class: 'ps-text-btn', onclick: done }, 'done')),
         h('div', { class: 'ph-scroll ps-scroll' },
-          h('div', { class: 'ps-edit-pfp' }, av(char, 'xl')),
+          pfpEdit(),
           field('name', text('display', nameOf(char), 40)),
           field('username', text('handle', handleC(char), 30)),
           field('bio', bio),

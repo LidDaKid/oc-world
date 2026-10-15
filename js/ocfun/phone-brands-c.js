@@ -5,7 +5,9 @@
 // saved stuff lives on the phone's data under one key per app (see DEF).
 
 import { h, s, fill, uid, openModal, confirmDialog, toast } from '../ui.js';
-import { sticker, portrait, nameOf, allOcs, pic } from './kit.js';
+import { sticker, allOcs, pic } from './kit.js';
+// portrait/nameOf here show an oc as their account on the open app (see phone-accounts.js)
+import { portrait, nameOf, acctId, activeOf } from './phone-accounts.js';
 import { who, face, freshRef, pickWho, hm, hmA, dayLabel, shortDate, ago, addPhotos, dropImage } from './phone-bits.js';
 
 const G = 'linear-gradient(160deg,';
@@ -157,7 +159,7 @@ export function install(api) {
   const { d, char, mine, save, SCREENS } = api;
   for (const [k, v] of Object.entries(DEF)) d[k] = { ...structuredClone(v), ...d[k] };
   const home = () => api.goHome();
-  const me = () => freshRef({ id: char.id, name: nameOf(char) });
+  const me = () => freshRef({ id: char.id, name: nameOf(char), acct: acctId(char) });
   const others = () => allOcs(char.id);
 
   // one screen per app, each with its own state + redraw
@@ -199,7 +201,7 @@ export function install(api) {
     if (st.tab === 'home') {
       const fr = others();
       body = h('div', { class: 'ph-scroll pk-rbx-body' },
-        h('div', { class: 'pk-rbx-me' }, portrait(char, 'lg'), h('div', {}, h('b', {}, nameOf(char)), h('span', {}, '@' + nameOf(char).toLowerCase().replace(/[^a-z0-9]+/g, '')))),
+        h('div', { class: 'pk-rbx-me', 'data-acct-switch': true }, portrait(char, 'lg'), h('div', {}, h('b', {}, nameOf(char)), h('span', {}, '@' + (activeOf(char, 'roblox')?.handle || nameOf(char).toLowerCase().replace(/[^a-z0-9]+/g, ''))))),
         h('div', { class: 'pk-rbx-h' }, h('b', {}, `friends (${fr.length})`)),
         h('div', { class: 'pk-rbx-friends' }, fr.length ? fr.map(o => {
           const stt = rbStatus(o);
@@ -708,7 +710,7 @@ export function install(api) {
       });
     }
     return h('div', { class: 'pk-fill pk-gm-inbox' },
-      h('div', { class: 'pk-gm-searchrow' }, btn('pk-gm-ib', backIco(), home), h('div', { class: 'pk-gm-search' }, h('span', {}, 'search in mail')), portrait(char, 'xs pk-gm-me')),
+      h('div', { class: 'pk-gm-searchrow' }, btn('pk-gm-ib', backIco(), home), h('div', { class: 'pk-gm-search' }, h('span', {}, 'search in mail')), h('span', { class: 'pk-gm-mewrap', 'data-acct-switch': true }, portrait(char, 'xs pk-gm-me'))),
       h('div', { class: 'pk-gm-tabs' }, [['primary', 'primary'], ['promotions', 'promotions'], ['social', 'social'], ['starred', 'starred'], ['sent', 'sent']].map(([k, l]) =>
         btn(st.tab === k ? 'on' : '', [l, unreadIn(k) ? h('b', {}, unreadIn(k)) : null], () => c.go({ tab: k }, null)))),
       h('div', { class: 'ph-scroll pk-gm-list' },

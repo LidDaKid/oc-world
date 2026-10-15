@@ -3,7 +3,9 @@
 // ({ id, name }) like the rest of the phone, so it still reads right if that oc gets renamed.
 
 import { h, s, fill, uid, openModal, confirmDialog, toast, swatches } from '../ui.js';
-import { pic, portrait, nameOf, allOcs } from './kit.js';
+import { pic, allOcs } from './kit.js';
+// portrait/nameOf here show an oc as their account on the open app (see phone-accounts.js)
+import { portrait, nameOf, acctId, accountBox } from './phone-accounts.js';
 import { who, face, freshRef, pickWho, hm, hmA, dayLabel, ago, addPhotos, dropImage, bigNum, relLabel } from './phone-bits.js';
 
 export const APPS = {
@@ -60,7 +62,7 @@ const discordLogo = () => s('svg', { viewBox: '0 0 24 24', class: 'pa-dc-logo' }
 const threadsLogo = () => s('svg', { viewBox: '0 0 24 24', class: 'pa-th-logo' }, P('M17 8.3C16.2 5.6 14.2 4 11.8 4 8 4 5.5 7.2 5.5 12s2.5 8 6.6 8c3.3 0 5.8-2 5.8-4.8 0-2.6-2-4.1-5-4.1-2.2 0-3.6 1.1-3.6 2.6 0 1.4 1.2 2.3 2.7 2.3 2.4 0 3.6-2 3.4-6', { 'stroke-width': 2.3 }));
 
 const dayKey = (ts = Date.now()) => { const x = new Date(ts); return `${x.getFullYear()}-${x.getMonth() + 1}-${x.getDate()}`; };
-const handleOf = ref => who(ref).name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'someone';
+const handleOf = ref => who(ref).handle || who(ref).name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'someone';
 const refKey = ref => (ref?.id ? ref.id : 'n:' + (ref?.name || '').toLowerCase());
 const sameRef = (a, b) => refKey(a) === refKey(b);
 const rnd = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
@@ -69,7 +71,7 @@ const lateLabel = m => (m < 60 ? `${m} min late` : `${Math.round(m / 60)}h late`
 
 export function install(api) {
   const { d, char, mine, save, show, SCREENS } = api;
-  const me = () => ({ id: char.id, name: nameOf(char) });
+  const me = () => ({ id: char.id, name: nameOf(char), acct: acctId(char) });
   const isMe = ref => ref?.id === char.id;
   const home = () => api.goHome();
 
@@ -92,7 +94,7 @@ export function install(api) {
         title,
         body: h('div', { class: 'who-pick' },
           h('div', { class: 'who-pick-grid' }, [char, ...allOcs(char.id)].map(o => h('button', {
-            type: 'button', class: 'who-pick-oc', style: { '--c': o.color }, onclick: () => { done = { id: o.id, name: nameOf(o) }; m.close(); },
+            type: 'button', class: 'who-pick-oc', style: { '--c': o.color }, onclick: () => { done = o.id === char.id ? me() : { id: o.id, name: nameOf(o) }; m.close(); },
           }, portrait(o, 'md'), h('span', {}, nameOf(o))))),
           h('div', { class: 'who-pick-typed' }, name)),
         actions: [{ label: 'pick', kind: 'primary', onClick: close => { const v = name.value.trim(); if (!v) { name.focus(); return; } done = { id: null, name: v }; close(); } }],
@@ -297,7 +299,7 @@ export function install(api) {
       draw();
       return wrap('',
         h('div', { class: 'ph-scroll' },
-          h('div', { class: 'pa-pn-me' }, portrait(char, 'lg'), h('h2', {}, nameOf(char)), h('span', {}, '@' + handleOf(me())),
+          h('div', { class: 'pa-pn-me' }, portrait(char, 'lg'), h('h2', { 'data-acct-switch': true }, nameOf(char)), h('span', {}, '@' + handleOf(me())),
             h('span', { class: 'pa-pn-follow' }, `${bigNum(pn.pins.length * 37 + 120)} followers · ${bigNum(pn.boards.length * 11 + 48)} following`)),
           body),
         nav);
@@ -394,7 +396,7 @@ export function install(api) {
     }
     return h('div', { class: 'ph-app-screen pa-dc' },
       h('div', { class: 'pa-dc-main' }, rail, panel),
-      h('div', { class: 'pa-dc-you' }, dcFace(me(), dc.status), h('div', {}, h('b', {}, nameOf(char)), h('span', {}, dc.status === 'dnd' ? 'do not disturb' : dc.status)),
+      h('div', { class: 'pa-dc-you' }, dcFace(me(), dc.status), h('div', { 'data-acct-switch': true }, h('b', {}, nameOf(char)), h('span', {}, dc.status === 'dnd' ? 'do not disturb' : dc.status)),
         mine ? h('button', { type: 'button', class: 'pa-dc-statbtn', title: 'status', onclick: () => { dc.status = STATUS[(STATUS.indexOf(dc.status) + 1) % STATUS.length]; save(); api.redraw(); } }, h('i', { class: 'pa-dot ' + dc.status })) : null,
         h('button', { type: 'button', class: 'pa-dc-homebtn', title: 'home', onclick: home }, ico.home())));
   };
@@ -608,7 +610,7 @@ export function install(api) {
                 if (fb.coverId) dropImage(fb.coverId); fb.coverId = x.imageId; save(); api.redraw();
               },
             }, ico.cam()) : null),
-          h('div', { class: 'pa-fb-me' }, portrait(char, 'lg'), h('h2', {}, nameOf(char)), h('span', {}, `${bigNum(allOcs(char.id).length * 47 + 212)} friends`),
+          h('div', { class: 'pa-fb-me' }, portrait(char, 'lg'), h('h2', { 'data-acct-switch': true }, nameOf(char)), h('span', {}, `${bigNum(allOcs(char.id).length * 47 + 212)} friends`),
             fb.bio ? h('p', {}, fb.bio) : null,
             mine ? h('div', { class: 'pa-fb-mebtns' }, h('button', { type: 'button', class: 'pa-fb-btn', onclick: () => fbPost() }, '+ add to story'), h('button', { type: 'button', class: 'pa-fb-btn grey', onclick: editFb }, 'edit profile')) : null),
           rows.length ? h('div', { class: 'pa-fb-about' }, rows.map(([k, l]) => h('div', {}, l ? h('span', {}, l + ' ') : null, h('b', {}, a[k])))) : null,
@@ -644,9 +646,10 @@ export function install(api) {
     const bio = h('textarea', { rows: 2, maxLength: 101, placeholder: 'bio', value: fb.bio });
     const f = {};
     const rows = [['work', 'works at'], ['school', 'school'], ['lives', 'lives in'], ['from', 'from'], ['rel', 'relationship']].map(([k, l]) => { f[k] = h('input', { type: 'text', maxLength: 60, placeholder: l, value: fb.about[k] }); return f[k]; });
+    const top = accountBox(api, 'facebook');
     openModal({
-      title: 'edit profile', body: h('div', { class: 'pa-form' }, bio, ...rows),
-      actions: [{ label: 'save', kind: 'primary', onClick: close => { fb.bio = bio.value.trim(); for (const k in f) fb.about[k] = f[k].value.trim(); save(); close(); api.redraw(); } }],
+      title: 'edit profile', body: h('div', { class: 'pa-form' }, top?.el || null, bio, ...rows),
+      actions: [{ label: 'save', kind: 'primary', onClick: close => { if (top && !top.check()) return; top?.commit(); fb.bio = bio.value.trim(); for (const k in f) fb.about[k] = f[k].value.trim(); save(); close(); api.redraw(); } }],
     });
   }
 
@@ -775,7 +778,7 @@ export function install(api) {
     return h('div', { class: 'ph-app-screen pa-sc pa-sc-cam' },
       h('div', { class: 'pa-sc-vf' }, last ? pic(last.imageId) : portrait(char, 'pa-sc-vfpfp')),
       h('div', { class: 'pa-sc-camtop' },
-        h('button', { type: 'button', class: 'pa-sc-bit', title: 'home', onclick: home }, portrait(char, 'sm')),
+        h('button', { type: 'button', class: 'pa-sc-bit', title: 'home', onclick: home, 'data-acct-switch': true }, portrait(char, 'sm')),
         h('button', { type: 'button', class: 'pa-sc-glass', title: 'search' }, ico.search()),
         h('span', { class: 'pa-grow' }),
         h('div', { class: 'pa-sc-side' }, h('button', { type: 'button', class: 'pa-sc-glass', title: 'flip', onclick: e => e.currentTarget.closest('.pa-sc-cam').querySelector('.pa-sc-vf').classList.toggle('flipped') }, ico.flip()), h('button', { type: 'button', class: 'pa-sc-glass', title: 'flash', onclick: e => e.currentTarget.classList.toggle('on') }, ico.bolt()))),
@@ -1173,7 +1176,7 @@ export function install(api) {
         h('div', { class: 'pa-th-top' }, h('button', { type: 'button', class: 'pa-ibtn', title: 'home', onclick: home }, ico.back()), h('span'), h('span', { class: 'pa-ibtn' }, ico.menu())),
         h('div', { class: 'ph-scroll' },
           h('div', { class: 'pa-th-prof' },
-            h('div', {}, h('h2', {}, nameOf(char)), h('div', { class: 'pa-th-handle' }, handleOf(me()), h('span', {}, 'threads.net'))),
+            h('div', { 'data-acct-switch': true }, h('h2', {}, nameOf(char)), h('div', { class: 'pa-th-handle' }, handleOf(me()), h('span', {}, 'threads.net'))),
             portrait(char, 'md')),
           th.bio ? h('p', { class: 'pa-th-bio' }, th.bio) : null,
           h('div', { class: 'pa-th-fol' }, h('span', { class: 'pa-dc-stack' }, followers.map(o => portrait(o, 'xs'))), `${bigNum(th.followers)} followers`),
@@ -1192,9 +1195,10 @@ export function install(api) {
   function editTh() {
     const bio = h('textarea', { rows: 3, maxLength: 150, placeholder: 'bio', value: th.bio });
     const fol = h('input', { type: 'number', min: 0, value: th.followers });
+    const top = accountBox(api, 'threads');
     openModal({
-      title: 'edit profile', body: h('div', { class: 'pa-form' }, bio, h('label', { class: 'pa-inline' }, h('span', {}, 'followers'), fol)),
-      actions: [{ label: 'done', kind: 'primary', onClick: close => { th.bio = bio.value.trim(); th.followers = Math.max(0, Number(fol.value) || 0); save(); close(); api.redraw(); } }],
+      title: 'edit profile', body: h('div', { class: 'pa-form' }, top?.el || null, bio, h('label', { class: 'pa-inline' }, h('span', {}, 'followers'), fol)),
+      actions: [{ label: 'done', kind: 'primary', onClick: close => { if (top && !top.check()) return; top?.commit(); th.bio = bio.value.trim(); th.followers = Math.max(0, Number(fol.value) || 0); save(); close(); api.redraw(); } }],
     });
   }
 }

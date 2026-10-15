@@ -1,4 +1,5 @@
-// phone app: the app store. get + remove apps from the home screen (d.hidden), and make your own apps
+// phone app: the app store. download apps onto the home screen (d.installed; a new phone only has the stock ones),
+// search them, and make your own apps
 // (d.custom: a name, a sticker icon, a color, and a page with a title, a picture and writing).
 
 import { h, fill, uid, openModal, confirmDialog, toast, autosize } from '../ui.js';
@@ -34,22 +35,23 @@ const appIco = (a, cls = '') => h('span', { class: 'pst-ico ' + cls, style: { ba
 export function install(api) {
   const { d, mine, save, show, header, SCREENS, APPS: ALL, appOf, FIXED } = api;
   const home = { label: 'home', go: () => api.goHome() };
-  const isOn = id => !d.hidden.includes(id);
+  const isOn = id => api.installed(id);
+  let tab = 'today', query = '';
 
+  // "get" downloads it (a ring fills up), then it's "open"
   function getBtn(id, after) {
+    if (isOn(id)) return h('button', { type: 'button', class: 'pst-get on', 'data-get': id, onclick: e => { e.stopPropagation(); open(id, e.currentTarget); } }, 'open');
     if (!mine) return null;
-    if (FIXED.includes(id)) return h('span', { class: 'pst-fixed' }, 'on');
     const b = h('button', {
-      type: 'button', class: 'pst-get' + (isOn(id) ? ' on' : ''), 'data-get': id,
+      type: 'button', class: 'pst-get', 'data-get': id,
       onclick: e => {
         e.stopPropagation();
-        if (isOn(id)) { d.hidden.push(id); save(); after(); return; }
-        // a quick loading ring, like it's downloading
+        if (b.classList.contains('loading')) return;
         b.classList.add('loading');
         b.textContent = '';
-        setTimeout(() => { d.hidden = d.hidden.filter(x => x !== id); save(); after(); }, 650);
+        setTimeout(() => { api.download(id); after(); }, 900);
       },
-    }, isOn(id) ? 'remove' : 'get');
+    }, 'get');
     return b;
   }
   const open = (id, el) => { if (!isOn(id)) return; const a = appOf(id); if (a.link) location.hash = `#/${api.ctx.base}/fun/${a.link}`; else if (a.custom) show('custom', { id }, 'push'); else api.openApp(id, el); };
@@ -60,13 +62,27 @@ export function install(api) {
       const top = body.scrollTop;
       const ids = Object.keys(ALL);
       const day = Math.floor(Date.now() / 864e5);
-      const pickable = ids.filter(id => !FIXED.includes(id) && !ALL[id].link);
+      const pickable = ids.filter(id => !FIXED.includes(id) && !ALL[id].link && !api.STOCK.includes(id));
       const featured = pickable[day % pickable.length];
       const fa = ALL[featured];
       const shelves = new Map();
       for (const id of ids) { const c = catOf(id, ALL[id]); if (!shelves.has(c)) shelves.set(c, []); shelves.get(c).push(id); }
       const rank = c => (CAT_ORDER.includes(c) ? CAT_ORDER.indexOf(c) : c === 'other' ? 99 : 50);
       const cats = [...shelves].sort((a, b) => rank(a[0]) - rank(b[0]));
+      if (tab === 'search') {
+        const q = query.trim().toLowerCase();
+        const hits = [...ids, ...d.custom.map(c => c.id)].filter(id => { const a = appOf(id); return a && (!q || a.label.toLowerCase().includes(q) || catOf(id, a).includes(q)); });
+        const input = h('input', { type: 'search', class: 'pst-search', placeholder: 'games, apps and more', value: query, oninput: e => { query = e.target.value; drawResults(); } });
+        const results = h('div', { class: 'ph-group pst-list' });
+        const drawResults = () => {
+          const qq = query.trim().toLowerCase();
+          fill(results, [...ids, ...d.custom.map(c => c.id)].filter(id => { const a = appOf(id); return a && (!qq || a.label.toLowerCase().includes(qq) || catOf(id, a).includes(qq)); }).map(id => row(id, catOf(id, appOf(id)), drawResults)));
+        };
+        drawResults();
+        fill(body, h('div', { class: 'pst-search-wrap' }, input), results);
+        if (hits) setTimeout(() => { if (input.isConnected && document.activeElement !== input) input.focus({ preventScroll: true }); }, 50);
+        return;
+      }
       fill(body,
         h('div', { class: 'pst-feature', style: { '--bg': fa.bg } },
           h('span', { class: 'pst-feature-tag' }, 'app of the day'),
@@ -81,18 +97,22 @@ export function install(api) {
     function section(name, list, after) {
       return [
         h('div', { class: 'pst-sec' }, h('b', {}, name)),
-        h('div', { class: 'ph-group pst-list' }, list.map(id => {
-          const a = appOf(id);
-          if (!a) return null;
-          return h('div', { class: 'ph-row pst-row' + (isOn(id) ? '' : ' off'), 'data-app-row': id, onclick: e => open(id, e.currentTarget.querySelector('.pst-ico')) },
-            appIco(a),
-            h('div', { class: 'ph-row-main' }, h('b', {}, a.label), h('div', { class: 'ph-row-sub' }, a.custom ? 'made by you' : name)),
-            getBtn(id, after));
-        })),
+        h('div', { class: 'ph-group pst-list' }, list.map(id => row(id, name, after))),
       ];
     }
+    function row(id, name, after) {
+      const a = appOf(id);
+      if (!a) return null;
+      return h('div', { class: 'ph-row pst-row' + (isOn(id) ? '' : ' off'), 'data-app-row': id, onclick: e => open(id, e.currentTarget.querySelector('.pst-ico')) },
+        appIco(a),
+        h('div', { class: 'ph-row-main' }, h('b', {}, a.label), h('div', { class: 'ph-row-sub' }, a.custom ? 'made by you' : name)),
+        getBtn(id, after));
+    }
+    const tabs = h('nav', { class: 'pst-tabs' });
+    const drawTabs = () => fill(tabs, [['today', 'today'], ['search', 'search']].map(([t, l]) => h('button', { type: 'button', class: t === tab ? 'on' : '', 'data-tab': t, onclick: () => { tab = t; api.redraw(); } }, l)));
+    drawTabs();
     draw();
-    return h('div', { class: 'ph-app-screen pst' }, header('app store', { big: true, back: home }), body);
+    return h('div', { class: 'ph-app-screen pst' }, header(tab === 'search' ? 'search' : 'app store', { big: true, back: home }), body, tabs);
   };
 
   // your own app's page

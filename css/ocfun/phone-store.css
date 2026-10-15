@@ -84,3 +84,13 @@
   .pst-prev { position: static; padding: 14px 0; }
 }
 @media (prefers-reduced-motion: reduce) { .pst-feature-stk { animation: none; } }
+
+/* get / open, the loading ring, tabs + search */
+.ph-screen .pst-get.on { background: rgba(120, 120, 128, .16); color: #0a84ff !important; }
+.pst .pst-scroll { padding-bottom: 70px; }
+.pst-tabs { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-around; padding: 7px 30px 24px; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border-top: 1px solid var(--line); z-index: 3; }
+.ph-screen .pst-tabs button { border: 0; background: none; font-size: 12px; font-weight: 700; color: var(--sub); padding: 4px 14px; }
+.ph-screen .pst-tabs button.on { color: #0a84ff; }
+.pst { position: relative; }
+.pst-search-wrap { padding: 4px 14px 10px; }
+.ph-screen .pst-search { width: 100%; border: 0; border-radius: 11px; padding: 9px 12px; background: rgba(120, 120, 128, .14); color: var(--text); font-size: 15px; outline: 0; box-shadow: none; }

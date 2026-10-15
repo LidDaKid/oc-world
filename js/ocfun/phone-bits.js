@@ -7,23 +7,30 @@ import { h, openModal, pickFiles, shrinkImage, toast, uid } from '../ui.js';
 import { store } from '../store.js';
 import { portrait, nameOf, allOcs, ocById, worldmates } from './kit.js';
 import { cropAll } from '../crop.js';
+import { ctx as acctCtx, acctOfRef } from './phone-accounts.js';
 
 export function who(ref) {
   const c = ref?.id ? ocById(ref.id) : null;
-  return { char: c, name: c ? nameOf(c) : (ref?.name || 'someone'), color: c?.color || ref?.color || '#9b8aa8', gone: !!ref?.id && !c };
+  const w = { char: c, name: c ? nameOf(c) : (ref?.name || 'someone'), color: c?.color || ref?.color || '#9b8aa8', gone: !!ref?.id && !c };
+  // inside an app, an oc reads as their account there (see phone-accounts.js)
+  const a = c && acctCtx.app ? acctOfRef(ref, acctCtx.app) : null;
+  if (a) Object.assign(w, { name: a.name || w.name, handle: a.handle, imageId: a.imageId || null });
+  return w;
 }
 
 export const refOf = c => ({ id: c.id, name: nameOf(c) });
 
 export function face(ref, cls = 'sm') {
   const w = who(ref);
-  return portrait(w.char || { name: w.name, color: w.color }, cls);
+  return portrait(w.char ? { ...w.char, name: w.name, imageId: w.imageId || w.char.imageId } : { name: w.name, color: w.color }, cls);
 }
 
 // refresh the backup names (call before saving)
 export function freshRef(ref) {
   const c = ref?.id ? ocById(ref.id) : null;
-  return c ? { id: c.id, name: nameOf(c) } : { id: ref?.id || null, name: ref?.name || '' };
+  const out = c ? { id: c.id, name: nameOf(c) } : { id: ref?.id || null, name: ref?.name || '' };
+  if (ref?.acct) out.acct = ref.acct;
+  return out;
 }
 
 // a box to pick an oc or type a name. resolves with a ref, or null

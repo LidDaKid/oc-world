@@ -657,3 +657,11 @@ button.ph-row:active { background: var(--line); }
 .ph-later .ph-later-text { flex: 1; min-width: 0; }
 .ph-later .ph-later-when { width: auto; flex: none; }
 .ph-later-n { display: block; margin-top: 4px; font-size: .8rem; opacity: .7; }
+
+/* an app that was just downloaded: grey with a filling pie, then it pops in */
+@property --ph-dl { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.ph-app.dl .ph-app-ico { animation: ph-dl-grey 1.5s steps(1, end) both, ph-pop-in .35s 1.5s cubic-bezier(.2, 1.6, .4, 1) both; }
+.ph-app.dl .ph-app-ico::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(circle, transparent 0 34%, rgba(0, 0, 0, .55) 35%), conic-gradient(transparent var(--ph-dl), rgba(0, 0, 0, .55) var(--ph-dl)); animation: ph-dl 1.4s ease-in-out forwards, ph-dl-out .2s 1.4s forwards; }
+@keyframes ph-dl-grey { 0% { filter: grayscale(1) brightness(.85); } 100% { filter: none; } }
+@keyframes ph-dl { from { --ph-dl: 0deg; } to { --ph-dl: 360deg; } }
+@keyframes ph-dl-out { to { opacity: 0; } }

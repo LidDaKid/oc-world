@@ -3,7 +3,9 @@
 // posts, comments, streams + shows can be "by" any oc or a typed name (pickWho).
 
 import { h, s, fill, uid, openModal, confirmDialog, toast, swatches } from '../ui.js';
-import { sticker, pic, portrait, nameOf, allOcs } from './kit.js';
+import { sticker, pic, allOcs } from './kit.js';
+// portrait/nameOf here show an oc as their account on the open app (see phone-accounts.js)
+import { portrait, nameOf, acctId, accountBox } from './phone-accounts.js';
 import { who, face, freshRef, refOf, ago, bigNum, addPhotos, dropImage } from './phone-bits.js';
 
 const MV = 'music + video';
@@ -37,7 +39,7 @@ function hashStr(str) {
 }
 const keyOf = ref => (ref?.id ? 'oc:' + ref.id : 'n:' + (ref?.name || '').toLowerCase());
 const sameWho = (a, b) => keyOf(a) === keyOf(b);
-const handleOf = ref => who(ref).name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 20) || 'someone';
+const handleOf = ref => who(ref).handle || who(ref).name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 20) || 'someone';
 const n = bigNum;
 const longAgo = ts => {
   const sec = Math.max(0, (Date.now() - ts) / 1000);
@@ -140,7 +142,7 @@ function pickWho({ title = 'who?' } = {}) {
     const m = openModal({
       title,
       body: h('div', { class: 'who-pick' },
-        h('div', { class: 'who-pick-grid' }, ocs.map(o => h('button', { type: 'button', class: 'who-pick-oc', style: { '--c': o.color }, onclick: () => { done = refOf(o); m.close(); } }, portrait(o, 'md'), h('span', {}, nameOf(o))))),
+        h('div', { class: 'who-pick-grid' }, ocs.map(o => h('button', { type: 'button', class: 'who-pick-oc', style: { '--c': o.color }, onclick: () => { done = o === pageChar ? { ...refOf(o), acct: acctId(o) } : refOf(o); m.close(); } }, portrait(o, 'md'), h('span', {}, nameOf(o))))),
         h('div', { class: 'who-pick-typed' }, name)),
       actions: [{ label: 'pick', kind: 'primary', onClick: close => { const v = name.value.trim(); if (!v) { name.focus(); return; } done = { id: null, name: v }; close(); } }],
       onClose: () => resolve(done),
@@ -150,7 +152,7 @@ function pickWho({ title = 'who?' } = {}) {
 
 // ---------- a quick form in a modal ----------
 // fields: { key, label, type: text|area|number|who|pic|select|check|color, value, options, max }
-function form(title, fields, onSave, { okLabel = 'save', extra } = {}) {
+function form(title, fields, onSave, { okLabel = 'save', extra, top } = {}) {
   const vals = {};
   const rows = fields.map(f => {
     vals[f.key] = f.value ?? (f.type === 'number' ? 0 : f.type === 'check' ? false : f.type === 'who' || f.type === 'pic' ? null : '');
@@ -188,10 +190,10 @@ function form(title, fields, onSave, { okLabel = 'save', extra } = {}) {
     return h('label', { class: 'field' }, label(f.label), input);
   });
   openModal({
-    title, body: h('div', { class: 'pb-form' }, rows),
+    title, body: h('div', { class: 'pb-form' }, top?.el || null, rows),
     actions: [
       extra || null,
-      { label: okLabel, kind: 'primary', onClick: close => { if (onSave(vals) !== false) close(); } },
+      { label: okLabel, kind: 'primary', onClick: close => { if (top && !top.check()) return; top?.commit(); if (onSave(vals) !== false) close(); } },
     ].filter(Boolean),
   });
 }
@@ -276,7 +278,7 @@ export function install(api) {
   pageChar = char;
   for (const k of Object.keys(DEF)) d[k] = { ...structuredClone(DEF[k]), ...d[k] };
   d.spotify.wrapped = { ...DEF.spotify.wrapped, ...d.spotify.wrapped };
-  const me = () => ({ id: char.id, name: nameOf(char) });
+  const me = () => ({ id: char.id, name: nameOf(char), acct: acctId(char) });
   const isMe = ref => ref?.id === char.id;
   const home = () => api.goHome();
   const scr = () => api.screen;
@@ -369,13 +371,13 @@ export function install(api) {
       const own = isMe(ref);
       const hs = hashStr(keyOf(ref));
       return h('div', { class: 'pb-tt-prof ph-scroll' },
-        h('div', { class: 'pb-tt-prof-top' }, ttWho ? topBack(() => { ttWho = null; ttPage = 'feed'; draw(); }) : h('span'), h('b', {}, who(ref).name), h('span')),
+        h('div', { class: 'pb-tt-prof-top' }, ttWho ? topBack(() => { ttWho = null; ttPage = 'feed'; draw(); }) : h('span'), h('b', { 'data-acct-switch': isMe(ref) }, who(ref).name), h('span')),
         av(ref, 92, 'pb-tt-prof-av'),
         h('div', { class: 'pb-tt-at' }, '@' + handleOf(ref)),
         h('div', { class: 'pb-tt-stats' },
           [[own ? tt.following.length : hs % 400, 'following'], [own ? tt.followers : (hs % 90000), 'followers'], [likes, 'likes']].map(([v, l]) => h('div', {}, h('b', {}, n(v)), h('span', {}, l)))),
         own && mine ? h('div', { class: 'pb-tt-btns' },
-          h('button', { type: 'button', class: 'pb-tt-btn', onclick: () => form('edit profile', [{ key: 'bio', label: 'bio', type: 'area', value: tt.bio, max: 160 }, { key: 'followers', label: 'followers', type: 'number', value: tt.followers }], v => { tt.bio = v.bio.trim(); tt.followers = v.followers; save(); draw(); }) }, 'edit profile'),
+          h('button', { type: 'button', class: 'pb-tt-btn', onclick: () => form('edit profile', [{ key: 'bio', label: 'bio', type: 'area', value: tt.bio, max: 160 }, { key: 'followers', label: 'followers', type: 'number', value: tt.followers }], v => { tt.bio = v.bio.trim(); tt.followers = v.followers; save(); draw(); }, { top: accountBox(api, 'tiktok') }) }, 'edit profile'),
           h('button', { type: 'button', class: 'pb-tt-btn', onclick: () => upload() }, 'post')) : null,
         own && tt.bio ? h('p', { class: 'pb-tt-bio' }, tt.bio) : null,
         h('div', { class: 'pb-tt-gridtabs' }, h('i', { class: 'on' }, ic('grid'))),
@@ -417,7 +419,7 @@ export function install(api) {
           h('div', { class: 'pb-yt-icons' }, mine ? h('button', { type: 'button', class: 'pb-ib', title: 'upload', onclick: upload }, ic('plus')) : null, h('span', { class: 'pb-ib' }, ic('bell')), h('span', { class: 'pb-ib' }, ic('search')))),
         ytTab === 'home' && cats.length > 1 ? h('div', { class: 'pb-chips' }, cats.map(c => h('button', { type: 'button', class: 'pb-chip' + (c === ytCat ? ' on' : ''), onclick: () => { ytCat = c; draw(); } }, c))) : null,
         ytTab === 'subs' ? h('div', { class: 'pb-yt-subrow' }, yt.subs.map(k => { const v = yt.videos.find(x => keyOf(x.who) === k); return v ? h('button', { type: 'button', onclick: () => show('youtube', { channel: k }) }, av(v.who, 46), h('span', {}, who(v.who).name)) : null; })) : null,
-        ytTab === 'you' ? h('div', { class: 'pb-yt-you' }, av(me(), 56), h('div', {}, h('b', {}, nameOf(char)), h('span', {}, '@' + handleOf(me()) + ' · view channel')), h('button', { type: 'button', class: 'pb-yt-you-go', onclick: () => show('youtube', { channel: keyOf(me()) }) }, '›')) : null,
+        ytTab === 'you' ? h('div', { class: 'pb-yt-you' }, av(me(), 56), h('div', { 'data-acct-switch': true }, h('b', {}, nameOf(char)), h('span', {}, '@' + handleOf(me()) + ' · view channel')), h('button', { type: 'button', class: 'pb-yt-you-go', onclick: () => show('youtube', { channel: keyOf(me()) }) }, '›')) : null,
         h('div', { class: 'ph-scroll pb-yt-feed' }, list.length ? list.map(card) : empty('1f4fa', 'upload', upload)),
         navBar([['home', 'home', 'home'], ['subs', 'sub', 'subscriptions'], ['add'], ['you', 'user', 'you']], ytTab, id => { if (id === 'add') return upload(); ytTab = id; draw(); }, 'pb-yt-nav'));
     };
@@ -589,7 +591,7 @@ export function install(api) {
           h('button', { type: 'button', class: 'pb-tw-bback', title: 'back', onclick: () => { twTab = 'home'; twWho = null; draw(); } }, ic('back'))),
         h('div', { class: 'pb-tw-prow' }, av(ref, 70, 'pb-tw-pav'),
           own && mine ? h('button', { type: 'button', class: 'pb-tw-edit', onclick: editProfile }, 'edit profile') : null),
-        h('div', { class: 'pb-tw-pname' }, h('b', {}, who(ref).name), isBlue(ref) ? verified() : null),
+        h('div', { class: 'pb-tw-pname', 'data-acct-switch': own }, h('b', {}, who(ref).name), isBlue(ref) ? verified() : null),
         h('div', { class: 'pb-tw-phandle' }, '@' + handleOf(ref)),
         own && tw.bio ? h('p', { class: 'pb-tw-bio' }, tw.bio) : null,
         h('div', { class: 'pb-tw-follow' }, h('span', {}, h('b', {}, n(own ? tw.following : hashStr(keyOf(ref)) % 800)), ' following'), h('span', {}, h('b', {}, n(own ? tw.followers : hashStr(keyOf(ref)) % 50000)), ' followers')),
@@ -609,7 +611,7 @@ export function install(api) {
         tw.blue = tw.blue.filter(x => x !== k);
         if (v.blue) tw.blue.push(k);
         save(); draw();
-      });
+      }, { top: accountBox(api, 'twitter') });
     }
     function tweet(t, redrawFn, big = false, parent = null) {
       const like = h('button', { type: 'button', class: 'pb-tw-act like' + (t.liked ? ' on' : ''), disabled: !mine, onclick: e => { e.stopPropagation(); t.liked = !t.liked; t.likes = Math.max(0, t.likes + (t.liked ? 1 : -1)); save(); fill(like, ic('heart', { fill: t.liked }), h('span', {}, n(t.likes))); like.classList.toggle('on', t.liked); like.classList.remove('pop'); void like.offsetWidth; like.classList.add('pop'); } }, ic('heart', { fill: t.liked }), h('span', {}, n(t.likes)));
@@ -752,7 +754,7 @@ export function install(api) {
           h('div', { class: 'pb-tb-bloghead', style: { '--bc': b.color } },
             tbBlog ? h('button', { type: 'button', class: 'pb-tw-bback', onclick: () => { tbTab = 'home'; tbBlog = null; draw(); } }, ic('back')) : null,
             av(ref, 76, 'pb-tb-bav'),
-            h('h3', {}, b.title || who(ref).name), h('span', {}, handleOf(ref).replace(/_/g, '-')),
+            h('h3', { 'data-acct-switch': own }, b.title || who(ref).name), h('span', {}, handleOf(ref).replace(/_/g, '-')),
             b.desc ? h('p', {}, b.desc) : null,
             own && mine ? h('button', { type: 'button', class: 'pb-tb-editblog', onclick: () => editBlog(ref) }, 'edit appearance') : null),
           list.length ? list.map(p => postEl(p, draw)) : h('div', { class: 'pb-cmt-empty light' }, 'no posts yet')));
@@ -763,7 +765,7 @@ export function install(api) {
         { key: 'title', label: 'blog title', value: b.title, max: 60 },
         { key: 'desc', label: 'description', type: 'area', value: b.desc, max: 300 },
         { key: 'color', label: 'theme color', type: 'color', value: b.color, options: ['#001935', '#ff4fa3', '#141114', '#b18cff', '#d81e5b', '#7df9d0', '#6ec6ff', '#ffd84d', '#5a1a2e', '#9b8aa8', '#ff6b35', '#2f6f4f'] },
-      ], v => { tb.blogs[keyOf(ref)] = { title: v.title.trim(), desc: v.desc.trim(), color: v.color }; save(); draw(); });
+      ], v => { tb.blogs[keyOf(ref)] = { title: v.title.trim(), desc: v.desc.trim(), color: v.color }; save(); draw(); }, { top: isMe(ref) ? accountBox(api, 'tumblr') : null });
     }
     draw();
     return root;
@@ -855,7 +857,7 @@ export function install(api) {
       const karma = mineP.reduce((a, p) => a + score(p), 0) + rd.posts.reduce((a, p) => a + walk(p.comments), 0);
       return h('div', { class: 'pb-rd-main' },
         h('div', { class: 'ph-scroll pb-rd-feed' },
-          h('div', { class: 'pb-rd-prof', style: { '--c': char.color || '#ff4500' } }, av(me(), 72), h('h3', {}, 'u/' + handleOf(me())),
+          h('div', { class: 'pb-rd-prof', style: { '--c': char.color || '#ff4500' } }, av(me(), 72), h('h3', { 'data-acct-switch': true }, 'u/' + handleOf(me())),
             h('div', { class: 'pb-rd-karma' }, h('div', {}, h('b', {}, n(karma)), h('span', {}, 'karma')), h('div', {}, h('b', {}, new Date(char.createdAt || Date.now()).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).toLowerCase()), h('span', {}, 'cake day')))),
           mineP.length ? mineP.map(p => postCard(p, draw)) : h('div', { class: 'pb-cmt-empty' }, 'no posts yet')));
     }
@@ -1069,7 +1071,7 @@ export function install(api) {
     const draw = () => fill(root,
       h('div', { class: 'ph-scroll pb-sp-body' },
         spTab === 'home' ? [
-          h('div', { class: 'pb-sp-top' }, h('button', { type: 'button', class: 'pb-sp-me', onclick: home }, av(me(), 30)), h('div', { class: 'pb-chips dark' }, h('span', { class: 'pb-chip on' }, 'all'), h('span', { class: 'pb-chip' }, 'music'), h('span', { class: 'pb-chip' }, 'podcasts'))),
+          h('div', { class: 'pb-sp-top' }, h('button', { type: 'button', class: 'pb-sp-me', onclick: home, 'data-acct-switch': true }, av(me(), 30)), h('div', { class: 'pb-chips dark' }, h('span', { class: 'pb-chip on' }, 'all'), h('span', { class: 'pb-chip' }, 'music'), h('span', { class: 'pb-chip' }, 'podcasts'))),
           h('h3', { class: 'pb-sp-hi' }, hr < 12 ? 'good morning' : hr < 18 ? 'good afternoon' : 'good evening'),
           h('div', { class: 'pb-sp-tiles' }, lists().slice(0, 6).map(l => h('button', { type: 'button', class: 'pb-sp-tile', onclick: () => show('spotify', { list: l.id }) }, cover(l, 'sm'), h('b', {}, l.name)))),
           h('h4', { class: 'pb-sp-row-t' }, `made for ${nameOf(char)}`),

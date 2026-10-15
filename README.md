@@ -71,5 +71,12 @@ js/views/ocs.js        a world's cast
 js/views/graph.js      connections boards
 js/views/maps.js       map list + editor
 js/views/lore.js       lore pages
+js/views/diary.js      a diary: the 3d book + the open book you write/draw/sticker in
+js/views/diary-cover.js the cover designer
+js/diary/covers.js     cover materials, the cover front, the 3d book
+js/diary/items.js      stickers + photos you can drag/turn/resize on a page or cover
+js/diary/sketch.js     drawing on a page (pens, highlighter, glitter, eraser, undo)
+js/diary/stickers.js   every sticker (3d ones, word stickers, washi tape, extras)
+stickers/              the 3d sticker pictures (Microsoft Fluent Emoji, MIT license)
 tools/dev-server.js    the little local server start.bat runs
 ```

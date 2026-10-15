@@ -6,6 +6,7 @@
 //   #/w/<world>/maps[/<map>]            maps
 //   #/w/<world>/lore[/<entry>]          lore pages
 //   #/join/<code>                       an invite link to someone's collab world
+//   #/diary/<id>[/cover|/write[/<page>]] a diary: the 3d book, its cover designer, the pages
 
 import { store } from './store.js';
 import { music } from './music.js';
@@ -19,6 +20,8 @@ import * as profile from './views/profile.js';
 import * as web from './views/graph.js';
 import * as maps from './views/maps.js';
 import * as lore from './views/lore.js';
+import { renderBook, renderWrite } from './views/diary.js';
+import { renderCover } from './views/diary-cover.js';
 
 const TABS = [
   { id: 'ocs', label: 'ocs', icon: '⭐', view: ocs },
@@ -143,6 +146,22 @@ async function route() {
       ? profile.render(body, { char, tab: parts[4], base: `w/${world.id}/ocs/${char.id}`, world, go })
       : tab.view.render(body, ctx));
     return;
+  }
+
+  // ---- a diary ----
+  if (parts[0] === 'diary') {
+    const diary = store.diary(parts[1]);
+    if (diary) {
+      body.classList.add('diary-body');
+      clear(app).append(h('header', { class: 'topbar' }, logo(), right), body);
+      document.title = `${diary.cover.title.text || 'diary'} · ${siteName()}`;
+      const ctx = { diary, go };
+      if (parts[2] === 'cover') mount(renderCover(body, ctx));
+      else if (parts[2] === 'write') mount(renderWrite(body, { ...ctx, startAt: (parseInt(parts[3], 10) || 1) - 1 }));
+      else mount(renderBook(body, ctx));
+      return;
+    }
+    toast("couldn't find that diary");
   }
 
   const onHome = parts[0] !== 'oc' || !store.char(parts[1]);

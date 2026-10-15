@@ -3,15 +3,16 @@
 // show in what order, how the cards look, the site's name + icon. it's saved on this device (store.home).
 
 import { store, imageIdsIn } from '../store.js';
-import { newChar, newWorld } from '../model.js';
+import { newChar, newWorld, newDiary } from '../model.js';
 import { h, fill, toast, openModal, confirmDialog, swatches, field, pickFile } from '../ui.js';
 import { iconPicker, worldIcon, picOr, emojiPicker, downloadBackup, ocCard, emptyState } from '../parts.js';
 import { paint, readableInk, lookCards, card, colorCard, choiceCard, pictureCard, orderList } from '../look.js';
 import { collab } from '../collab.js';
 import { openJoinModal } from '../collab-ui.js';
+import { book3d } from '../diary/covers.js';
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
-const SECTION_NAMES = { header: 'header', worlds: 'worlds', ocs: 'ocs' };
+const SECTION_NAMES = { header: 'header', worlds: 'worlds', ocs: 'ocs', diaries: 'diaries' };
 const LAYOUT_CLASSES = {
   width: ['wide', 'full'], headerSize: ['short', 'tall'], headerAlign: ['left'],
   ocSize: ['small', 'big'], ocLayout: ['list'], pfpShape: ['circle', 'square'], worldSize: ['small', 'big'],
@@ -45,7 +46,8 @@ export function render(el, { go }) {
   const worldGrid = h('div', { class: 'card-grid worlds' });
   const ocGrid = h('div', { class: 'card-grid oc-grid' });
   const filters = h('div', { class: 'chip-row' });
-  const counts = { worlds: h('span', { class: 'count' }), ocs: h('span', { class: 'count' }) };
+  const shelf = h('div', { class: 'shelf' });
+  const counts = { worlds: h('span', { class: 'count' }), ocs: h('span', { class: 'count' }), diaries: h('span', { class: 'count' }) };
 
   const sections = {
     header,
@@ -63,6 +65,10 @@ export function render(el, { go }) {
           h('button', { class: 'btn primary sm', onclick: addOc }, '+ new oc'))),
       filters,
       ocGrid),
+    diaries: h('section', { class: 'home-section' },
+      h('div', { class: 'section-bar' }, h('h2', {}, 'diaries ', counts.diaries),
+        h('div', { class: 'page-head-actions' }, h('button', { class: 'btn sm', onclick: addDiary }, '+ new diary'))),
+      shelf),
   };
   const foot = h('footer', { class: 'home-foot' },
     h('div', { class: 'home-foot-actions' },
@@ -75,6 +81,7 @@ export function render(el, { go }) {
   drawLayout();
   drawWorlds();
   drawOcs();
+  drawShelf();
   current = { openDrawer };
 
   // ---- the layout ----
@@ -226,6 +233,27 @@ export function render(el, { go }) {
       null);
   }
 
+  // the diaries stand on a shelf in 3d
+  function drawShelf() {
+    const diaries = store.diaries;
+    counts.diaries.textContent = diaries.length || '';
+    fill(shelf,
+      h('div', { class: 'shelf-row' },
+        diaries.map(d => {
+          const owner = store.char(d.charId);
+          return h('a', { class: 'shelf-book', href: `#/diary/${d.id}`, title: d.cover.title.text || 'diary' },
+            book3d(d, { scale: .3 }),
+            owner ? h('span', { class: 'shelf-owner' }, owner.name || '') : null);
+        }),
+        h('button', { class: 'shelf-new', title: 'new diary', onclick: addDiary }, h('span', { class: 'plus' }, '+'))),
+      h('div', { class: 'shelf-plank' }));
+  }
+
+  function addDiary() {
+    const diary = store.addDiary(newDiary());
+    go(`diary/${diary.id}/cover`);
+  }
+
   function addOc() {
     const char = store.add('char', newChar());
     const world = store.world(filter);
@@ -289,7 +317,7 @@ export function render(el, { go }) {
     if (!file) return;
     try {
       const got = await store.importBackup(JSON.parse(await file.text()));
-      toast(`loaded ${plural(got.worlds, 'world')} + ${plural(got.chars, 'oc')}` + (got.home ? ' + the home layout' : ''));
+      toast(`loaded ${plural(got.worlds, 'world')} + ${plural(got.chars, 'oc')}` + (got.diaries ? ` + ${plural(got.diaries, 'diary').replace('diarys', 'diaries')}` : '') + (got.home ? ' + the home layout' : ''));
       if (got.home) {
         render(fill(el), { go });
         drawLogo();
@@ -297,6 +325,7 @@ export function render(el, { go }) {
       }
       drawWorlds();
       drawOcs();
+      drawShelf();
     } catch (err) {
       console.error(err);
       toast("that file doesn't look like an oc world backup", 'bad');

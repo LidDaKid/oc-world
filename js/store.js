@@ -8,12 +8,12 @@
 import { uid, toast } from './ui.js';
 import { me } from './me.js';
 import { replaceInPlace } from './sync.js';
-import { fixWorld, fixChar, fixRel, fixHome, blankHome, splitV1World } from './model.js';
+import { fixWorld, fixChar, fixRel, fixHome, fixDiary, blankHome, splitV1World } from './model.js';
 
 const DB_NAME = 'oc-world';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const FORMAT_VERSION = 2;
-const STORES = { world: 'worlds', char: 'chars', rel: 'rels' };
+const STORES = { world: 'worlds', char: 'chars', rel: 'rels', diary: 'diaries' };
 export const MAX_VIDEO = 100e6; // biggest moodboard video (bytes)
 export const MAX_SONG = 50e6; // biggest playlist song (bytes)
 
@@ -52,6 +52,8 @@ function openDb() {
         }
         // v3: a spot for this device's own stuff (the home page layout)
         if (e.oldVersion < 3) db.createObjectStore('meta', { keyPath: 'id' });
+        // v4: diaries
+        if (e.oldVersion < 4) db.createObjectStore('diaries', { keyPath: 'id' });
       };
       req.onsuccess = () => {
         // if a newer version of the site opens in another tab, let go so it can upgrade
@@ -78,7 +80,7 @@ const localAdapter = {
   async loadAll() {
     const reqs = await run(Object.values(STORES), 'readonly', t =>
       Object.fromEntries(Object.entries(STORES).map(([kind, name]) => [kind, t.objectStore(name).getAll()])));
-    return { worlds: reqs.world.result, chars: reqs.char.result, rels: reqs.rel.result };
+    return { worlds: reqs.world.result, chars: reqs.char.result, rels: reqs.rel.result, diaries: reqs.diary.result };
   },
   getMeta: id => run('meta', 'readonly', t => t.objectStore('meta').get(id)).then(req => req.result),
   putMeta: rec => run('meta', 'readwrite', t => { t.objectStore('meta').put(rec); }),
@@ -126,7 +128,7 @@ function blobToDataURL(blob) {
 
 // ---- the store ----
 
-const mem = { world: [], char: [], rel: [], home: blankHome() };
+const mem = { world: [], char: [], rel: [], diary: [], home: blankHome() };
 let homeTimer = null;
 const pending = new Map(); // "kind:id" -> { kind, rec }
 const urlCache = new Map(); // imageId -> Promise<object url | null>
@@ -163,6 +165,7 @@ export const store = {
     mem.world = all.worlds.map(fixWorld);
     mem.char = all.chars.map(fixChar).sort((a, b) => a.createdAt - b.createdAt);
     mem.rel = all.rels.map(fixRel).sort((a, b) => a.createdAt - b.createdAt);
+    mem.diary = all.diaries.map(fixDiary).sort((a, b) => a.createdAt - b.createdAt);
     mem.home = fixHome(await adapter.getMeta('home'));
   },
 
@@ -279,6 +282,21 @@ export const store = {
     if (rec) localListeners.forEach(fn => fn({ op: 'del', kind, rec }));
   },
 
+  // ---- diaries (this device only, so they skip collab: no guard, no announcing) ----
+  get diaries() { return mem.diary; },
+  diary: id => mem.diary.find(d => d.id === id) || null,
+  addDiary(d) { return this.insert('diary', d); },
+  saveDiary(d) {
+    d.updatedAt = Date.now();
+    this.persist('diary', d);
+  },
+  async deleteDiary(id) {
+    const d = this.diary(id);
+    if (!d) return;
+    await Promise.all(imageIdsIn(d).map(imageId => this.deleteImage(imageId)));
+    await this.drop('diary', id);
+  },
+
   // ---- bigger moves ----
 
   // takes an oc out of one world: off its cast list, its boards and its pins. the oc itself is fine.
@@ -361,10 +379,10 @@ export const store = {
 
   // ---- backups: one json file, pictures included ----
 
-  async exportData(worlds, chars, rels, scope, home) {
+  async exportData(worlds, chars, rels, scope, home, diaries = []) {
     await this.flush();
-    const data = { app: 'oc-world', version: FORMAT_VERSION, scope, exportedAt: new Date().toISOString(), worlds, chars, rels, home, images: {} };
-    for (const imageId of imageIdsIn([worlds, chars, home])) {
+    const data = { app: 'oc-world', version: FORMAT_VERSION, scope, exportedAt: new Date().toISOString(), worlds, chars, rels, home, diaries, images: {} };
+    for (const imageId of imageIdsIn([worlds, chars, home, diaries])) {
       const rec = await adapter.getImage(imageId);
       if (rec) data.images[imageId] = await blobToDataURL(new Blob([rec.buf], { type: rec.type }));
     }
@@ -372,7 +390,7 @@ export const store = {
   },
 
   exportEverything() {
-    return this.exportData(mem.world, mem.char, mem.rel, 'everything', mem.home.touched ? mem.home : undefined);
+    return this.exportData(mem.world, mem.char, mem.rel, 'everything', mem.home.touched ? mem.home : undefined, mem.diary);
   },
 
   // a world, everyone in it, and the relationships between them
@@ -386,7 +404,7 @@ export const store = {
   // everything in the file lands as brand new copies, so loading a backup can never overwrite anything
   async importBackup(file) {
     if (!file || file.app !== 'oc-world') throw new Error('not an oc world backup');
-    let { worlds = [], chars = [], rels = [], home = null } = structuredClone(file);
+    let { worlds = [], chars = [], rels = [], home = null, diaries = [] } = structuredClone(file);
     if (file.world) { // a v1 backup: one world with its ocs inside it
       const out = splitV1World(structuredClone(file.world));
       worlds = [out.world];
@@ -402,7 +420,7 @@ export const store = {
     for (const [oldId, dataURL] of Object.entries(file.images || {})) {
       ids.set(oldId, await this.putImage(await (await fetch(dataURL)).blob()));
     }
-    walkImageIds([worlds, chars, home], imageId => ids.get(imageId));
+    walkImageIds([worlds, chars, home, diaries], imageId => ids.get(imageId));
 
     // whatever comes out of a backup is yours, and isn't being shared with anyone
     for (const c of chars) Object.assign(c, { id: fresh(c.id, 'c_'), owner: me.id, ownerName: undefined });
@@ -432,7 +450,10 @@ export const store = {
       imageIdsIn(home).forEach(id => this.deleteImage(id));
     }
 
+    for (const d of diaries) Object.assign(d, { id: fresh(d.id, 'd_'), charId: ids.get(d.charId) || null });
+
     const now = Date.now();
+    diaries.forEach(d => mem.diary.push(fixDiary(d)));
     worlds.forEach(w => mem.world.push(Object.assign(w, { updatedAt: now })));
     chars.forEach(c => mem.char.push(fixChar(c)));
     rels.forEach(r => mem.rel.push(fixRel(r)));
@@ -440,8 +461,9 @@ export const store = {
       ...worlds.map(rec => ({ kind: 'world', rec })),
       ...chars.map(rec => ({ kind: 'char', rec })),
       ...rels.map(rec => ({ kind: 'rel', rec })),
+      ...diaries.map(rec => ({ kind: 'diary', rec })),
     ]);
-    return { worlds: worlds.length, chars: chars.length, home: tookHome };
+    return { worlds: worlds.length, chars: chars.length, diaries: diaries.length, home: tookHome };
   },
 };
 

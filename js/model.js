@@ -35,7 +35,7 @@ export const blankPage = () => ({
 });
 
 // the home page's layout. it lives on this device only (it's not part of any oc or world).
-export const HOME_SECTIONS = ['header', 'worlds', 'ocs'];
+export const HOME_SECTIONS = ['header', 'worlds', 'ocs', 'diaries'];
 export const blankHome = () => ({
   id: 'home',
   look: blankLook(),
@@ -122,6 +122,37 @@ export function fixRel(r) {
 
 export function newRel(fields = {}) {
   return fixRel({ id: 'r_' + uid(), ...fields });
+}
+
+// a diary: its cover, what paper it has, and its pages. diaries live on this device (not in collab).
+//   diary = { id, charId, cover, paper: { kind, color }, pages }
+//   cover = { preset, color, pic: { imageId }, title: { text, font, style, color }, items, stitch, corners, band, bandColor, ribbon, ribbonColor }
+//   page  = { id, text, date, font, ink, items, drawing: { imageId } }
+// items on a page / cover are stickers + photos (see diary/items.js)
+export const newPage = (from = {}) => ({ id: 'p_' + uid(), text: '', date: '', font: from.font || 'caveat', ink: from.ink || '#27306b', items: [], drawing: { imageId: null } });
+
+export function fixDiary(d) {
+  d.charId ??= null;
+  d.paper = { kind: 'lined', color: 'white', ...d.paper };
+  const c = d.cover = {
+    preset: 'leather', color: '#ff4fa3', items: [], stitch: true, corners: false,
+    band: false, bandColor: '#141114', ribbon: true, ribbonColor: '#d81e5b', ...d.cover,
+  };
+  c.pic = { imageId: null, ...c.pic };
+  c.title = { text: '', font: 'fancy', style: 'foil', color: null, ...c.title };
+  d.pages ||= [];
+  if (d.pages.length < 2) d.pages.push(...Array.from({ length: 2 - d.pages.length }, () => newPage()));
+  for (const p of d.pages) { p.items ||= []; p.drawing = { imageId: null, ...p.drawing }; p.text ||= ''; p.date ||= ''; }
+  d.createdAt ||= Date.now();
+  return d;
+}
+
+export function newDiary(fields = {}) {
+  return fixDiary({
+    id: 'd_' + uid(),
+    cover: { title: { text: 'my diary' }, items: [{ id: 'i_' + uid(), kind: 'title', x: 210, y: 210, r: 0, k: 1 }] },
+    ...fields,
+  });
 }
 
 export const newBoard = name => ({ id: 'b_' + uid(), name, nodes: [], edges: [], hiddenRels: [] });

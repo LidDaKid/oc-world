@@ -35,7 +35,7 @@ export async function cropAll(files, opts = {}) {
   const out = [];
   for (const file of files) {
     const blob = await cropImage(file, opts);
-    if (blob) out.push(Object.assign(blob, { name: file.name }));
+    if (blob) out.push(blob instanceof File ? blob : new File([blob], file.name, { type: blob.type }));
   }
   return out;
 }

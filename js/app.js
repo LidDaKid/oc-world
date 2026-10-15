@@ -143,7 +143,7 @@ async function route() {
     const char = tab.id === 'ocs' && parts[3] ? store.char(parts[3]) : null;
     const ctx = { world, sub: parts[3], go, save: () => store.save('world', world) };
     mount(char
-      ? profile.render(body, { char, tab: parts[4], base: `w/${world.id}/ocs/${char.id}`, world, go })
+      ? profile.render(body, { char, tab: parts[4], sub: parts[5], base: `w/${world.id}/ocs/${char.id}`, world, go })
       : tab.view.render(body, ctx));
     return;
   }
@@ -173,7 +173,7 @@ async function route() {
     const char = store.char(parts[1]);
     if (char) {
       document.title = `${char.name || 'unnamed oc'} · ${siteName()}`;
-      mount(profile.render(body, { char, tab: parts[2], base: `oc/${char.id}`, world: null, go }));
+      mount(profile.render(body, { char, tab: parts[2], sub: parts[3], base: `oc/${char.id}`, world: null, go }));
       return;
     }
     toast("couldn't find that oc");

@@ -8,16 +8,18 @@ import { portrait, nameOf, emptyState, worldIcon } from '../parts.js';
 import { seenFrom, openRelEditor } from '../rels.js';
 import { blankPage } from '../model.js';
 import { paint, lookCards, card, colorCard, choiceCard, pictureCard, orderList } from '../look.js';
+import { FEATURES } from '../ocfun/index.js';
+import { dataFor, sticker } from '../ocfun/kit.js';
 
 // the tabs you can move around / hide. page style is always last (and only for whoever made the oc).
-const TAB_NAMES = { about: 'about', relationships: 'relationships', gallery: 'gallery', moodboard: 'moodboard' };
+const TAB_NAMES = { about: 'about', relationships: 'relationships', gallery: 'gallery', moodboard: 'moodboard', fun: 'more' };
 const tabOrder = page => [...new Set([...(page.tabs || []).filter(id => id in TAB_NAMES), ...Object.keys(TAB_NAMES)])];
 
 const LAYOUT_CLASSES = {
   bannerSize: ['none', 'short', 'tall'], heroAlign: ['center'], pfpShape: ['circle', 'square'], pfpSize: ['small', 'big'], width: ['wide', 'full'],
 };
 
-export function render(el, { char, tab, base, world, go }) {
+export function render(el, { char, tab, sub, base, world, go }) {
   const page = char.page;
   // in a collab world you can look at someone else's oc, but only they can change it
   const mine = store.isMine(char);
@@ -506,8 +508,22 @@ export function render(el, { char, tab, base, world, go }) {
     return wrap;
   }
 
+  // ---- tab: more (a grid of little apps, each one in ocfun/) ----
+  let funCleanup = null;
+  function funTab() {
+    const app = FEATURES.find(f => f.meta.id === sub);
+    if (!app) {
+      return h('div', { class: 'fun-grid' }, FEATURES.map(f =>
+        h('a', { class: 'fun-tile', href: `#/${base}/fun/${f.meta.id}` }, sticker(f.meta.icon), h('span', {}, f.meta.label))));
+    }
+    const box = h('div', { class: 'fun-app fun-' + app.meta.id });
+    const ctx = { char, mine, save, go, base, world, ocLink: linkTo, data: dataFor(char, app.meta.id) };
+    try { funCleanup = app.render(box, ctx) || null; } catch (err) { console.error(err); toast("that didn't open right", 'bad'); }
+    return box;
+  }
+
   // ---- put it together ----
-  const TAB_VIEWS = { about: aboutTab, relationships: relsTab, gallery: galleryTab, moodboard: moodTab, style: styleTab };
+  const TAB_VIEWS = { about: aboutTab, relationships: relsTab, gallery: galleryTab, moodboard: moodTab, fun: funTab, style: styleTab };
   const panel = h('div', { class: 'profile-panel' }, TAB_VIEWS[active]());
 
   el.append(bleed);
@@ -533,4 +549,5 @@ export function render(el, { char, tab, base, world, go }) {
   drawPfp();
   drawMeta();
   if (!char.name) requestAnimationFrame(() => el.querySelector('.profile-name')?.focus());
+  return () => { try { (typeof funCleanup === 'function' ? funCleanup : funCleanup?.cleanup)?.(); } catch (err) { console.error(err); } };
 }

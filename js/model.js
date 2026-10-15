@@ -70,6 +70,7 @@ export function fixChar(c) {
   c.gallery ||= [];
   c.moodboard ||= [];
   c.playlist ||= [];
+  c.fun ||= {}; // the "more" tab apps (see ocfun/)
   c.page = { ...blankPage(), ...c.page };
   c.page.wallpaper = { imageId: null, tile: false, ...c.page.wallpaper };
   c.page.bannerPic = { imageId: null, ...c.page.bannerPic };

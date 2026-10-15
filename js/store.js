@@ -169,6 +169,19 @@ export const store = {
     mem.home = fixHome(await adapter.getMeta('home'));
   },
 
+  // ---- a one-time share link being looked at (share.js) ----
+  // someone else's oc held in memory only. init() never runs, so this browser's saves aren't even opened,
+  // and nothing below ever writes. leaving the link reloads the page.
+  viewOnly: false,
+  enterView({ chars, rels, urls }) {
+    this.viewOnly = true;
+    mem.world = [];
+    mem.diary = [];
+    mem.char = chars.map(fixChar);
+    mem.rel = rels.map(fixRel);
+    for (const [id, url] of urls) urlCache.set(id, Promise.resolve(url));
+  },
+
   // ---- the home page layout (this device only, never shared in collab) ----
   get home() { return mem.home; },
   resetHome() {
@@ -176,6 +189,7 @@ export const store = {
     this.saveHome();
   },
   saveHome() {
+    if (this.viewOnly) return;
     mem.home.touched = true;
     setStatus('saving');
     clearTimeout(homeTimer);
@@ -230,6 +244,7 @@ export const store = {
 
   // call this after any change. writes are bundled up so typing doesn't hammer the disk.
   save(kind, rec) {
+    if (this.viewOnly) return;
     const no = this.guard?.(kind, rec);
     if (no) {
       refuse(kind, rec, no);
@@ -243,6 +258,7 @@ export const store = {
   // the quiet versions: same as save / add / remove but without announcing it as a change made here.
   // collab.js uses them for changes that arrived from someone else.
   persist(kind, rec) {
+    if (this.viewOnly) return;
     pending.set(`${kind}:${rec.id}`, { kind, rec });
     setStatus('saving');
     clearTimeout(saveTimer);
@@ -250,18 +266,21 @@ export const store = {
   },
 
   insert(kind, rec) {
+    if (this.viewOnly) return rec;
     mem[kind].push(rec);
     this.persist(kind, rec);
     return rec;
   },
 
   async drop(kind, id) {
+    if (this.viewOnly) return;
     mem[kind] = mem[kind].filter(rec => rec.id !== id);
     pending.delete(`${kind}:${id}`);
     await adapter.delete(kind, id);
   },
 
   async flush() {
+    if (this.viewOnly) return;
     await this.flushHome();
     clearTimeout(saveTimer);
     if (!pending.size) return;
@@ -346,12 +365,14 @@ export const store = {
 
   async putImage(blob) {
     const id = 'img_' + uid();
+    if (this.viewOnly) { urlCache.set(id, Promise.resolve(URL.createObjectURL(blob))); return id; }
     await adapter.putImage({ id, type: blob.type, buf: await blob.arrayBuffer() });
     return id;
   },
 
   imageURL(id) {
     if (!id) return Promise.resolve(null);
+    if (!urlCache.has(id) && store.viewOnly) return Promise.resolve(null);
     if (!urlCache.has(id)) {
       urlCache.set(id, adapter.getImage(id).then(rec => {
         if (rec) return URL.createObjectURL(new Blob([rec.buf], { type: rec.type }));
@@ -363,14 +384,14 @@ export const store = {
   },
 
   // moving pictures between people: the raw { id, type, buf } record
-  imageRecord: id => adapter.getImage(id),
+  imageRecord: id => (store.viewOnly ? Promise.resolve(null) : adapter.getImage(id)),
   async keepImageRecord(rec) {
     await adapter.putImage({ id: rec.id, type: rec.type, buf: rec.buf });
     urlCache.delete(rec.id);
   },
 
   async deleteImage(id) {
-    if (!id) return;
+    if (!id || this.viewOnly) return;
     const url = await urlCache.get(id);
     if (url) URL.revokeObjectURL(url);
     urlCache.delete(id);

@@ -1,0 +1,27 @@
+/* one-time share links (share.js): the box on an oc's page + the screens around opening one */
+
+.profile-top-right { display: flex; gap: 1rem; align-items: center; }
+
+.share-box { display: grid; gap: .9rem; }
+.share-box > .btn.primary { justify-self: start; }
+.share-progress { height: 10px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--edge); overflow: hidden; }
+.share-progress i { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .25s; }
+.share-progress.big { width: min(320px, 80vw); height: 12px; }
+.share-url-row { display: flex; gap: .5rem; align-items: center; }
+.share-url { flex: 1; min-width: 0; font-size: .85rem; }
+.share-links { display: grid; gap: .3rem; }
+.share-links:empty { display: none; }
+.share-link-row { display: flex; align-items: center; gap: .8rem; padding: .45rem .7rem; border-radius: 12px; background: var(--panel2); font-size: .9rem; }
+.share-when { flex: 1; min-width: 0; color: var(--ink2); }
+.share-state { font-weight: 800; font-size: .8rem; padding: .1rem .55rem; border-radius: 999px; background: var(--edge); }
+.share-state[data-state="waiting"] { background: color-mix(in srgb, var(--accent3) 30%, transparent); }
+.share-state[data-state="opened"] { background: color-mix(in srgb, var(--accent2) 28%, transparent); }
+
+.share-screen { min-height: 60vh; display: grid; place-items: center; padding: 2rem 1rem; }
+.share-dead { display: grid; justify-items: center; gap: .8rem; text-align: center; }
+.share-dead-icon { font-size: 3.4rem; line-height: 1; filter: drop-shadow(0 6px 14px var(--shadow)); }
+.share-dead h2 { font-family: var(--font-display); font-size: 1.4rem; }
+
+/* read-only: nothing on the page looks clickable-to-edit */
+.share-view .rel-card { cursor: default; }
+.share-view .pfp-btn { cursor: default; }

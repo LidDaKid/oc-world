@@ -1,10 +1,27 @@
 // phone: the oc's phone. a case you can dress up (flip it to see the back), a lock screen,
 // a home screen + messages, photos, music, notes, camera, contacts, settings.
+//
+// more apps plug in from phone-calls.js, phone-life.js, phone-web.js. each one exports
+//   APPS     { id: { label, icon, bg } }   (icon = sticker code; link: '<more-tab app id>' jumps to that app instead)
+//   DEF      defaults for its saved stuff (top-level keys on the phone's data)
+//   install(api)        adds its screens: api.SCREENS.<id> = (params, view) => element
+//   lockNotifs?(api)    [{ app, title, text, at, open() }] for the lock screen
+//   widget?(api)        a widget for the second home page (or null)
+// api = { d, char, mine, ctx, save, show, redraw, goHome, openApp, header, plusBtn, screen, SCREENS, onLeave(fn), drawStatus, APPS, appOf, FIXED }
+// apps can be taken off the home screen (d.hidden) and made from scratch in the app store (d.custom, see phone-store.js)
 
 import { h, s, fill, uid, openModal, confirmDialog, swatches, segmented, toast } from '../ui.js';
 import { store } from '../store.js';
 import { dataFor, pic, sticker, appBar, portrait, nameOf, allOcs, ocById } from './kit.js';
-import { who, face, freshRef, pickWho, hm, hmA, stamp, dayLabel, shortDate, addPhotos, dropImage, relLabel, inkOn } from './phone-bits.js';
+import { who, face, freshRef, pickWho, hm, hmA, stamp, dayLabel, shortDate, addPhotos, dropImage, relLabel, inkOn, mirrorSend, mirrorReact, mirrorDelete } from './phone-bits.js';
+import * as callsApps from './phone-calls.js';
+import * as lifeApps from './phone-life.js';
+import * as webApps from './phone-web.js';
+import * as socialApps from './phone-social.js';
+import * as brandApps from './phone-brands.js';
+import * as storeApps from './phone-store.js';
+
+const EXTRA = [callsApps, lifeApps, webApps, socialApps, storeApps, brandApps];
 
 export const meta = { id: 'phone', label: 'phone', icon: '1f4f1' };
 
@@ -13,7 +30,9 @@ const DEF = {
   lock: { imageId: null },
   home: { imageId: null },
   clockFont: 'clean', dark: false, bubble: null, carrier: 'oc mobile', battery: 78,
+  passcode: '', faceId: false, later: [], // later = texts that arrive in a bit: { id, threadId, text, due }
   threads: [], photos: [], notes: [], songs: [], nowPlaying: null,
+  ...Object.assign({}, ...EXTRA.map(m => m.DEF || {})),
 };
 
 export const CASES = [
@@ -34,7 +53,13 @@ const APPS = {
   notes: { label: 'notes', icon: '1f4dd', bg: 'linear-gradient(160deg,#fff7c2,#ffd84d)' },
   contacts: { label: 'contacts', icon: '1f4de', bg: 'linear-gradient(160deg,#c9c9d1,#8e8e99)' },
   settings: { label: 'settings', icon: '2699-fe0f', bg: 'linear-gradient(160deg,#9a9aa5,#55555f)' },
+  ...Object.assign({}, ...EXTRA.map(m => m.APPS || {})),
 };
+// where every app sits. anything not listed lands at the end of the last page
+const PAGE1 = ['camera', 'notes', 'contacts', 'settings', 'clock', 'calendar', 'weather', 'reminders', 'store'];
+const PAGE2 = ['browser', 'maps', 'memos', 'wallet', 'calculator', 'screentime', 'games', 'socials', 'diaries'];
+const DOCK = ['phone', 'messages', 'photos', 'music'];
+const FIXED = ['settings', 'store']; // can't be taken off the home screen
 
 // little svgs for the status bar
 const signal = () => s('svg', { viewBox: '0 0 18 12', class: 'ph-ico' }, [0, 1, 2, 3].map(i => s('rect', { x: i * 4.6, y: 9 - i * 3, width: 3.2, height: 3 + i * 3, rx: 1 })));
@@ -48,6 +73,9 @@ const battery = pct => s('svg', { viewBox: '0 0 27 12', class: 'ph-ico ph-batt' 
   s('path', { d: 'M24 4v4a2 2 0 0 0 0-4Z', 'fill-opacity': .5 }));
 const torchIco = () => s('svg', { viewBox: '0 0 24 24', class: 'ph-round-ico' }, s('path', { d: 'M7 2h10v4l-3 4v11a2 2 0 0 1-4 0V10L7 6Z' }), s('circle', { cx: 12, cy: 14, r: 1.4, fill: '#000', 'fill-opacity': .4 }));
 const camIco = () => s('svg', { viewBox: '0 0 24 24', class: 'ph-round-ico' }, s('path', { d: 'M4 7h3l2-3h6l2 3h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z' }), s('circle', { cx: 12, cy: 13, r: 3.6, fill: '#000', 'fill-opacity': .35 }));
+const faceIdIco = () => s('svg', { viewBox: '0 0 24 24', class: 'ph-faceid-ico', fill: 'none', stroke: 'currentColor', 'stroke-width': 1.8, 'stroke-linecap': 'round' },
+  s('path', { d: 'M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3' }),
+  s('path', { d: 'M8.5 9v1.5M15.5 9v1.5M12 9v4h-1M9 16a4.5 4.5 0 0 0 6 0' }));
 const lockIco = open => s('svg', { viewBox: '0 0 20 26', class: 'ph-lock-ico' + (open ? ' open' : '') },
   s('path', { class: 'ph-shackle', d: 'M5 11V7a5 5 0 0 1 10 0v4', fill: 'none', stroke: 'currentColor', 'stroke-width': 2.6, 'stroke-linecap': 'round' }),
   s('rect', { x: 1.5, y: 11, width: 17, height: 13, rx: 3.5 }));
@@ -59,6 +87,8 @@ export function render(el, ctx) {
   d.lock = { imageId: null, ...d.lock };
   d.home = { imageId: null, ...d.home };
   for (const t of d.threads) { t.msgs ||= []; t.read ??= true; }
+  d.hidden = (d.hidden || []).filter(id => !FIXED.includes(id));
+  d.custom ||= [];
   const save = () => ctx.save();
   const myRef = { id: char.id, name: nameOf(char) };
   const timers = [];
@@ -69,8 +99,10 @@ export function render(el, ctx) {
   const statusRight = h('span', { class: 'ph-status-right' });
   const screen = h('div', { class: 'ph-screen' },
     h('div', { class: 'ph-status' }, statusTime, h('div', { class: 'ph-island' }, h('i')), statusRight),
+    h('button', { type: 'button', class: 'ph-nc-pull', title: 'notifications', onclick: () => openCenter(), onpointerdown: pullCenter }),
     views,
     h('button', { type: 'button', class: 'ph-homebar', title: 'home', onclick: () => goHome() }));
+  mouseScroll(screen);
   const back = h('div', { class: 'ph-back' });
   const device = h('div', { class: 'ph-device' },
     h('div', { class: 'ph-front' }, h('i', { class: 'ph-btn ph-btn-a' }), h('i', { class: 'ph-btn ph-btn-b' }), h('i', { class: 'ph-btn ph-btn-c' }), h('i', { class: 'ph-btn ph-btn-d' }), screen),
@@ -114,6 +146,7 @@ export function render(el, ctx) {
   let cur = null;
   let cleanupScreen = null;
   function show(name, params = {}, anim = 'push', origin = null) {
+    if (name !== 'home') jiggle = false;
     cleanupScreen?.();
     cleanupScreen = null;
     const old = [...views.children].filter(v => !v.classList.contains('leaving'));
@@ -133,6 +166,7 @@ export function render(el, ctx) {
   const redraw = () => show(cur.name, cur.params, null);
   let lastIcon = null;
   function goHome() {
+    if (cur?.name === 'home' && jiggle) { jiggle = false; redraw(); return; }
     if (!cur || cur.name === 'home') return;
     if (cur.name === 'lock') { show('home', {}, 'unlock'); return; }
     show('home', {}, 'close', lastIcon);
@@ -157,32 +191,55 @@ export function render(el, ctx) {
 
   const SCREENS = {};
 
+  // every notification, newest first (lock screen + notification center). perThread = how many texts per chat
+  function allNotifs(perThread = 1) {
+    return [
+      ...d.threads.flatMap(t => t.msgs.filter(m => m.from === 'them').slice(-perThread).map(m => ({
+        app: 'messages', title: who(t.who).name, text: m.imageId && !m.text ? '📷 photo' : m.text, at: m.at, faceOf: t.who, open: () => show('thread', { id: t.id }, 'unlock'),
+      }))),
+      ...EXTRA.flatMap(m => { try { return m.lockNotifs?.(api) || []; } catch (err) { console.error(err); return []; } }),
+    ].filter(n => APPS[n.app]).sort((a, b) => b.at - a.at);
+  }
+  // getting past the lock screen: passcode (always for someone else's oc), face id, or straight in
+  function unlockThen(then = () => show('home', {}, 'unlock')) {
+    if (d.passcode && (!mine || !d.faceId)) { show('passcode', { then }, 'fade'); return; }
+    if (d.passcode && d.faceId) { faceScan(then); return; }
+    then();
+  }
+  function faceScan(then) {
+    const scan = h('div', { class: 'ph-faceid' }, faceIdIco(), h('span', {}, 'face id'));
+    screen.append(scan);
+    setTimeout(() => scan.classList.add('ok'), 900);
+    setTimeout(() => { scan.remove(); then(); }, 1400);
+  }
+
   // lock screen
   SCREENS.lock = () => {
     const now = new Date();
-    const notes = d.threads.map(t => ({ t, m: t.msgs.filter(m => m.from === 'them').at(-1) })).filter(x => x.m).sort((a, b) => b.m.at - a.m.at).slice(0, 3);
+    const notes = allNotifs().slice(0, 3);
     let y0 = null, going = false;
-    const unlock = () => { if (going) return; going = true; lockEl.classList.add('opening'); setTimeout(() => show('home', {}, 'unlock'), 160); };
+    const unlock = (then) => { if (going) return; going = true; lockEl.classList.add('opening'); setTimeout(() => { going = false; lockEl.classList.remove('opening'); unlockThen(then); }, 160); };
     const lockEl = h('div', {
       class: 'ph-lock',
       onpointerdown: e => { y0 = e.clientY; },
       onpointerup: e => { if (y0 != null && y0 - e.clientY > 40) unlock(); y0 = null; },
       onclick: e => { if (!e.target.closest('button')) unlock(); },
+      'data-locked': d.passcode ? '' : null,
     },
       wall(d.lock.imageId, 'ph-wall-lock'),
       h('span', { class: 'ph-carrier' }, d.carrier),
-      h('div', { class: 'ph-lock-top' }, lockIco(false)),
+      h('div', { class: 'ph-lock-top' }, lockIco(!d.passcode)),
       h('div', { class: 'ph-lock-date' }, now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).toLowerCase()),
       h('div', { class: 'ph-lock-clock', 'data-clock-live': '' }, hm()),
-      h('div', { class: 'ph-notifs' }, notes.map(({ t, m }, i) => h('button', {
-        type: 'button', class: 'ph-notif', style: { animationDelay: (0.15 + i * 0.12) + 's' },
-        onclick: () => { lockEl.classList.add('opening'); setTimeout(() => show('thread', { id: t.id }, 'unlock'), 160); },
+      h('div', { class: 'ph-notifs' }, notes.map((n, i) => h('button', {
+        type: 'button', class: 'ph-notif', 'data-app': n.app, style: { animationDelay: (0.15 + i * 0.12) + 's' },
+        onclick: () => unlock(n.open),
       },
-        h('div', { class: 'ph-notif-ico', style: { background: APPS.messages.bg } }, sticker(APPS.messages.icon)),
+        h('div', { class: 'ph-notif-ico', style: { background: APPS[n.app].bg } }, sticker(APPS[n.app].icon)),
         h('div', { class: 'ph-notif-body' },
-          h('div', { class: 'ph-notif-top' }, h('b', {}, who(t.who).name), h('span', {}, dayLabel(m.at) === 'today' ? hm(m.at) : dayLabel(m.at))),
-          h('div', { class: 'ph-notif-text' }, m.imageId && !m.text ? '📷 photo' : m.text)),
-        face(t.who, 'xs ph-notif-face')))),
+          h('div', { class: 'ph-notif-top' }, h('b', {}, n.title), h('span', {}, dayLabel(n.at) === 'today' ? hm(n.at) : dayLabel(n.at))),
+          h('div', { class: 'ph-notif-text' }, n.text)),
+        n.faceOf ? face(n.faceOf, 'xs ph-notif-face') : null))),
       h('div', { class: 'ph-lock-bottom' },
         h('button', { type: 'button', class: 'ph-round', title: 'flashlight', onclick: e => { e.currentTarget.classList.toggle('on'); screen.classList.toggle('torch'); } }, torchIco()),
         h('button', { type: 'button', class: 'ph-round', title: 'camera', onclick: e => { e.stopPropagation(); openApp('camera', e.currentTarget); } }, camIco())));
@@ -195,20 +252,57 @@ export function render(el, ctx) {
     for (let i = t.msgs.length - 1; i >= 0 && t.msgs[i].from === 'them'; i--) k++;
     return n + k;
   }, 0);
+  // apps you made in the app store look + open like the built in ones
+  const appOf = id => {
+    if (APPS[id]) return APPS[id];
+    const c = d.custom.find(x => x.id === id);
+    return c ? { label: c.label || 'app', icon: c.icon, bg: c.bg, custom: true } : null;
+  };
+  let jiggle = false; // holding an icon wiggles them all + shows the − buttons
+  async function removeApp(id) {
+    const c = d.custom.find(x => x.id === id);
+    if (c) {
+      if (!(await confirmDialog(`delete ${c.label || 'this app'}?`, { danger: true, okLabel: 'delete' }))) return;
+      d.custom = d.custom.filter(x => x !== c);
+      dropImage(c.imageId);
+    } else if (!d.hidden.includes(id)) d.hidden.push(id);
+    save();
+    redraw();
+  }
   const icon = (id, extra) => {
-    const a = APPS[id];
-    const b = h('button', { type: 'button', class: 'ph-app', 'data-app': id, onclick: e => openApp(id, e.currentTarget.querySelector('.ph-app-ico')) },
-      h('span', { class: 'ph-app-ico', style: { background: a.bg } }, sticker(a.icon), extra),
+    const a = appOf(id);
+    if (!a) return null;
+    const removable = mine && !FIXED.includes(id);
+    let held = null, x0 = 0, y0 = 0;
+    const startJiggle = () => { held = null; if (jiggle) return; jiggle = true; redraw(); };
+    const b = h('button', {
+      type: 'button', class: 'ph-app', 'data-app': id,
+      onclick: e => {
+        if (jiggle) return;
+        const ico = e.currentTarget.querySelector('.ph-app-ico');
+        if (a.link) location.hash = `#/${ctx.base}/fun/${a.link}`;
+        else if (a.custom) openApp('custom', ico, { id });
+        else openApp(id, ico);
+      },
+      onpointerdown: e => { if (!mine || e.button > 0) return; x0 = e.clientX; y0 = e.clientY; clearTimeout(held); held = setTimeout(startJiggle, 520); },
+      onpointermove: e => { if (held && Math.hypot(e.clientX - x0, e.clientY - y0) > 6) { clearTimeout(held); held = null; } },
+      onpointerup: () => { clearTimeout(held); held = null; },
+      onpointerleave: () => { clearTimeout(held); held = null; },
+      oncontextmenu: e => { if (!mine) return; e.preventDefault(); startJiggle(); },
+    },
+      h('span', { class: 'ph-app-ico', style: { background: a.bg } }, sticker(a.icon), jiggle ? null : extra,
+        jiggle && removable ? h('span', { class: 'ph-app-x', role: 'button', title: 'remove', onclick: e => { e.stopPropagation(); removeApp(id); } }, '−') : null),
       h('span', { class: 'ph-app-label' }, a.label));
     return b;
   };
   SCREENS.home = () => {
-    const n = unread();
+    const shown = id => !d.hidden.includes(id) && (mine || (id !== 'settings' && id !== 'store')) && !!appOf(id);
+    const counts = Object.assign({ messages: unread() }, ...EXTRA.map(m => { try { return m.badges?.(api) || {}; } catch (err) { console.error(err); return {}; } }));
+    const badge = id => (counts[id] ? h('span', { class: 'ph-badge' }, counts[id] > 99 ? '99+' : counts[id]) : null);
     const lastPhoto = d.photos.at(-1);
     const songs = allSongs();
     const playingTitle = songs[0]?.title;
-    return h('div', { class: 'ph-home' },
-      wall(d.home.imageId || d.lock.imageId, 'ph-wall-home'),
+    const page1 = h('div', { class: 'ph-page' },
       h('div', { class: 'ph-widgets' },
         h('button', { type: 'button', class: 'ph-widget ph-w-photo', onclick: e => openApp('photos', e.currentTarget) },
           lastPhoto ? pic(lastPhoto.imageId, 'ph-w-img') : portrait(char, 'ph-w-pfp'),
@@ -222,11 +316,38 @@ export function render(el, ctx) {
             h('span', {}, new Date().toLocaleDateString(undefined, { weekday: 'long' }).toLowerCase()),
             h('b', {}, new Date().getDate()),
             h('em', {}, d.notes[0] ? noteTitle(d.notes[0]) : new Date().toLocaleDateString(undefined, { month: 'long' }).toLowerCase()))),
-      h('div', { class: 'ph-grid' }, icon('camera'), icon('notes'), icon('contacts'), mine ? icon('settings') : null),
-      h('div', { class: 'ph-dots' }, h('i', { class: 'on' }), h('i')),
+      h('div', { class: 'ph-grid' }, PAGE1.filter(shown).map(id => icon(id, badge(id)))));
+    const allWidgets = EXTRA.map(m => { try { return m.widget?.(api) || null; } catch (err) { console.error(err); return null; } }).filter(Boolean);
+    const placed = new Set([...PAGE1, ...PAGE2, ...DOCK]);
+    const rest = [...PAGE2, ...Object.keys(APPS).filter(id => !placed.has(id)), ...d.custom.map(c => c.id)].filter(shown);
+    const page2 = h('div', { class: 'ph-page' },
+      allWidgets.length ? h('div', { class: 'ph-widgets' }, allWidgets.slice(0, 2)) : null,
+      h('div', { class: 'ph-grid' }, rest.slice(0, 12).map(id => icon(id, badge(id)))));
+    // apps that don't fit spill onto more pages, then widgets that don't fit get their own page
+    const more = [];
+    for (let i = 12; i < rest.length; i += 20) more.push(h('div', { class: 'ph-page' }, h('div', { class: 'ph-grid' }, rest.slice(i, i + 20).map(id => icon(id, badge(id))))));
+    for (let i = 2; i < allWidgets.length; i += 4) more.push(h('div', { class: 'ph-page' }, h('div', { class: 'ph-widgets' }, allWidgets.slice(i, i + 4))));
+    const nPages = 2 + more.length;
+    homePage = Math.min(homePage, nPages - 1);
+    const dots = h('div', { class: 'ph-dots' }, Array.from({ length: nPages }, (_, i) =>h('i', { class: i === homePage ? 'on' : '', onclick: () => pages.scrollTo({ left: i * pages.clientWidth, behavior: 'smooth' }) })));
+    const pages = h('div', {
+      class: 'ph-pages', onscroll: () => {
+        homePage = Math.round(pages.scrollLeft / (pages.clientWidth || 1));
+        dots.querySelectorAll('i').forEach((dot, i) => dot.classList.toggle('on', i === homePage));
+      },
+    }, page1, page2, ...more);
+    if (homePage) requestAnimationFrame(() => { pages.scrollLeft = homePage * pages.clientWidth; });
+    return h('div', {
+      class: 'ph-home' + (jiggle ? ' jiggle' : ''),
+      onclick: e => { if (jiggle && !e.target.closest('.ph-app, .ph-dots, .ph-jiggle-done')) { jiggle = false; redraw(); } },
+    },
+      wall(d.home.imageId || d.lock.imageId, 'ph-wall-home'),
+      jiggle ? h('button', { type: 'button', class: 'ph-jiggle-done', onclick: () => { jiggle = false; redraw(); } }, 'done') : null,
+      pages, dots,
       h('div', { class: 'ph-dock' },
-        icon('messages', n ? h('span', { class: 'ph-badge' }, n > 99 ? '99+' : n) : null), icon('photos'), icon('music')));
+        DOCK.filter(shown).map(id => icon(id, badge(id)))));
   };
+  let homePage = 0;
 
   // messages
   const threadById = id => d.threads.find(t => t.id === id);
@@ -277,9 +398,11 @@ export function render(el, ctx) {
       const text = input.value.trim();
       if (!text && !imageId) return;
       t.who = freshRef(t.who);
-      t.msgs.push({ id: 'm_' + uid(), from: as, text, imageId, at: Date.now(), react: null });
+      const m = { id: 'm_' + uid(), from: as, text, imageId, at: Date.now(), react: null };
+      t.msgs.push(m);
       input.value = '';
       save();
+      mirrorSend(char, t.who, m);
       drawMsgs(true);
     }
     async function sendPic() {
@@ -312,8 +435,8 @@ export function render(el, ctx) {
     function tapback(m, bubble) {
       closeTapback();
       const bar = h('div', { class: 'ph-tapback ' + m.from },
-        REACTS.map(r => h('button', { type: 'button', class: m.react === r ? 'on' : '', disabled: !mine, onclick: e => { e.stopPropagation(); m.react = m.react === r ? null : r; save(); closeTapback(); drawMsgs(); } }, r)),
-        mine ? h('button', { type: 'button', class: 'ph-tb-del', title: 'delete', onclick: e => { e.stopPropagation(); t.msgs = t.msgs.filter(x => x !== m); dropImage(m.imageId); save(); closeTapback(); drawMsgs(); } }, '🗑') : null);
+        REACTS.map(r => h('button', { type: 'button', class: m.react === r ? 'on' : '', disabled: !mine, onclick: e => { e.stopPropagation(); m.react = m.react === r ? null : r; save(); mirrorReact(char, t.who, m.id, m.react); closeTapback(); drawMsgs(); } }, r)),
+        mine ? h('button', { type: 'button', class: 'ph-tb-del', title: 'delete', onclick: e => { e.stopPropagation(); t.msgs = t.msgs.filter(x => x !== m); dropImage(m.imageId); save(); mirrorDelete(char, t.who, [m.id]); closeTapback(); drawMsgs(); } }, '🗑') : null);
       bubble.closest('.ph-msg-row').prepend(bar);
       bubble.classList.add('lifted');
       setTimeout(() => document.addEventListener('click', closeTapback, { once: true }), 0);
@@ -322,14 +445,30 @@ export function render(el, ctx) {
     function info() {
       const readBox = h('input', { type: 'checkbox', checked: t.read, onchange: e => { t.read = e.target.checked; save(); drawMsgs(); } });
       const typingBox = h('input', { type: 'checkbox', checked: !!t.typing, onchange: e => { t.typing = e.target.checked; save(); drawMsgs(); } });
+      // a text from them that shows up in a bit (as a banner wherever you are)
+      const laterText = h('input', { type: 'text', class: 'ph-later-text', placeholder: `text from ${w.name}`, maxLength: 600 });
+      const laterWhen = h('select', { class: 'ph-later-when' }, [[5, '5 sec'], [30, '30 sec'], [60, '1 min'], [300, '5 min']].map(([v, l]) => h('option', { value: v }, l)));
+      const queued = d.later.filter(x => x.threadId === t.id).length;
       openModal({
         title: w.name,
         body: h('div', { class: 'ph-info' },
           h('label', { class: 'check' }, readBox, 'read receipts'),
           h('label', { class: 'check' }, typingBox, `${w.name} is typing`),
+          h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'text me in'),
+            h('div', { class: 'ph-later' }, laterWhen, laterText,
+              h('button', {
+                type: 'button', class: 'btn sm ph-later-go', onclick: () => {
+                  if (!laterText.value.trim()) return laterText.focus();
+                  d.later.push({ id: 'l_' + uid(), threadId: t.id, text: laterText.value.trim(), due: Date.now() + Number(laterWhen.value) * 1000 });
+                  save();
+                  laterText.value = '';
+                  toast(`coming in ${laterWhen.selectedOptions[0].textContent}`);
+                },
+              }, 'set')),
+            queued ? h('span', { class: 'ph-later-n' }, `${queued} on the way`) : null),
           w.char ? h('a', { class: 'btn ghost sm', href: ctx.ocLink(w.char) }, 'their page') : null),
         actions: [
-          { label: 'delete chat', kind: 'danger', onClick: async close => { if (await confirmDialog(`delete the chat with ${w.name}?`, { danger: true, okLabel: 'delete' })) { close(); d.threads = d.threads.filter(x => x !== t); t.msgs.forEach(m => dropImage(m.imageId)); save(); show('messages', {}, 'pop'); } } },
+          { label: 'delete chat', kind: 'danger', onClick: async close => { if (await confirmDialog(`delete the chat with ${w.name}?`, { danger: true, okLabel: 'delete' })) { close(); d.threads = d.threads.filter(x => x !== t); d.later = d.later.filter(x => x.threadId !== t.id); t.msgs.forEach(m => dropImage(m.imageId)); save(); show('messages', {}, 'pop'); } } },
           { label: 'done', kind: 'primary', onClick: close => close() },
         ],
       });
@@ -602,6 +741,15 @@ export function render(el, ctx) {
           h('div', { class: 'ph-row static' }, h('span', { class: 'ph-set-ico', style: { background: '#3a3a46' } }, '🌙'), h('div', { class: 'ph-row-main' }, h('b', {}, 'dark mode')), toggle(d.dark, v => { d.dark = v; save(); screen.classList.toggle('dark', v); })),
           h('div', { class: 'ph-row static col' }, h('div', { class: 'ph-set-line' }, h('span', { class: 'ph-set-ico', style: { background: 'var(--me)' } }, '💬'), h('b', {}, 'bubble color')),
             swatches(d.bubble || char.color, c => { d.bubble = c; save(); screen.style.setProperty('--me', c); screen.style.setProperty('--me-ink', inkOn(c)); }))),
+        h('div', { class: 'ph-set-label' }, 'passcode'),
+        h('div', { class: 'ph-group' },
+          h('div', { class: 'ph-row static' }, h('span', { class: 'ph-set-ico', style: { background: '#ff3b30' } }, lockIco(!d.passcode)), h('div', { class: 'ph-row-main' }, h('b', {}, 'passcode')),
+            h('div', { class: 'ph-seg ph-pass-seg' }, [['', 'off'], [4, '4 digits'], [6, '6 digits']].map(([n, l]) => h('button', {
+              type: 'button', class: (n ? d.passcode.length === n : !d.passcode) ? 'on' : '', 'data-pass': n || 'off',
+              onclick: () => { if (!n) { d.passcode = ''; d.faceId = false; save(); redraw(); } else show('passcode', { set: n }, 'push'); },
+            }, l)))),
+          d.passcode ? h('div', { class: 'ph-row static' }, h('span', { class: 'ph-set-ico', style: { background: '#8e8e93' } }, '#'), h('div', { class: 'ph-row-main' }, h('b', {}, 'code')), h('span', { class: 'ph-pass-show' }, d.passcode)) : null,
+          d.passcode ? h('div', { class: 'ph-row static' }, h('span', { class: 'ph-set-ico', style: { background: '#34c759' } }, faceIdIco()), h('div', { class: 'ph-row-main' }, h('b', {}, 'face id')), toggle(d.faceId, v => { d.faceId = v; save(); })) : null),
         h('div', { class: 'ph-set-label' }, 'phone'),
         h('div', { class: 'ph-group' },
           h('label', { class: 'ph-row static' }, h('span', { class: 'ph-set-ico', style: { background: '#34c759' } }, '📶'), h('b', {}, 'carrier'),
@@ -610,6 +758,150 @@ export function render(el, ctx) {
             h('input', { type: 'range', class: 'ph-range', min: 1, max: 100, value: d.battery, oninput: e => { d.battery = Number(e.target.value); save(); drawStatus(); e.target.nextSibling.textContent = d.battery + '%'; } }), h('em', { class: 'ph-batt-pct' }, d.battery + '%'))),
         h('button', { type: 'button', class: 'ph-pill wide', onclick: () => show('lock', {}, 'lockdown') }, 'lock phone')));
   };
+
+  // passcode: { then } to unlock, { set: 4|6 } to pick a new one
+  SCREENS.passcode = ({ then, set }) => {
+    const len = set || d.passcode.length || 4;
+    let typed = '', first = null;
+    const title = h('div', { class: 'ph-pass-title' });
+    const dots = h('div', { class: 'ph-pass-dots' });
+    const drawTitle = () => { title.textContent = set ? (first ? 'confirm passcode' : 'new passcode') : 'enter passcode'; };
+    const drawDots = () => fill(dots, Array.from({ length: len }, (_, i) => h('i', { class: i < typed.length ? 'on' : '' })));
+    const side = h('button', { type: 'button', class: 'ph-pass-side', onclick: () => { if (typed) { typed = typed.slice(0, -1); drawDots(); drawSide(); } else cancel(); } });
+    const drawSide = () => { side.textContent = typed ? 'delete' : 'cancel'; };
+    const cancel = () => (set ? show('settings', {}, 'pop') : show('lock', {}, 'fade'));
+    const wrong = () => {
+      dots.classList.remove('shake'); void dots.offsetWidth; dots.classList.add('shake');
+      navigator.vibrate?.(180);
+      setTimeout(() => { typed = ''; drawDots(); drawSide(); }, 380);
+    };
+    const press = k => {
+      if (typed.length >= len) return;
+      typed += k;
+      drawDots();
+      drawSide();
+      if (typed.length < len) return;
+      setTimeout(() => {
+        if (set) {
+          if (!first) { first = typed; typed = ''; drawTitle(); drawDots(); drawSide(); return; }
+          if (typed !== first) { first = null; drawTitle(); wrong(); return; }
+          d.passcode = typed; save(); toast('passcode set'); show('settings', {}, 'pop');
+          return;
+        }
+        if (typed === d.passcode) (then || (() => show('home', {}, 'unlock')))();
+        else wrong();
+      }, 120);
+    };
+    const keys = e => {
+      if (/^\d$/.test(e.key)) { press(e.key); e.preventDefault(); }
+      else if (e.key === 'Backspace' && typed) { typed = typed.slice(0, -1); drawDots(); drawSide(); }
+      else if (e.key === 'Escape') cancel();
+    };
+    document.addEventListener('keydown', keys);
+    cleanupScreen = () => document.removeEventListener('keydown', keys);
+    const LETTERS = ['', 'abc', 'def', 'ghi', 'jkl', 'mno', 'pqrs', 'tuv', 'wxyz'];
+    drawTitle(); drawDots(); drawSide();
+    return h('div', { class: 'ph-pass' + (set ? ' setting' : '') },
+      wall(d.lock.imageId, 'ph-wall-lock'),
+      h('div', { class: 'ph-pass-in' },
+        lockIco(false), title, dots,
+        h('div', { class: 'ph-pass-keys' },
+          [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => h('button', { type: 'button', class: 'ph-pass-key', 'data-key': n, onclick: () => press(String(n)) }, h('b', {}, n), h('span', {}, LETTERS[n - 1]))),
+          h('button', { type: 'button', class: 'ph-pass-side', onclick: () => { if (APPS.phone && SCREENS.phone) show('phone', { tab: 'keypad' }, 'fade'); } }, set ? '' : 'emergency'),
+          h('button', { type: 'button', class: 'ph-pass-key', 'data-key': 0, onclick: () => press('0') }, h('b', {}, 0)),
+          side),
+        mine && !set ? h('button', { type: 'button', class: 'ph-pass-forgot', onclick: () => toast(`it's ${d.passcode}`) }, 'forgot passcode') : null));
+  };
+
+  // a banner that drops down from the top when something arrives
+  function banner(n) {
+    screen.querySelector('.ph-banner')?.remove();
+    const a = APPS[n.app];
+    let y0 = null, gone = false;
+    const hide = () => { if (gone) return; gone = true; b.classList.add('out'); setTimeout(() => b.remove(), 350); };
+    const b = h('button', {
+      type: 'button', class: 'ph-banner', 'data-app': n.app,
+      onpointerdown: e => { y0 = e.clientY; e.stopPropagation(); },
+      onpointermove: e => { if (y0 != null && e.clientY - y0 < 0) b.style.transform = `translateY(${e.clientY - y0}px)`; },
+      onpointerup: e => { if (y0 != null && y0 - e.clientY > 18) { hide(); y0 = null; return; } b.style.transform = ''; y0 = null; },
+      onclick: () => { if (gone) return; hide(); if (cur?.name === 'lock' || cur?.name === 'passcode') unlockThen(n.open); else n.open(); },
+    },
+      h('div', { class: 'ph-notif-ico', style: { background: a.bg } }, sticker(a.icon)),
+      h('div', { class: 'ph-notif-body' },
+        h('div', { class: 'ph-notif-top' }, h('b', {}, n.title), h('span', {}, 'now')),
+        h('div', { class: 'ph-notif-text' }, n.text)),
+      n.faceOf ? face(n.faceOf, 'xs ph-notif-face') : null);
+    screen.append(b);
+    setTimeout(hide, 4200);
+  }
+  // pulling down from the top left (or tapping the clock) shows every notification
+  function openCenter() {
+    if (screen.querySelector('.ph-nc')) return;
+    const list = allNotifs(3);
+    const groups = new Map();
+    for (const n of list) { if (!groups.has(n.app)) groups.set(n.app, []); groups.get(n.app).push(n); }
+    const close = () => { nc.classList.add('out'); setTimeout(() => nc.remove(), 380); };
+    let y0 = null;
+    const nc = h('div', {
+      class: 'ph-nc',
+      onclick: e => { if (!e.target.closest('.ph-nc-item')) close(); },
+      onpointerdown: e => { y0 = e.clientY; },
+      onpointerup: e => { if (y0 != null && y0 - e.clientY > 40) close(); y0 = null; },
+    },
+      wall(d.lock.imageId, 'ph-wall-lock'),
+      h('div', { class: 'ph-nc-in' },
+        h('div', { class: 'ph-nc-date' }, new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).toLowerCase()),
+        h('div', { class: 'ph-nc-clock' }, hm()),
+        h('div', { class: 'ph-nc-list ph-scroll' },
+          list.length ? [...groups].map(([app, ns]) => h('div', { class: 'ph-nc-group' },
+            h('div', { class: 'ph-nc-app' }, APPS[app].label),
+            ns.map(n => h('button', {
+              type: 'button', class: 'ph-notif ph-nc-item', 'data-app': n.app,
+              onclick: () => { close(); if (cur?.name === 'lock' || cur?.name === 'passcode') unlockThen(n.open); else n.open(); },
+            },
+              h('div', { class: 'ph-notif-ico', style: { background: APPS[n.app].bg } }, sticker(APPS[n.app].icon)),
+              h('div', { class: 'ph-notif-body' },
+                h('div', { class: 'ph-notif-top' }, h('b', {}, n.title), h('span', {}, dayLabel(n.at) === 'today' ? hm(n.at) : dayLabel(n.at))),
+                h('div', { class: 'ph-notif-text' }, n.text)),
+              n.faceOf ? face(n.faceOf, 'xs ph-notif-face') : null))))
+            : h('div', { class: 'ph-nc-none' }, 'no notifications'))));
+    screen.append(nc);
+  }
+  function pullCenter(e) {
+    const y0 = e.clientY;
+    const move = ev => { if (ev.clientY - y0 > 30) { stop(); openCenter(); } };
+    const stop = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
+  }
+  // texts set to arrive later: drop them in when they're due
+  function deliverLater() {
+    const now = Date.now();
+    const due = d.later.filter(x => x.due <= now);
+    if (!due.length) return;
+    d.later = d.later.filter(x => x.due > now);
+    for (const x of due) {
+      const t = threadById(x.threadId);
+      if (!t) continue;
+      const m = { id: 'm_' + uid(), from: 'them', text: x.text, imageId: null, at: Math.max(x.due, (t.msgs.at(-1)?.at || 0) + 1), react: null };
+      t.msgs.push(m);
+      t.typing = false;
+      mirrorSend(char, t.who, m);
+      const n = { app: 'messages', title: who(t.who).name, text: x.text, at: m.at, faceOf: t.who, open: () => show('thread', { id: t.id }, cur?.name === 'lock' ? 'unlock' : 'zoom') };
+      if (cur?.name === 'thread' && cur.params.id === t.id) redraw();
+      else if (cur?.name === 'lock') { redraw(); screen.classList.remove('wake'); void screen.offsetWidth; screen.classList.add('wake'); }
+      else { banner(n); if (cur?.name === 'home' || cur?.name === 'messages') redraw(); }
+    }
+    save();
+  }
+  timers.push(setInterval(deliverLater, 1000));
+
+  // ---- the other apps ----
+  const api = {
+    d, char, mine, ctx, save, show, redraw, goHome, openApp, header, plusBtn, screen, SCREENS, drawStatus, APPS, appOf, FIXED, banner,
+    onLeave: fn => { cleanupScreen = fn; },
+  };
+  for (const m of EXTRA) m.install?.(api);
 
   // ---- the case box ----
   function caseBox() {
@@ -681,4 +973,102 @@ function dragOn(item, area, onMove, onDone) {
     item.addEventListener('pointerup', up);
     item.addEventListener('pointercancel', up);
   });
+}
+
+// ---- scrolling with a mouse like it's a touchscreen ----
+// drag anything scrollable inside the screen (with a little glide when you let go), drag the home screen
+// sideways to change pages, and the scroll wheel flips home pages. touch keeps the browser's own scrolling.
+const NO_DRAG = 'input, textarea, select, [contenteditable="true"], canvas, [data-nodrag], .ph-lock, .pw-map, .pw-board, .pw-pad';
+function scrollerFor(el, stop, axis) {
+  for (; el && el !== stop; el = el.parentElement) {
+    const cs = getComputedStyle(el);
+    if (axis === 'y' ? /auto|scroll/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 1
+      : /auto|scroll/.test(cs.overflowX) && el.scrollWidth > el.clientWidth + 1) return el;
+  }
+  return null;
+}
+function flipTo(pages, k) {
+  const w = pages.clientWidth, n = Math.max(1, Math.round(pages.scrollWidth / w));
+  pages.scrollTo({ left: Math.max(0, Math.min(n - 1, k)) * w, behavior: 'smooth' });
+}
+function mouseScroll(screen) {
+  let glide = 0;
+  screen.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch' || e.button !== 0 || e.defaultPrevented || e.target.closest(NO_DRAG)) return;
+    cancelAnimationFrame(glide);
+    const sx = e.clientX, sy = e.clientY;
+    let axis = null, el = null, start = 0;
+    const samples = [];
+    const pos = ev => (axis === 'x' ? ev.clientX : ev.clientY);
+    const move = ev => {
+      if (!axis) {
+        const dx = ev.clientX - sx, dy = ev.clientY - sy;
+        if (Math.hypot(dx, dy) < 6) return;
+        axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+        el = scrollerFor(e.target, screen, axis);
+        if (!el) { done(); return; }
+        start = axis === 'x' ? el.scrollLeft : el.scrollTop;
+        el.style.scrollSnapType = 'none';
+        el.style.scrollBehavior = 'auto';
+        screen.classList.add('ph-grabbing');
+      }
+      const delta = pos(ev) - (axis === 'x' ? sx : sy);
+      if (axis === 'x') el.scrollLeft = start - delta; else el.scrollTop = start - delta;
+      samples.push({ t: ev.timeStamp, p: pos(ev) });
+      if (samples.length > 5) samples.shift();
+    };
+    const done = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      screen.classList.remove('ph-grabbing');
+    };
+    const up = ev => {
+      done();
+      if (!el) return;
+      // the click after a drag shouldn't press whatever's under the mouse
+      const eat = c => { c.stopPropagation(); c.preventDefault(); };
+      screen.addEventListener('click', eat, { capture: true, once: true });
+      setTimeout(() => screen.removeEventListener('click', eat, { capture: true }), 80);
+      const a = samples[0], b = samples.at(-1);
+      let v = a && b && b.t > a.t && ev.timeStamp - b.t < 90 ? (b.p - a.p) / (b.t - a.t) : 0; // px per ms
+      const unsnap = () => { el.style.scrollSnapType = ''; el.style.scrollBehavior = ''; };
+      if (el.classList.contains('ph-pages')) {
+        const k = el.scrollLeft / el.clientWidth;
+        flipTo(el, Math.abs(v) > .25 ? (v < 0 ? Math.ceil(k) : Math.floor(k)) : Math.round(k));
+        setTimeout(unsnap, 480);
+        return;
+      }
+      unsnap();
+      if (Math.abs(v) < .1) return;
+      let last = performance.now();
+      const step = now => {
+        const dt = Math.min(32, now - last);
+        last = now;
+        if (axis === 'x') el.scrollLeft -= v * dt; else el.scrollTop -= v * dt;
+        v *= Math.pow(.95, dt / 16);
+        if (Math.abs(v) > .02 && el.isConnected) glide = requestAnimationFrame(step);
+      };
+      glide = requestAnimationFrame(step);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  });
+  // the wheel flips home pages one at a time (one flip per flick)
+  let wheelQuiet = 0;
+  screen.addEventListener('wheel', e => {
+    const pages = e.target.closest('.ph-pages');
+    if (!pages) return;
+    const page = e.target.closest('.ph-page');
+    let dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY : 0;
+    if (!dx && page && page.scrollHeight <= page.clientHeight + 1) dx = e.deltaY;
+    if (!dx) return;
+    e.preventDefault();
+    const now = performance.now();
+    const busy = now < wheelQuiet;
+    wheelQuiet = now + 260;
+    if (busy || Math.abs(dx) < 3) return;
+    flipTo(pages, Math.round(pages.scrollLeft / pages.clientWidth) + Math.sign(dx));
+  }, { passive: false });
 }

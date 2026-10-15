@@ -50,8 +50,15 @@ export function pic(imageId, cls = '') {
 // a 3d sticker picture from /stickers by its code
 export const sticker = (code, cls = '') => h('img', { class: 'fun-stk ' + cls, src: `stickers/${code}.webp`, alt: '', draggable: false, loading: 'lazy' });
 
-// every oc you can pick (yours + anyone in a shared world), minus `not`
-export const allOcs = not => store.chars.filter(c => c.id !== not);
+// the ocs that share a world with this one (only they show up in each other's phones, posts, picks...)
+export function worldmates(charId) {
+  const ids = new Set(store.worldsOf(charId).flatMap(w => w.charIds));
+  ids.delete(charId);
+  return store.chars.filter(c => ids.has(c.id));
+}
+
+// every oc you can pick for `not`'s page = their worldmates. with no `not`, every oc
+export const allOcs = not => (not ? worldmates(not) : store.chars);
 
 // a dropdown of ocs. value = an oc id or ''
 export function ocSelect(value, onPick, { not, empty = '—' } = {}) {

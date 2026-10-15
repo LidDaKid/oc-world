@@ -3,9 +3,9 @@
 // a person ("ref") = { id: an oc id or null, name: what to call them }.
 // name is kept as a backup so it still reads right if that oc gets deleted.
 
-import { h, openModal, pickFiles, shrinkImage, toast } from '../ui.js';
+import { h, openModal, pickFiles, shrinkImage, toast, uid } from '../ui.js';
 import { store } from '../store.js';
-import { portrait, nameOf, allOcs, ocById } from './kit.js';
+import { portrait, nameOf, allOcs, ocById, worldmates } from './kit.js';
 import { cropAll } from '../crop.js';
 
 export function who(ref) {
@@ -114,4 +114,54 @@ export function inkOn(hex) {
   if (!m) return '#fff';
   const n = parseInt(m[1], 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
   return (0.299 * r + 0.587 * g + 0.114 * b) > 170 ? '#1a0d16' : '#fff';
+}
+
+// ---- texting another oc lands on their phone too ----
+// a message one oc sends to another oc you made gets copied into that oc's phone (me/them flipped, same message id
+// so reactions + deletes follow it). ocs you can't edit (someone else's in a shared world) are left alone.
+function otherThread(fromChar, ref, make = true) {
+  const other = ref?.id ? store.char(ref.id) : null;
+  if (!other || other.id === fromChar.id || !store.isMine(other) || !store.isMine(fromChar)) return null;
+  if (!worldmates(fromChar.id).some(c => c.id === other.id)) return null; // only ocs in the same world
+  other.fun ||= {};
+  const p = other.fun.phone ||= {};
+  p.threads ||= [];
+  let t = p.threads.find(x => x.who?.id === fromChar.id);
+  if (!t && make) {
+    t = { id: 't_' + uid(), who: { id: fromChar.id, name: nameOf(fromChar) }, msgs: [], read: true, typing: false, at: Date.now() };
+    p.threads.push(t);
+  }
+  return t ? { other, t } : null;
+}
+async function copyImage(imageId) {
+  try {
+    const url = await store.imageURL(imageId);
+    if (!url) return null;
+    return await store.putImage(await (await fetch(url)).blob());
+  } catch (err) { console.error(err); return null; }
+}
+export async function mirrorSend(fromChar, ref, m) {
+  const o = otherThread(fromChar, ref);
+  if (!o || o.t.msgs.some(x => x.id === m.id)) return;
+  const copy = { id: m.id, from: m.from === 'me' ? 'them' : 'me', text: m.text, imageId: null, at: m.at, react: m.react || null };
+  o.t.msgs.push(copy);
+  o.t.msgs.sort((a, b) => a.at - b.at);
+  store.save('char', o.other);
+  if (m.imageId) { copy.imageId = await copyImage(m.imageId); store.save('char', o.other); }
+}
+export function mirrorReact(fromChar, ref, id, react) {
+  const o = otherThread(fromChar, ref, false);
+  const m = o?.t.msgs.find(x => x.id === id);
+  if (!m) return;
+  m.react = react;
+  store.save('char', o.other);
+}
+export function mirrorDelete(fromChar, ref, ids) {
+  const o = otherThread(fromChar, ref, false);
+  if (!o) return;
+  const gone = o.t.msgs.filter(x => ids.includes(x.id));
+  if (!gone.length) return;
+  o.t.msgs = o.t.msgs.filter(x => !ids.includes(x.id));
+  gone.forEach(m => dropImage(m.imageId));
+  store.save('char', o.other);
 }

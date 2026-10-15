@@ -7,3 +7,7 @@
   [headers.values]
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+
+# the tiny backend for one-time share links (netlify/functions/share.mjs, uses netlify blobs)
+[functions]
+  directory = "netlify/functions"

@@ -1,5 +1,6 @@
 // one oc's page: about, relationships, gallery, moodboard, page style (+ their music, see music.js).
-// the same page shows at #/oc/<id> (on their own) and #/w/<world>/ocs/<id> (inside a world).
+// the same page shows at #/oc/<id> (on their own) and #/w/<world>/ocs/<id> (inside a world),
+// and read-only at #/view/<token> when someone opens a one-time share link (view = true, see share.js).
 
 import { store, MAX_VIDEO, MAX_SONG } from '../store.js';
 import { music } from '../music.js';
@@ -12,6 +13,7 @@ import { FEATURES } from '../ocfun/index.js';
 import { dataFor, sticker } from '../ocfun/kit.js';
 import * as mood from '../ocfun/mood.js';
 import { pickAndCrop, cropAll } from '../crop.js';
+import { openShareModal } from '../share.js';
 
 // the tabs you can move around / hide. page style is always last (and only for whoever made the oc).
 const TAB_NAMES = { about: 'about', relationships: 'relationships', gallery: 'gallery', moodboard: 'moodboard', fun: 'more' };
@@ -21,7 +23,7 @@ const LAYOUT_CLASSES = {
   bannerSize: ['none', 'short', 'tall'], heroAlign: ['center'], pfpShape: ['circle', 'square'], pfpSize: ['small', 'big'], width: ['wide', 'full'],
 };
 
-export function render(el, { char, tab, sub, base, world, go }) {
+export function render(el, { char, tab, sub, base, world, go, view = false }) {
   const page = char.page;
   // in a collab world you can look at someone else's oc, but only they can change it
   const mine = store.isMine(char);
@@ -31,7 +33,7 @@ export function render(el, { char, tab, sub, base, world, go }) {
   const tabs = [...shown.map(id => [id, TAB_NAMES[id]]), ...(mine ? [['style', 'page style']] : [])];
   const active = tabs.some(t => t[0] === tab) ? tab : tabs[0][0];
   const save = () => store.save('char', char);
-  const linkTo = other => (world && world.charIds.includes(other.id) ? `#/w/${world.id}/ocs/${other.id}` : `#/oc/${other.id}`);
+  const linkTo = other => (view ? `#/${base}` : world && world.charIds.includes(other.id) ? `#/w/${world.id}/ocs/${other.id}` : `#/oc/${other.id}`);
   const backHref = world ? `#/w/${world.id}/ocs` : '#/';
 
   // the little numbers on the tabs
@@ -97,7 +99,7 @@ export function render(el, { char, tab, sub, base, world, go }) {
     const worlds = store.worldsOf(char.id);
     fill(meta,
       mood.moodBadge?.(char) || null,
-      mine ? null : h('span', { class: 'owner-tag' }, char.ownerName || 'someone else'),
+      mine || view ? null : h('span', { class: 'owner-tag' }, char.ownerName || 'someone else'),
       worlds.map(w => h('a', { class: 'chip', href: `#/w/${w.id}/ocs`, style: { '--c': w.color } }, worldIcon(w), ' ', w.name)),
       mine && store.worlds.length ? h('button', { class: 'chip dashed', onclick: pickWorlds }, worlds.length ? '＋' : '＋ add to a world') : null,
       char.tags.map(t => h('span', { class: 'tag' }, t)));
@@ -191,26 +193,26 @@ export function render(el, { char, tab, sub, base, world, go }) {
     const wrap = h('div', { class: 'rels-tab' });
     let mode = 'list';
     const add = () => openRelEditor({ me: char, onDone: draw });
-    const edit = rel => openRelEditor({ me: char, rel, onDone: draw });
+    const edit = rel => { if (!view) openRelEditor({ me: char, rel, onDone: draw }); };
 
     function draw() {
       const rels = store.relsOf(char.id);
       drawCounts();
       if (!rels.length) {
-        fill(wrap, emptyState('🧶', 'no relationships yet', null, h('button', { class: 'btn primary', onclick: add }, '+ add one')));
+        fill(wrap, emptyState('🧶', 'no relationships yet', null, view ? null : h('button', { class: 'btn primary', onclick: add }, '+ add one')));
         return;
       }
       fill(wrap,
         h('div', { class: 'section-bar' },
           segmented([{ value: 'list', label: 'list' }, { value: 'web', label: 'web' }], mode, v => { mode = v; draw(); }),
-          h('button', { class: 'btn primary sm', onclick: add }, '+ add')),
+          view ? null : h('button', { class: 'btn primary sm', onclick: add }, '+ add')),
         mode === 'list' ? relList(rels) : relWeb(rels));
     }
 
     const relList = rels => h('div', { class: 'rel-cards' }, rels.map(rel => {
       const v = seenFrom(rel, char.id);
       return h('div', {
-        class: 'rel-card', style: { '--c': rel.color }, role: 'button', tabindex: 0,
+        class: 'rel-card', style: { '--c': rel.color }, role: view ? null : 'button', tabindex: view ? null : 0,
         onclick: () => edit(rel), onkeydown: e => { if (e.key === 'Enter') edit(rel); },
       },
         portrait(v.other || { name: v.otherName }, 'md'),
@@ -218,7 +220,7 @@ export function render(el, { char, tab, sub, base, world, go }) {
           h('div', { class: 'rel-card-top' }, h('strong', {}, v.otherName), v.theyAre ? h('span', { class: 'rel-chip' }, v.theyAre) : null),
           v.iAm ? h('div', { class: 'rel-card-back' }, `${nameOf(char)} is their ${v.iAm}`) : v.iAm === '' ? h('div', { class: 'rel-card-back' }, 'one-sided') : null,
           rel.note ? h('div', { class: 'rel-card-note' }, rel.note) : null),
-        v.other ? h('a', { class: 'rel-visit', href: linkTo(v.other), title: `go to ${v.otherName}`, onclick: e => e.stopPropagation() }, '→') : null);
+        v.other && !view ? h('a', { class: 'rel-visit', href: linkTo(v.other), title: `go to ${v.otherName}`, onclick: e => e.stopPropagation() }, '→') : null);
     }));
 
     // them in the middle, everyone they know in a ring around them
@@ -240,9 +242,9 @@ export function render(el, { char, tab, sub, base, world, go }) {
           const mx = (50 + x) / 2 - Math.sin(angle) * bow, my = (50 + y) / 2 + Math.cos(angle) * bow;
           lines.append(s('path', { class: 'edge-line ' + rel.line, stroke: rel.color, d: `M50,50 Q${2 * mx - (50 + x) / 2},${2 * my - (50 + y) / 2} ${x},${y}` }));
           const label = seenFrom(rel, char.id).theyAre;
-          if (label) box.append(h('button', { class: 'edge-label', style: { '--c': rel.color, left: mx + '%', top: my + '%' }, onclick: () => edit(rel) }, label));
+          if (label) box.append(h(view ? 'span' : 'button', { class: 'edge-label', style: { '--c': rel.color, left: mx + '%', top: my + '%' }, onclick: () => edit(rel) }, label));
         });
-        box.append(h(p.v.other ? 'a' : 'div', { class: 'web-node', href: p.v.other ? linkTo(p.v.other) : null, style: { left: x + '%', top: y + '%' } },
+        box.append(h(p.v.other && !view ? 'a' : 'div', { class: 'web-node', href: p.v.other && !view ? linkTo(p.v.other) : null, style: { left: x + '%', top: y + '%' } },
           portrait(p.v.other || { name: p.v.otherName }, 'md'), h('span', { class: 'node-name' }, p.v.otherName)));
       });
       box.append(h('div', { class: 'web-node me', style: { left: '50%', top: '50%' } }, portrait(char, 'lg')));
@@ -535,9 +537,11 @@ export function render(el, { char, tab, sub, base, world, go }) {
 
   el.append(bleed);
   bleed.append(videoBack, h('div', { class: 'page profile' },
-    h('div', { class: 'profile-top' },
+    view ? null : h('div', { class: 'profile-top' },
       h('a', { class: 'back-link', href: backHref }, world ? `← ${world.name}` : '← home'),
-      mine && h('button', { class: 'link-btn danger', onclick: removeOc }, 'delete oc')),
+      mine && h('div', { class: 'profile-top-right' },
+        h('button', { class: 'link-btn', onclick: () => openShareModal(char) }, 'share'),
+        h('button', { class: 'link-btn danger', onclick: removeOc }, 'delete oc'))),
     h('div', { class: 'profile-hero' },
       banner,
       h('div', { class: 'profile-id' },

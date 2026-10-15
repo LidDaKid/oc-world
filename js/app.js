@@ -7,6 +7,7 @@
 //   #/w/<world>/lore[/<entry>]          lore pages
 //   #/join/<code>                       an invite link to someone's collab world
 //   #/diary/<id>[/cover|/write[/<page>]] a diary: the 3d book, its cover designer, the pages
+//   #/view/<token>[/<tab>]              a one-time share link: someone's oc, read-only, kept in memory (share.js)
 
 import { store } from './store.js';
 import { music } from './music.js';
@@ -22,6 +23,7 @@ import * as maps from './views/maps.js';
 import * as lore from './views/lore.js';
 import { renderBook, renderWrite } from './views/diary.js';
 import { renderCover } from './views/diary-cover.js';
+import { openLink } from './share.js';
 
 const TABS = [
   { id: 'ocs', label: 'ocs', icon: '⭐', view: ocs },
@@ -100,6 +102,43 @@ function worldSettings(world) {
   });
 }
 
+// ---- a one-time share link ----
+// opening one never loads this browser's own saves. it's a page of its own: leaving it reloads the site.
+
+const viewToken = () => { const m = location.hash.match(/^#\/view\/([A-Za-z0-9_-]+)/); return m ? m[1] : null; };
+const bootedView = !!viewToken();
+let viewing = null; // { token, char } once it's here, or { token, state } if it isn't coming
+
+async function routeView(parts) {
+  const token = parts[1];
+  const body = h('main', { class: 'world-body' });
+  clear(app).append(h('header', { class: 'topbar' }, h('span', { class: 'logo-link' }, h('span', { class: 'logo-planet' }, '🪐'), h('span', { class: 'logo-word' }, 'oc world')),
+    h('div', { class: 'topbar-right' }, themeButton())), body);
+  if (!viewing) {
+    const bar = h('i');
+    fill(body, h('div', { class: 'share-screen' }, h('div', { class: 'share-progress big' }, bar)));
+    viewing = { token, state: 'loading' };
+    const got = await openLink(token, p => { bar.style.width = Math.round(p * 100) + '%'; });
+    if (got.char) {
+      store.enterView({ chars: [got.char, ...got.others], rels: got.rels, urls: got.urls });
+      viewing = { token, char: store.char(got.char.id) };
+    } else viewing = { token, state: got.state };
+    if (viewToken() !== token) return;
+  }
+  if (viewing.state === 'loading') return;
+  if (!viewing.char) {
+    const words = { opened: 'this link was already opened', expired: 'this link expired', gone: "this link doesn't work anymore", error: "couldn't open this link" };
+    document.title = 'oc world';
+    fill(body, h('div', { class: 'share-screen' }, h('div', { class: 'share-dead' }, h('div', { class: 'share-dead-icon' }, '🔒'), h('h2', {}, words[viewing.state] || words.gone))));
+    return;
+  }
+  const char = viewing.char;
+  document.title = `${char.name || 'unnamed oc'} · oc world`;
+  body.classList.add('share-view');
+  fill(body);
+  mount(profile.render(body, { char, tab: parts[2], sub: parts[3], base: `view/${token}`, world: null, go, view: true }));
+}
+
 // ---- routing ----
 
 const mount = result => { view = typeof result === 'function' ? { cleanup: result } : result || {}; };
@@ -109,6 +148,13 @@ async function route() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
   try { view.cleanup?.(); } catch (err) { console.error(err); }
   view = {};
+  // a share link is its own little site. going anywhere else (or to another link) starts fresh
+  if (bootedView || parts[0] === 'view') {
+    if (!bootedView || parts[0] !== 'view' || (viewing && parts[1] !== viewing.token)) { await store.flush(); location.reload(); return; }
+    music.keepOnly(viewing?.char?.id || null);
+    await routeView(parts);
+    return;
+  }
   await store.flush();
   if (token !== routeToken) return;
   // an oc's music keeps going between their own tabs, and stops anywhere else
@@ -220,7 +266,10 @@ store.onRemote(refreshSoon);
 onModalsClosed(() => stale && refreshSoon());
 document.addEventListener('focusout', () => stale && refreshSoon());
 
-store.init().then(() => {
+if (viewToken()) {
+  window.addEventListener('hashchange', route);
+  route();
+} else store.init().then(() => {
   collab.start();
   window.addEventListener('hashchange', route);
   route();

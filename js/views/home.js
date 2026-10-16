@@ -265,7 +265,7 @@ export function render(el, { go }) {
   }
 
   function addWorld() {
-    const draft = { name: '', blurb: '', emoji: '🪐', color: '#ff4fa3', iconId: null };
+    const draft = { name: '', blurb: '', emoji: '🪐', color: '#ff4fa3', iconId: null, sticker: null };
     const icon = iconPicker(draft, null);
     let made = false;
     openModal({
@@ -280,8 +280,8 @@ export function render(el, { go }) {
         { label: 'cancel', onClick: close => close() },
         {
           label: 'make it', kind: 'primary', onClick: close => {
-            const { iconId, ...rest } = draft;
-            const world = store.add('world', newWorld({ ...rest, name: draft.name.trim() || 'untitled world', icon: { imageId: iconId } }));
+            const { iconId, sticker, ...rest } = draft;
+            const world = store.add('world', newWorld({ ...rest, name: draft.name.trim() || 'untitled world', icon: { imageId: iconId, sticker } }));
             made = true;
             close();
             go(`w/${world.id}`);

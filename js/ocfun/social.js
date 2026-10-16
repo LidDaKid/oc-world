@@ -1,10 +1,12 @@
-// socials: the oc's social media profile. two looks: a 2000s scene-era profile (top 8, profile song,
-// glitter, friends comments) or a modern feed (grid, highlights, likes). posts + comments written as other ocs.
+// socials: the oc's social media profile. two looks: an old-school myspace page (see myspace.js: top friends,
+// profile song, blog, friends comments, layouts + custom css) or a modern feed (grid, highlights, likes).
+// posts + comments written as other ocs.
 
-import { h, fill, uid, openModal, confirmDialog, swatches, segmented, toast, autosize } from '../ui.js';
+import { h, fill, uid, openModal, confirmDialog, segmented, toast, autosize } from '../ui.js';
 import { store } from '../store.js';
 import { dataFor, pic, sticker, appBar, portrait, nameOf, allOcs, ocById } from './kit.js';
 import { who, face, freshRef, pickWho, refOf, ago, bigNum, addPhotos, dropImage, relLabel, hmA, dayLabel, vid } from './phone-bits.js';
+import { renderMyspace, editMyspace } from './myspace.js';
 
 // a post made in the phone's snapshot app can be a video with no picture
 const postVid = p => vid(p.video, 'so-vid', { inView: true, loop: true });
@@ -16,15 +18,12 @@ const DEF = {
   handle: '', display: '', bio: '', link: '',
   followers: 1313, following: 213, verified: false,
   mood: '', headline: '', about: '', meet: '',
-  interests: { general: '', music: '', movies: '', heroes: '' },
+  interests: { general: '', music: '', movies: '', television: '', books: '', heroes: '' },
   song: { songId: null, title: '' },
   topFriends: [], pinned: null,
   posts: [], highlights: [], wall: [],
   scene: { bg: 'stars', color: '#ff4fa3', glitter: true, font: 'verdana', sparkles: true },
 };
-const SCENE_BGS = [['stars', 'stars'], ['leopard', 'leopard'], ['zebra', 'zebra'], ['hearts', 'hearts'], ['skulls', 'skulls'], ['glitter', 'glitter'], ['plaid', 'plaid']];
-const SCENE_FONTS = [['verdana', 'verdana'], ['comic', 'bubbly'], ['typewriter', 'typewriter'], ['pixel', 'pixel']];
-const SCENE_COLORS = ['#ff4fa3', '#ff2e88', '#d81e5b', '#b18cff', '#7df9d0', '#6ec6ff', '#ffd84d', '#9be564', '#f6eefb', '#ff5d6c'];
 
 const handleOf = (char, d) => (d.handle || nameOf(char).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'oc').slice(0, 30);
 const handleFor = ref => {
@@ -262,166 +261,23 @@ export function render(el, ctx) {
     });
   }
 
-  // ======== scene profile ========
+  // ======== scene profile: the old-school myspace page (myspace.js) ========
+  let autoplayed = false;
   function scenePage() {
-    const sc = d.scene;
-    const name = d.display || nameOf(char);
-    const first = name.split(/\s+/)[0];
-    const handle = handleOf(char, d);
-    const basics = Object.fromEntries((char.basics || []).filter(b => b.value).map(b => [b.label, b.value]));
-    const friends = d.topFriends.map(r => ({ r, w: who(r) })).filter(x => !x.w.gone);
-    let added = false, faved = false;
-    const friendCount = h('b', {}, bigNum(d.followers));
-    const posts = sorted();
-
-    const wrap = h('div', { class: `so-scene bg-${sc.bg} font-${sc.font}`, style: { '--sc': sc.color } },
-      h('div', { class: 'so-sc-nav' },
-        h('b', { class: 'so-sc-logo' }, 'myscene', h('sup', {}, '™')),
-        h('nav', {}, ['home', 'browse', 'search', 'mail', 'blog', 'music'].map(l => h('span', {}, l)))),
-      h('div', { class: 'so-sc-cols' },
-        h('div', { class: 'so-sc-left' },
-          h('h1', { class: 'so-sc-name' + (sc.glitter ? ' glitter' : '') }, name),
-          h('div', { class: 'so-sc-card' },
-            h('div', { class: 'so-sc-pfp' }, portrait(char, 'so-sc-me')),
-            h('div', { class: 'so-sc-info' },
-              d.headline ? h('p', { class: 'so-sc-quote' }, `"${d.headline}"`) : null,
-              basics.pronouns ? h('p', {}, basics.pronouns) : null,
-              basics.age ? h('p', {}, `${basics.age} years old`) : null,
-              basics.species ? h('p', {}, basics.species) : null,
-              h('p', { class: 'so-sc-online' }, h('i'), 'online now!'),
-              h('p', { class: 'so-sc-small' }, 'last login: ', dayLabel(char.updatedAt || Date.now())))),
-          h('p', { class: 'so-sc-mood' }, h('b', {}, 'mood: '), d.mood || '—', ' ', sticker('1f5a4', 'so-sc-mood-stk')),
-          songPlayer(),
-          h('div', { class: 'so-sc-box' },
-            h('div', { class: 'so-sc-box-head' }, `contacting ${first}`),
-            h('div', { class: 'so-sc-contact' },
-              h('button', { type: 'button', onclick: e => { added = !added; friendCount.textContent = bigNum(d.followers + (added ? 1 : 0)); e.currentTarget.classList.toggle('on', added); sparkleAt(e.currentTarget); } }, '💗 add to friends'),
-              h('button', { type: 'button', onclick: () => ctx.go(`${ctx.base}/fun/phone`) }, '✉️ send message'),
-              h('button', { type: 'button', onclick: e => { faved = !faved; e.currentTarget.classList.toggle('on', faved); sparkleAt(e.currentTarget); } }, '⭐ add to favorites'),
-              h('button', { type: 'button', onclick: e => { e.currentTarget.classList.remove('shake'); void e.currentTarget.offsetWidth; e.currentTarget.classList.add('shake'); } }, '🚫 block user'))),
-          h('div', { class: 'so-sc-url' }, h('b', {}, 'myscene url: '), `myscene.com/${handle}`),
-          h('div', { class: 'so-sc-box' },
-            h('div', { class: 'so-sc-box-head' }, `${first}'s interests`),
-            h('table', { class: 'so-sc-table' }, [['general', 'general'], ['music', 'music'], ['movies', 'movies'], ['heroes', 'heroes']].map(([k, l]) =>
-              h('tr', {}, h('th', {}, l), h('td', {}, d.interests[k] || '—')))))),
-        h('div', { class: 'so-sc-right' },
-          h('div', { class: 'so-sc-network' }, h('b', {}, `${first} is in your extended network`)),
-          posts.length ? h('div', { class: 'so-sc-blog' },
-            h('div', { class: 'so-sc-h' }, `${first}'s latest blog entry`),
-            posts.slice(0, 4).map(p => h('button', { type: 'button', class: 'so-sc-blog-row', onclick: () => openPost(p) }, p.id === d.pinned ? '📌 ' : '', (p.caption || 'untitled').split('\n')[0].slice(0, 60), h('span', {}, ' (view more)')))) : null,
-          h('div', { class: 'so-sc-h' }, `${first}'s blurbs`),
-          h('div', { class: 'so-sc-blurb' }, h('b', {}, 'about me:'), h('p', {}, d.about || d.bio || '—'), h('b', {}, "who i'd like to meet:"), h('p', {}, d.meet || '—')),
-          h('div', { class: 'so-sc-h' }, `${first}'s friend space`),
-          h('div', { class: 'so-sc-friends' },
-            h('p', { class: 'so-sc-fcount' }, first, ' has ', friendCount, ' friends.'),
-            friends.length ? h('div', { class: 'so-sc-top8' }, friends.slice(0, 8).map(({ r, w }, i) =>
-              h(w.char ? 'a' : 'div', { class: 'so-sc-friend', href: w.char ? ctx.ocLink(w.char) : null, style: { animationDelay: i * 0.06 + 's' } },
-                h('span', { class: 'so-sc-fname' }, w.name.split(/\s+/)[0]), face(r, 'so-sc-fpic')))) : null,
-            mine ? h('button', { type: 'button', class: 'so-sc-link', onclick: pickTop8 }, friends.length ? 'edit top 8' : 'pick top 8') : null),
-          h('div', { class: 'so-sc-h' }, `${first}'s pics`, mine ? h('button', { type: 'button', class: 'so-sc-link light', onclick: newPost }, '+ add') : null),
-          posts.filter(p => p.imageId).length ? h('div', { class: 'so-sc-pics' }, posts.filter(p => p.imageId).map(p =>
-            h('button', { type: 'button', class: 'so-sc-pic', onclick: () => openPost(p) }, pic(p.imageId), p.comments.length ? h('span', {}, p.comments.length, ' 💬') : null))) : null,
-          wallBox(first))));
-    if (sc.sparkles) cleanups.push(sparkleTrail(wrap));
-    return wrap;
+    const page = renderMyspace(char, { mine, save, ocLink: ctx.ocLink, autoplay: !autoplayed });
+    autoplayed = true;
+    cleanups.push(page.cleanup);
+    return page;
   }
-
-  function songPlayer() {
-    const real = char.playlist.find(s => s.id === d.song.songId);
-    const title = real?.title || d.song.title;
-    if (!title) return null;
-    const btn = h('button', { type: 'button', class: 'so-sc-play', title: 'play' }, '▶');
-    const eq = h('span', { class: 'so-sc-eq' }, h('i'), h('i'), h('i'), h('i'), h('i'));
-    const state = () => {
-      const bar = document.querySelector('.player');
-      const playing = real && bar && !bar.hidden && bar.querySelector('.player-title')?.textContent === real.title && bar.querySelector('.player-btn.big')?.title === 'pause';
-      btn.textContent = playing ? '❚❚' : '▶';
-      eq.classList.toggle('on', !!playing || fake);
-    };
-    let fake = false;
-    btn.onclick = () => {
-      if (real) {
-        const bar = document.querySelector('.player');
-        if (bar?.querySelector('.player-title')?.textContent === real.title) bar.querySelector('.player-btn.big')?.click();
-        else document.querySelectorAll('.player .player-song')[char.playlist.indexOf(real)]?.click();
-      } else fake = !fake;
-      setTimeout(state, 200);
-    };
-    const iv = setInterval(state, 600);
-    cleanups.push(() => clearInterval(iv));
-    requestAnimationFrame(state);
-    return h('div', { class: 'so-sc-player' },
-      btn, eq,
-      h('div', { class: 'so-sc-song' }, h('marquee', { scrollamount: 3 }, '♫ ', title, ' ♫')));
-  }
-
-  function wallBox(first) {
-    const list = [...d.wall].sort((a, b) => b.at - a.at);
-    return [
-      h('div', { class: 'so-sc-h' }, `${first}'s friends comments`),
-      h('div', { class: 'so-sc-wall' },
-        h('p', { class: 'so-sc-small' }, `displaying ${list.length} of ${list.length} comments `, mine ? h('button', { type: 'button', class: 'so-sc-link', onclick: addWall }, '( add comment )') : null),
-        list.map(c => {
-          const w = who(c.who);
-          return h('div', { class: 'so-sc-wc' },
-            h(w.char ? 'a' : 'div', { class: 'so-sc-wc-who', href: w.char ? ctx.ocLink(w.char) : null }, h('span', {}, w.name), face(c.who, 'so-sc-fpic')),
-            h('div', { class: 'so-sc-wc-body' }, h('b', {}, `${dayLabel(c.at)} ${hmA(c.at)}`), h('p', {}, c.text),
-              mine ? h('button', { type: 'button', class: 'so-sc-link', onclick: () => { d.wall = d.wall.filter(x => x !== c); save(); draw(); } }, 'delete') : null));
-        })),
-    ];
-  }
-  async function addWall() {
-    let as = defaultCommenter();
-    const asBtn = h('button', { type: 'button', class: 'so-as', onclick: async () => { const r = await pickWho({ title: 'comment as', okLabel: 'comment as them' }); if (r) { as = r; drawAs(); } } });
-    const drawAs = () => fill(asBtn, face(as, 'xs'), h('span', {}, who(as).name), ' ▾');
-    drawAs();
-    const ta = autosize(h('textarea', { maxLength: 600, 'data-autofocus': '' }));
-    openModal({
-      title: 'add comment', body: h('div', { class: 'so-form' }, asBtn, ta),
-      actions: [{ label: 'post', kind: 'primary', onClick: close => { if (!ta.value.trim()) return ta.focus(); d.wall.push({ id: 'w_' + uid(), who: freshRef(as), text: ta.value.trim(), at: Date.now() }); save(); close(); draw(); } }],
-    });
-  }
-  function pickTop8() {
-    let picks = d.topFriends.map(r => ({ ...r }));
-    const list = h('div', { class: 'so-t8-picks' });
-    const drawPicks = () => fill(list,
-      picks.map((r, i) => h('div', { class: 'so-t8-pick' }, h('em', {}, i + 1), face(r, 'sm'), h('span', {}, who(r).name),
-        i > 0 ? h('button', { type: 'button', class: 'icon-btn sm', title: 'move up', onclick: () => { [picks[i - 1], picks[i]] = [picks[i], picks[i - 1]]; drawPicks(); } }, '↑') : null,
-        h('button', { type: 'button', class: 'icon-btn sm', title: 'remove', onclick: () => { picks.splice(i, 1); drawPicks(); } }, '✕'))),
-      picks.length < 8 ? h('button', { type: 'button', class: 'btn ghost sm', onclick: async () => { const r = await pickWho({ title: 'add a friend', not: char.id, okLabel: 'add' }); if (r && !picks.some(p => (p.id && p.id === r.id))) { picks.push(r); drawPicks(); } } }, '+ add a friend') : null);
-    drawPicks();
-    openModal({
-      title: 'top 8', body: list,
-      actions: [{ label: 'save', kind: 'primary', onClick: close => { d.topFriends = picks; save(); close(); draw(); } }],
-    });
-  }
+  const editScene = () => editMyspace(char, { save, onChange: draw });
 
   // ======== edit profile ========
   function editProfile() {
     const t = (key, ph, max = 80) => h('input', { type: 'text', value: d[key], placeholder: ph, maxLength: max, oninput: e => { d[key] = e.target.value; save(); } });
     const area = (obj, key, ph) => autosize(h('textarea', { value: obj[key], placeholder: ph, maxLength: 1200, oninput: e => { obj[key] = e.target.value; save(); } }));
     const num = key => h('input', { type: 'number', class: 'so-num', min: 0, value: d[key], oninput: e => { d[key] = Math.max(0, Number(e.target.value) || 0); save(); } });
-    const songSel = h('select', { onchange: e => { d.song.songId = e.target.value || null; save(); songText.hidden = !!d.song.songId; } },
-      h('option', { value: '' }, 'type one'),
-      char.playlist.map(s => h('option', { value: s.id, selected: s.id === d.song.songId }, s.title || 'untitled')));
-    const songText = h('input', { type: 'text', value: d.song.title, maxLength: 80, hidden: !!d.song.songId, oninput: e => { d.song.title = e.target.value; save(); } });
     const field = (label, ...kids) => h('label', { class: 'field' }, h('span', { class: 'field-label' }, label), ...kids);
-    const styleSeg = segmented([{ value: 'scene', label: 'scene' }, { value: 'feed', label: 'feed' }], d.style, v => { d.style = v; save(); draw(); sceneBox.hidden = v !== 'scene'; });
-    const sceneBox = h('div', { class: 'so-edit-scene', hidden: d.style !== 'scene' },
-      field('background', h('div', { class: 'so-bg-picks' }, SCENE_BGS.map(([v, l]) => h('button', {
-        type: 'button', class: `so-bg-pick bg-${v}` + (d.scene.bg === v ? ' on' : ''), style: { '--sc': d.scene.color }, title: l,
-        onclick: e => { d.scene.bg = v; save(); draw(); e.currentTarget.parentNode.querySelectorAll('.on').forEach(x => x.classList.remove('on')); e.currentTarget.classList.add('on'); },
-      }, h('span', {}, l))))),
-      field('color', swatches(d.scene.color, c => { d.scene.color = c; save(); draw(); document.querySelectorAll('.so-bg-pick').forEach(b => b.style.setProperty('--sc', c)); }, SCENE_COLORS)),
-      field('font', segmented(SCENE_FONTS.map(([value, label]) => ({ value, label })), d.scene.font, v => { d.scene.font = v; save(); draw(); })),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: d.scene.glitter, onchange: e => { d.scene.glitter = e.target.checked; save(); draw(); } }), 'glitter name'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: d.scene.sparkles, onchange: e => { d.scene.sparkles = e.target.checked; save(); draw(); } }), 'sparkle cursor'),
-      field('mood', t('mood', '')),
-      field('headline', t('headline', '', 120)),
-      field('about me', area(d, 'about', '')),
-      field("who i'd like to meet", area(d, 'meet', '')),
-      ...['general', 'music', 'movies', 'heroes'].map(k => field(k, area(d.interests, k, ''))),
-      field('profile song', h('div', { class: 'so-song-pick' }, char.playlist.length ? songSel : null, songText)));
+    const styleSeg = segmented([{ value: 'scene', label: 'scene' }, { value: 'feed', label: 'feed' }], d.style, v => { d.style = v; save(); draw(); });
     openModal({
       title: 'edit profile', wide: true,
       body: h('div', { class: 'so-edit' },
@@ -434,8 +290,7 @@ export function render(el, ctx) {
         h('div', { class: 'so-edit-grid three' },
           field('followers', num('followers')),
           field('following', num('following')),
-          h('label', { class: 'check so-verified' }, h('input', { type: 'checkbox', checked: d.verified, onchange: e => { d.verified = e.target.checked; save(); } }), 'verified')),
-        sceneBox),
+          h('label', { class: 'check so-verified' }, h('input', { type: 'checkbox', checked: d.verified, onchange: e => { d.verified = e.target.checked; save(); } }), 'verified'))),
       actions: [{ label: 'done', kind: 'primary', onClick: close => close() }],
       onClose: draw,
     });
@@ -445,7 +300,7 @@ export function render(el, ctx) {
   el.append(
     appBar(ctx, meta,
       h('div', { class: 'so-switch' }, segmented([{ value: 'scene', label: 'scene' }, { value: 'feed', label: 'feed' }], d.style, v => { d.style = v; if (mine) save(); draw(); })),
-      mine ? h('button', { type: 'button', class: 'btn sm', onclick: editProfile }, 'edit') : null,
+      mine ? h('button', { type: 'button', class: 'btn sm', onclick: () => (d.style === 'scene' ? editScene() : editProfile()) }, 'edit') : null,
       mine ? h('button', { type: 'button', class: 'btn primary sm', onclick: newPost }, '+ post') : null),
     body);
   return () => cleanups.forEach(f => f());
@@ -467,26 +322,4 @@ function burst(target) {
   const b = h('span', { class: 'so-burst' }, '♥');
   target.append(b);
   setTimeout(() => b.remove(), 900);
-}
-function sparkleAt(el) {
-  const r = el.getBoundingClientRect();
-  for (let i = 0; i < 8; i++) {
-    const s = h('span', { class: 'so-spark', style: { left: r.left + r.width / 2 + 'px', top: r.top + r.height / 2 + 'px', '--dx': (Math.random() * 120 - 60) + 'px', '--dy': (Math.random() * -90 - 10) + 'px' } }, ['✦', '✧', '★', '♥'][i % 4]);
-    document.body.append(s);
-    setTimeout(() => s.remove(), 900);
-  }
-}
-// the classic: sparkles trailing the mouse
-function sparkleTrail(area) {
-  let last = 0;
-  const move = e => {
-    const now = performance.now();
-    if (now - last < 45) return;
-    last = now;
-    const s = h('span', { class: 'so-trail', style: { left: e.clientX + 'px', top: e.clientY + 'px', '--dx': (Math.random() * 30 - 15) + 'px' } }, ['✦', '✧', '⋆', '♥', '★'][Math.floor(Math.random() * 5)]);
-    document.body.append(s);
-    setTimeout(() => s.remove(), 800);
-  };
-  area.addEventListener('pointermove', move);
-  return () => area.removeEventListener('pointermove', move);
 }

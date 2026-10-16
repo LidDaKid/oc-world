@@ -72,7 +72,7 @@ function drawCollabBits() {
 collab.onStatus(drawCollabBits);
 
 function worldSettings(world) {
-  const draft = { name: world.name, blurb: world.blurb, emoji: world.emoji, color: world.color, iconId: world.icon.imageId };
+  const draft = { name: world.name, blurb: world.blurb, emoji: world.emoji, color: world.color, iconId: world.icon.imageId, sticker: world.icon.sticker || null };
   const icon = iconPicker(draft, world.icon.imageId);
   let saved = false;
   openModal({
@@ -89,8 +89,8 @@ function worldSettings(world) {
       { label: 'cancel', onClick: close => close() },
       {
         label: 'save', kind: 'primary', onClick: close => {
-          const { iconId, ...rest } = draft;
-          Object.assign(world, rest, { name: draft.name.trim() || world.name, icon: { imageId: iconId } });
+          const { iconId, sticker, ...rest } = draft;
+          Object.assign(world, rest, { name: draft.name.trim() || world.name, icon: { imageId: iconId, sticker } });
           saved = true;
           store.save('world', world);
           close();

@@ -12,8 +12,9 @@
 
 import { h, s, fill, uid, openModal, confirmDialog, swatches, segmented, toast, pickFiles, shrinkImage } from '../ui.js';
 import { cropAll } from '../crop.js';
+import { STICKER_TABS, stickerNode } from '../diary/stickers.js';
 import { store } from '../store.js';
-import { dataFor, pic, sticker, appBar, portrait, nameOf, allOcs, ocById } from './kit.js';
+import { dataFor, pic, sticker, appBar, portrait, nameOf, allOcs, ocById, uploadPic } from './kit.js';
 import { who, face, freshRef, pickWho, hm, hmA, stamp, dayLabel, shortDate, addPhotos, dropImage, relLabel, inkOn, mirrorSend, mirrorReact, mirrorDelete, refOf, addVideo, vid,
   mirrorGroupSend, mirrorGroupReact, mirrorGroupDelete, mirrorGroupInfo, catchUp, unreadCount } from './phone-bits.js';
 import * as callsApps from './phone-calls.js';
@@ -22,14 +23,16 @@ import * as webApps from './phone-web.js';
 import * as socialApps from './phone-social.js';
 import * as brandApps from './phone-brands.js';
 import * as storeApps from './phone-store.js';
+import * as myspaceApps from './phone-myspace.js';
 import { ACCT, setApp, gateScreens, switcher, settingsGroup } from './phone-accounts.js';
 
-const EXTRA = [callsApps, lifeApps, webApps, socialApps, storeApps, brandApps];
+const EXTRA = [callsApps, lifeApps, webApps, socialApps, storeApps, brandApps, myspaceApps];
 
 export const meta = { id: 'phone', label: 'phone', icon: '1f4f1' };
 
 const DEF = {
-  case: { style: 'glossy', color: '#ff4fa3', charm: '1f987', stickers: [] },
+  case: { style: 'glossy', color: '#ff4fa3', color2: '#141114', charms: ['1f987'], strap: 'beads', stickers: [], imageId: null, text: null, grip: null },
+  savedCases: [], // designs you saved to switch back to: { id, name, look }
   lock: { imageId: null },
   home: { imageId: null },
   clockFont: 'clean', dark: false, bubble: null, carrier: 'oc mobile', battery: 78,
@@ -41,9 +44,19 @@ const DEF = {
 export const CASES = [
   ['glossy', 'glossy'], ['glitter', 'glitter'], ['fuzzy', 'fuzzy'], ['studded', 'studded'],
   ['leopard', 'leopard'], ['hearts', 'hearts'], ['stars', 'stars'], ['clear', 'clear'], ['lace', 'lace'],
+  ['zebra', 'zebra'], ['checker', 'checker'], ['skulls', 'skulls'], ['bats', 'bats'], ['plaid', 'plaid'], ['cherries', 'cherries'],
+  ['web', 'spiderweb'], ['stripes', 'stripes'], ['ombre', 'ombre'], ['holo', 'holo'], ['chrome', 'chrome'], ['jelly', 'jelly'],
+  ['pearl', 'pearl'], ['rhinestone', 'rhinestone'], ['puffer', 'puffer'], ['photo', 'my picture'],
 ];
-const CASE_COLORS = ['#ff4fa3', '#ff8ac4', '#141114', '#f6eefb', '#b18cff', '#d81e5b', '#7df9d0', '#6ec6ff', '#ffd84d', '#9b8aa8', '#5a1a2e', '#c0c0c8'];
-const CHARMS = ['1f987', '1f5a4', '1f496', '1f480', '1f380', '2b50', '1f319', '1f98b', '1f353', '1f431', '1f9f8', '1f484', '1f3b8', '1f52e', '1f344', '1f47b'];
+// styles that use the second color
+const TWO_TONE = new Set(['checker', 'plaid', 'stripes', 'ombre', 'zebra', 'skulls', 'bats', 'web', 'cherries']);
+const STRAPS = [['beads', 'beads'], ['chain', 'chain'], ['ribbon', 'ribbon'], ['pearls', 'pearls'], ['none', 'none']];
+const CASE_FONTS = [['Creepster', 'creepy'], ['Rubik Glitch', 'glitch'], ['Sedgwick Ave Display', 'graffiti'], ['Permanent Marker', 'marker'],
+  ['UnifrakturMaguntia', 'gothic'], ['Pixelify Sans', 'pixel'], ['Caveat', 'cursive'], ['Fredoka', 'bubbly'], ['Special Elite', 'typewriter']];
+const CASE_COLORS = ['#ff4fa3', '#ff8ac4', '#ffc4e1', '#141114', '#f6eefb', '#b18cff', '#6b2fa3', '#d81e5b', '#8b0000', '#7df9d0', '#6ec6ff', '#1f3a93', '#ffd84d', '#9be564', '#9b8aa8', '#5a1a2e', '#c0c0c8', '#ff7a3d'];
+const CHARMS = ['1f987', '1f5a4', '1f496', '1f480', '1f380', '2b50', '1f319', '1f98b', '1f353', '1f431', '1f9f8', '1f484', '1f3b8', '1f52e', '1f344', '1f47b',
+  '1f9db', '1f9c7', '1f352', '1f36c', '1f383', '1f56f-fe0f', '1f5dd-fe0f', '1fa78', '1f9ff', '1f3ae', '1f3b5', '1f338', '1f940', '1f40d', '1f577-fe0f', '26b0-fe0f',
+  '1fa90', '1f9c1', '1f36d', '1f984', '1f47d', '2620-fe0f', '1f5e1-fe0f', '1f3a4', '1f4bf', '1f48d', '1f451', '1f498', '1f49d', '1fa77', '1fa75', '2764-fe0f-200d-1f525'];
 const CASE_STICKERS = ['1f5a4', '1f496', '1f987', '1f480', '2b50', '2728', '1f380', '1f98b', '1f319', '1f353', '1f48b', '1f3b8', '1f3a7', '1f4bf', '1f52e', '1f47b', '1f578-fe0f', '1f577-fe0f', '1f339', '1f940', '1f431', '1f430', '1f9f8', '1f451', '1f48e', '1f344', '1f308', '1f525', '26a1', '1f36d'];
 const CLOCKS = [['clean', 'clean'], ['bubbly', 'bubbly'], ['pixel', 'pixel'], ['gothic', 'gothic'], ['script', 'script']];
 const REACTS = ['❤️', '👍', '👎', '😂', '‼️', '❓'];
@@ -91,6 +104,8 @@ export function render(el, ctx) {
   const { char, mine } = ctx;
   const d = dataFor(char, 'phone', DEF);
   d.case = { ...DEF.case, ...d.case };
+  if (!Array.isArray(d.case.charms)) d.case.charms = d.case.charm ? [d.case.charm] : [];
+  delete d.case.charm;
   d.accounts ||= {};
   // apps used before accounts existed get an account made for them instead of a sign up wall
   const usedBefore = Object.fromEntries(Object.entries(ACCT).map(([id, a]) => [id, id === 'insta'
@@ -136,12 +151,16 @@ export function render(el, ctx) {
   function paintCase() {
     device.dataset.case = d.case.style;
     stage.style.setProperty('--case', d.case.color);
+    stage.style.setProperty('--case2', d.case.color2 || '#141114');
+    caseImg(stage);
     screen.classList.toggle('dark', !!d.dark);
     screen.style.setProperty('--me', d.bubble || char.color || '#ff4fa3');
     screen.style.setProperty('--me-ink', inkOn(d.bubble || char.color || '#ff4fa3'));
     stage.style.setProperty('--oc', char.color || '#ff4fa3');
     screen.dataset.clock = d.clockFont;
-    fill(charm, d.case.charm ? [h('i', { class: 'ph-strap' }), h('i', { class: 'ph-bead' }), sticker(d.case.charm, 'ph-charm-stk')] : null);
+    charm.dataset.strap = d.case.strap || 'beads';
+    fill(charm, d.case.charms.length ? [d.case.strap === 'none' ? null : h('i', { class: 'ph-strap' }), d.case.strap === 'none' ? null : h('i', { class: 'ph-bead' }),
+      h('div', { class: 'ph-charms n' + d.case.charms.length }, d.case.charms.map(c => sticker(c, 'ph-charm-stk')))] : null);
     drawBack();
   }
 
@@ -152,18 +171,46 @@ export function render(el, ctx) {
   }
   timers.push(setInterval(drawStatus, 10000));
 
-  // the back of the phone: camera bump, case pattern + stickers you can drag around
+  // a picture case: the photo goes in --case-img on whatever shows the case
+  function caseImg(el) {
+    el.style.removeProperty('--case-img');
+    if (d.case.style !== 'photo' || !d.case.imageId) return;
+    store.imageURL(d.case.imageId).then(url => { if (url && d.case.style === 'photo') el.style.setProperty('--case-img', `url("${url}")`); });
+  }
+
+  // the back of the phone: camera bump, case pattern + stickers, words + a grip you can drag around
+  let picked = null; // the thing on the back that's tapped (shows its size/turn buttons)
   function drawBack() {
+    const place = (box, it) => { box.style.left = it.x + '%'; box.style.top = it.y + '%'; box.style.transform = `translate(-50%,-50%) rotate(${it.r || 0}deg) scale(${it.k || 1})`; };
+    // drag it, tap it for the size + turn buttons, scroll to resize (shift + scroll turns it)
+    const handle = (box, it, onDelete) => {
+      place(box, it);
+      if (!mine) return box;
+      const tweak = (dk, dr) => { it.k = Math.max(0.35, Math.min(3.2, (it.k || 1) + dk)); it.r = ((it.r || 0) + dr) % 360; place(box, it); save(); };
+      box.append(h('div', { class: 'ph-case-tools' },
+        h('button', { type: 'button', title: 'smaller', onclick: e => { e.stopPropagation(); tweak(-0.15, 0); } }, '−'),
+        h('button', { type: 'button', title: 'bigger', onclick: e => { e.stopPropagation(); tweak(0.15, 0); } }, '+'),
+        h('button', { type: 'button', title: 'turn', onclick: e => { e.stopPropagation(); tweak(0, -15); } }, '↺'),
+        h('button', { type: 'button', title: 'turn', onclick: e => { e.stopPropagation(); tweak(0, 15); } }, '↻'),
+        h('button', { type: 'button', title: 'take off', onclick: e => { e.stopPropagation(); onDelete(); picked = null; save(); drawBack(); } }, '✕')));
+      box.classList.toggle('sel', picked === it);
+      box.addEventListener('pointerdown', () => { picked = it; back.querySelectorAll('.sel').forEach(x => x.classList.remove('sel')); box.classList.add('sel'); });
+      box.addEventListener('wheel', e => { e.preventDefault(); if (e.shiftKey) tweak(0, e.deltaY > 0 ? 8 : -8); else tweak(e.deltaY > 0 ? -0.08 : 0.08, 0); }, { passive: false });
+      dragOn(box, back, (x, y) => { it.x = x; it.y = y; place(box, it); }, save);
+      return box;
+    };
+    const t = d.case.text;
+    const g = d.case.grip;
     fill(back,
       h('div', { class: 'ph-cam' }, h('i'), h('i'), h('i'), h('b')),
-      d.case.stickers.map(st => {
-        const img = sticker(st.code, 'ph-case-stk');
-        const box = h('div', { class: 'ph-case-item', style: { left: st.x + '%', top: st.y + '%', transform: `translate(-50%,-50%) rotate(${st.r || 0}deg) scale(${st.k || 1})` } }, img,
-          mine ? h('button', { type: 'button', class: 'ph-case-x', title: 'take off', onclick: e => { e.stopPropagation(); d.case.stickers = d.case.stickers.filter(x => x !== st); save(); drawBack(); } }, '✕') : null);
-        if (mine) dragOn(box, back, (x, y) => { st.x = x; st.y = y; box.style.left = x + '%'; box.style.top = y + '%'; }, save);
-        return box;
-      }));
+      d.case.stickers.map(st => handle(h('div', { class: 'ph-case-item' + (st.sid && !st.sid.startsWith('e:') ? ' big' : '') }, st.sid ? stickerNode(st.sid) : sticker(st.code, 'ph-case-stk')), st,
+        () => { d.case.stickers = d.case.stickers.filter(x => x !== st); })),
+      t?.value ? handle(h('div', { class: 'ph-case-item ph-case-text', style: { fontFamily: `'${t.font}', cursive`, color: t.color, '--glow': t.glow ? t.color : 'transparent' } }, t.value), t,
+        () => { d.case.text = null; }) : null,
+      g ? handle(h('div', { class: 'ph-case-item ph-grip ' + g.kind, style: { '--grip': g.color } }, g.kind === 'pop' && g.sticker ? stickerNode(g.sticker) : null), g,
+        () => { d.case.grip = null; }) : null);
   }
+  back.addEventListener('pointerdown', e => { if (!e.target.closest('.ph-case-item')) { picked = null; back.querySelectorAll('.sel').forEach(x => x.classList.remove('sel')); } });
 
   // ---- screens ----
   let cur = null;
@@ -1062,34 +1109,119 @@ export function render(el, ctx) {
 
   // ---- the case box ----
   function caseBox() {
+    const c = d.case;
+    const changed = () => { save(); paintCase(); drawAll(); };
+    const showBack = () => { if (!device.classList.contains('flipped')) flip(); };
     const preview = h('div', { class: 'ph-case-prev' });
-    const drawPrev = () => { fill(preview, h('div', { class: 'ph-mini', 'data-case': d.case.style, style: { '--case': d.case.color } }, h('div', { class: 'ph-cam' }, h('i'), h('i'), h('i'), h('b')))); };
+    const mini = (style, cls = '') => {
+      const m = h('div', { class: 'ph-mini ' + cls, 'data-case': style, style: { '--case': c.color, '--case2': c.color2 } });
+      if (style === 'photo' && c.imageId) store.imageURL(c.imageId).then(url => { if (url) m.style.setProperty('--case-img', `url("${url}")`); });
+      return m;
+    };
     const styles = h('div', { class: 'ph-case-styles' });
-    const drawStyles = () => fill(styles, CASES.map(([v, l]) => h('button', { type: 'button', class: 'ph-case-style' + (d.case.style === v ? ' on' : ''), onclick: () => { d.case.style = v; save(); paintCase(); drawStyles(); drawPrev(); } },
-      h('i', { class: 'ph-mini', 'data-case': v, style: { '--case': d.case.color } }), h('span', {}, l))));
+    const extra = h('div', { class: 'ph-case-extra' });
     const charms = h('div', { class: 'ph-pick-grid' });
-    const drawCharms = () => fill(charms,
-      h('button', { type: 'button', class: 'ph-pick' + (!d.case.charm ? ' on' : ''), onclick: () => { d.case.charm = null; save(); paintCase(); drawCharms(); } }, '✕'),
-      CHARMS.map(c => h('button', { type: 'button', class: 'ph-pick' + (d.case.charm === c ? ' on' : ''), onclick: () => { d.case.charm = c; save(); paintCase(); drawCharms(); } }, sticker(c))));
-    drawStyles(); drawCharms(); drawPrev();
+    const saved = h('div', { class: 'ph-saved-cases' });
+    async function photoCase() {
+      const up = await uploadPic(1200, { aspect: 9 / 19.2 });
+      if (!up) return false;
+      if (c.imageId && !d.savedCases.some(x => x.look.imageId === c.imageId)) dropImage(c.imageId);
+      c.imageId = up.imageId;
+      return true;
+    }
+    const drawAll = () => {
+      fill(preview, h('div', { class: 'ph-case-prev-wrap' }, (() => { const m = mini(c.style); m.append(h('div', { class: 'ph-cam' }, h('i'), h('i'), h('i'), h('b'))); return m; })()));
+      fill(styles, CASES.map(([v, l]) => h('button', {
+        type: 'button', class: 'ph-case-style' + (c.style === v ? ' on' : ''), 'data-style': v,
+        onclick: async () => { if (v === 'photo' && !c.imageId && !(await photoCase())) return; c.style = v; changed(); },
+      }, mini(v), h('span', {}, l))));
+      fill(extra,
+        c.style === 'photo' ? h('button', { type: 'button', class: 'btn ghost sm', onclick: async () => { if (await photoCase()) changed(); } }, 'change picture') : null,
+        TWO_TONE.has(c.style) ? h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'second color'), swatches(c.color2, v => { c.color2 = v; changed(); }, CASE_COLORS)) : null);
+      fill(charms,
+        c.charms.length ? c.charms.map((code, i) => h('button', { type: 'button', class: 'ph-pick on', title: 'take off', onclick: () => { c.charms.splice(i, 1); changed(); } }, sticker(code))) : null,
+        c.charms.length < 3 ? CHARMS.filter(x => !c.charms.includes(x)).map(code => h('button', { type: 'button', class: 'ph-pick', onclick: () => { c.charms.push(code); changed(); } }, sticker(code))) : null);
+      fill(saved,
+        d.savedCases.map(sc => h('div', { class: 'ph-saved-case' },
+          h('button', { type: 'button', class: 'ph-saved-pick', title: sc.name, onclick: () => { Object.assign(c, structuredClone(sc.look)); changed(); } },
+            (() => { const m = h('div', { class: 'ph-mini', 'data-case': sc.look.style, style: { '--case': sc.look.color, '--case2': sc.look.color2 } }); if (sc.look.style === 'photo' && sc.look.imageId) store.imageURL(sc.look.imageId).then(url => { if (url) m.style.setProperty('--case-img', `url("${url}")`); }); return m; })(),
+            h('span', {}, sc.name)),
+          h('button', {
+            type: 'button', class: 'ph-saved-x', title: 'delete', onclick: async () => {
+              if (!(await confirmDialog(`delete ${sc.name}?`, { danger: true, okLabel: 'delete' }))) return;
+              d.savedCases = d.savedCases.filter(x => x !== sc);
+              const id = sc.look.imageId;
+              if (id && c.imageId !== id && !d.savedCases.some(x => x.look.imageId === id)) dropImage(id);
+              save(); drawAll();
+            },
+          }, '✕'))),
+        h('button', {
+          type: 'button', class: 'btn ghost sm', onclick: () => {
+            const name = h('input', { type: 'text', maxLength: 30, value: `case ${d.savedCases.length + 1}`, 'data-autofocus': '' });
+            openModal({
+              title: 'save design', body: name,
+              actions: [{ label: 'save', kind: 'primary', onClick: close => { d.savedCases.push({ id: uid(), name: name.value.trim() || 'case', look: structuredClone(c) }); save(); close(); drawAll(); } }],
+            });
+          },
+        }, 'save this design'));
+    };
+
+    // stickers: every sticker the diaries have
+    let tab = STICKER_TABS[0][0];
+    const tabs = h('div', { class: 'stk-tabs ph-case-stk-tabs' });
+    const grid = h('div', { class: 'stk-grid ph-case-stk-grid' });
+    const drawStickers = () => {
+      fill(tabs, STICKER_TABS.map(([name, icon]) => h('button', { type: 'button', class: 'stk-tab' + (name === tab ? ' on' : ''), title: name, onclick: () => { tab = name; drawStickers(); } }, h('span', { class: 'stk-tab-icon' }, stickerNode(icon)))));
+      fill(grid, STICKER_TABS.find(x => x[0] === tab)[2].map(id => h('button', {
+        type: 'button', class: 'stk-cell', onclick: () => {
+          c.stickers.push({ id: uid(), sid: id, x: 22 + Math.random() * 56, y: 34 + Math.random() * 54, r: Math.round(Math.random() * 40 - 20), k: 0.8 + Math.random() * 0.4 });
+          save(); drawBack(); showBack();
+        },
+      }, stickerNode(id))));
+    };
+
+    // words on the back
+    const text = c.text || { value: '', font: CASE_FONTS[0][0], color: '#ffffff', glow: false, x: 50, y: 70, r: -6, k: 1 };
+    const putText = () => { if (text.value.trim()) { c.text = text; } else c.text = null; save(); drawBack(); };
+    const textBox = h('div', { class: 'ph-case-words' },
+      h('input', { type: 'text', value: text.value, maxLength: 24, placeholder: 'words', oninput: e => { text.value = e.target.value; putText(); showBack(); } }),
+      h('div', { class: 'ph-case-fonts' }, CASE_FONTS.map(([f, l]) => h('button', {
+        type: 'button', class: 'font-chip' + (text.font === f ? ' on' : ''), style: { fontFamily: `'${f}', cursive` }, title: l,
+        onclick: e => { text.font = f; e.currentTarget.parentNode.querySelectorAll('.on').forEach(x => x.classList.remove('on')); e.currentTarget.classList.add('on'); putText(); },
+      }, 'Aa'))),
+      swatches(text.color, v => { text.color = v; putText(); }, ['#ffffff', '#141114', '#ff4fa3', '#d81e5b', '#b18cff', '#7df9d0', '#ffd84d', '#c0c0c8']),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!text.glow, onchange: e => { text.glow = e.target.checked; putText(); } }), 'glow'));
+
+    // a pop socket or a ring on the back
+    const grip = h('div', { class: 'ph-case-grip-row' });
+    const drawGrip = () => fill(grip,
+      segmented([{ value: '', label: 'none' }, { value: 'pop', label: 'pop socket' }, { value: 'ring', label: 'ring' }], c.grip?.kind || '', v => {
+        c.grip = v ? { kind: v, color: c.grip?.color || c.color, sticker: c.grip?.sticker || null, x: c.grip?.x ?? 50, y: c.grip?.y ?? 58, r: 0, k: 1 } : null;
+        save(); drawBack(); drawGrip(); if (v) showBack();
+      }),
+      c.grip ? swatches(c.grip.color, v => { c.grip.color = v; save(); drawBack(); }, CASE_COLORS) : null,
+      c.grip?.kind === 'pop' ? h('div', { class: 'ph-pick-grid ph-grip-stk' },
+        h('button', { type: 'button', class: 'ph-pick' + (!c.grip.sticker ? ' on' : ''), onclick: () => { c.grip.sticker = null; save(); drawBack(); drawGrip(); } }, '✕'),
+        CHARMS.slice(0, 24).map(code => h('button', { type: 'button', class: 'ph-pick' + (c.grip.sticker === 'e:' + code ? ' on' : ''), onclick: () => { c.grip.sticker = 'e:' + code; save(); drawBack(); drawGrip(); } }, sticker(code)))) : null);
+
+    drawAll(); drawStickers(); drawGrip();
+    const sec = (label, ...kids) => h('div', { class: 'field' }, h('span', { class: 'field-label' }, label), ...kids);
     openModal({
       title: 'phone case', wide: true,
       body: h('div', { class: 'ph-case-box' },
         h('div', { class: 'ph-case-side' }, preview),
         h('div', { class: 'ph-case-main' },
-          h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'style'), styles),
-          h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'color'), swatches(d.case.color, c => { d.case.color = c; save(); paintCase(); drawStyles(); drawPrev(); }, CASE_COLORS)),
-          h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'charm'), charms),
-          h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'stickers on the back'),
-            h('div', { class: 'ph-pick-grid' }, CASE_STICKERS.map(c => h('button', {
-              type: 'button', class: 'ph-pick', onclick: () => {
-                d.case.stickers.push({ id: uid(), code: c, x: 22 + Math.random() * 56, y: 34 + Math.random() * 54, r: Math.round(Math.random() * 40 - 20), k: 0.8 + Math.random() * 0.5 });
-                save(); drawBack();
-                if (!device.classList.contains('flipped')) flip();
-              },
-            }, sticker(c))))))),
+          sec('style', styles),
+          sec('color', swatches(c.color, v => { c.color = v; changed(); }, CASE_COLORS)),
+          extra,
+          sec('charms', charms),
+          sec('strap', segmented(STRAPS.map(([value, label]) => ({ value, label })), c.strap || 'beads', v => { c.strap = v; changed(); })),
+          sec('stickers on the back', tabs, grid),
+          sec('words on the back', textBox),
+          sec('grip', grip),
+          sec('saved designs', saved))),
       actions: [
-        d.case.stickers.length ? { label: 'peel off stickers', kind: 'ghost', onClick: () => { d.case.stickers = []; save(); drawBack(); } } : null,
+        c.stickers.length ? { label: 'peel off stickers', kind: 'ghost', onClick: () => { c.stickers = []; save(); drawBack(); } } : null,
         { label: 'done', kind: 'primary', onClick: close => close() },
       ].filter(Boolean),
     });
@@ -1117,7 +1249,7 @@ function dragOn(item, area, onMove, onDone) {
     if (e.target.closest('button')) return;
     e.preventDefault();
     e.stopPropagation();
-    item.setPointerCapture(e.pointerId);
+    try { item.setPointerCapture(e.pointerId); } catch {}
     item.classList.add('dragging');
     const r = area.getBoundingClientRect();
     const move = ev => {

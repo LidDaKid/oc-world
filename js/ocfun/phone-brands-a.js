@@ -424,6 +424,39 @@ export function install(api) {
   // discord
   // ======================================================================
   const dc = d.discord;
+  // discord is shared like the feeds: a worldmate's server shows up for the ocs in it (it stays on their phone,
+  // messages go straight into it), and a dm shows both phones' sides of the chat
+  const svOwner = new WeakMap(); // a worldmate's server -> them
+  const mateRef = m => ({ id: m.id, name: m.name || '' });
+  const allServers = () => [...dc.servers, ...worldmates(char.id).flatMap(m => (m.fun?.phone?.discord?.servers || [])
+    .filter(sv => sv.members?.some(x => x.ref?.id === char.id)).map(sv => { svOwner.set(sv, m); return sv; }))];
+  const saveSv = sv => { const o = svOwner.get(sv); if (!o) save(); else if (store.isMine(o)) store.save('char', o); };
+  const canSv = sv => mine && (!svOwner.get(sv) || store.isMine(svOwner.get(sv)));
+  // everyone in a server: { ref, status, self, owner, real }. on a worldmate's server, they're the owner and
+  // this oc is one of the members (real = that member entry, so status changes land on it)
+  const svPeople = sv => {
+    const o = svOwner.get(sv);
+    if (!o) return [{ ref: me(), status: dc.status, self: true }, ...sv.members];
+    return [{ ref: mateRef(o), status: o.fun.phone.discord.status || 'online', owner: true },
+      ...sv.members.map(m => (m.ref?.id === char.id ? { ...m, ref: me(), self: true, real: m } : m))];
+  };
+  // the other side of a dm with an oc = their dm with this oc
+  const mateDm = dm => {
+    const m = dm?.who?.id ? worldmates(char.id).find(x => x.id === dm.who.id) : null;
+    const x = m?.fun?.phone?.discord?.dms?.find(y => y.who?.id === char.id);
+    return x ? { m, x } : null;
+  };
+  const msgOwner = new WeakMap(); // a message from the other side of a dm -> the oc whose phone it's on
+  const dmMsgs = dm => {
+    const other = mateDm(dm);
+    if (other) other.x.msgs.forEach(m => msgOwner.set(m, other.m));
+    const seen = new Set();
+    return [...dm.msgs, ...(other?.x.msgs || [])].filter(m => !seen.has(m.id) && seen.add(m.id)).sort((a, b) => a.at - b.at);
+  };
+  // a worldmate who dm'd this oc shows up in the dm list here too
+  for (const m of worldmates(char.id)) {
+    if (m.fun?.phone?.discord?.dms?.some(y => y.who?.id === char.id && y.msgs?.length) && !dc.dms.some(x => x.who?.id === m.id)) dc.dms.push({ id: 'dm_' + uid(), who: mateRef(m), msgs: [] });
+  }
   let dcSel = dc.servers[0]?.id || 'dms';
   const STATUS = ['online', 'idle', 'dnd', 'offline'];
   const dcColor = ref => who(ref).color;
@@ -466,33 +499,38 @@ export function install(api) {
     const v = p.view || 'home';
     if (v === 'chat') return dcChat(p);
     if (v === 'members') return dcMembers(p);
-    const sv = dc.servers.find(x => x.id === dcSel);
+    const sv = allServers().find(x => x.id === dcSel);
     const rail = h('div', { class: 'pa-dc-rail ph-scroll' },
       h('button', { type: 'button', class: 'pa-dc-sv pa-dc-home' + (!sv ? ' on' : ''), title: 'direct messages', onclick: () => { dcSel = 'dms'; api.redraw(); } }, h('span', { class: 'pa-dc-sv-ico' }, discordLogo())),
       h('i', { class: 'pa-dc-sep' }),
-      dc.servers.map(x => h('button', { type: 'button', class: 'pa-dc-sv' + (x === sv ? ' on' : ''), title: x.name, 'data-id': x.id, onclick: () => { dcSel = x.id; api.redraw(); } }, serverIcon(x))),
+      allServers().map(x => h('button', { type: 'button', class: 'pa-dc-sv' + (x === sv ? ' on' : ''), title: x.name, 'data-id': x.id, onclick: () => { dcSel = x.id; api.redraw(); } }, serverIcon(x))),
       mine ? h('button', { type: 'button', class: 'pa-dc-sv pa-dc-add', title: 'add a server', onclick: newServer }, h('span', { class: 'pa-dc-sv-ico' }, ico.plus())) : null);
     let panel;
     if (sv) {
       panel = h('div', { class: 'pa-dc-panel' },
         h('div', { class: 'pa-dc-svname' }, h('b', {}, sv.name), h('span', {}, '›')),
         h('div', { class: 'ph-scroll' },
-          h('div', { class: 'pa-dc-cat' }, h('span', {}, 'text channels'), mine ? h('button', { type: 'button', class: 'pa-dc-catadd', title: 'create channel', onclick: () => newChannel(sv) }, '+') : null),
+          h('div', { class: 'pa-dc-cat' }, h('span', {}, 'text channels'), canSv(sv) ? h('button', { type: 'button', class: 'pa-dc-catadd', title: 'create channel', onclick: () => newChannel(sv) }, '+') : null),
           sv.channels.map(c => h('button', { type: 'button', class: 'pa-dc-chan', 'data-id': c.id, onclick: () => show('discord', { view: 'chat', sv: sv.id, ch: c.id }, 'push') }, h('em', {}, '#'), h('span', {}, c.name))),
           h('div', { class: 'pa-dc-cat' }, h('span', {}, `members — ${sv.members.length + 1}`)),
-          h('button', { type: 'button', class: 'pa-dc-chan', onclick: () => show('discord', { view: 'members', sv: sv.id }, 'push') }, h('div', { class: 'pa-dc-stack' }, [me(), ...sv.members.map(m => m.ref)].slice(0, 4).map(r => face(r, 'xs'))), h('span', {}, 'see all'))),
-        mine ? h('button', {
+          h('button', { type: 'button', class: 'pa-dc-chan', onclick: () => show('discord', { view: 'members', sv: sv.id }, 'push') }, h('div', { class: 'pa-dc-stack' }, svPeople(sv).map(m => m.ref).slice(0, 4).map(r => face(r, 'xs'))), h('span', {}, 'see all'))),
+        mine && !svOwner.get(sv) ? h('button', {
           type: 'button', class: 'pa-dc-leave', onclick: async () => {
             if (!(await confirmDialog(`delete ${sv.name}?`, { danger: true, okLabel: 'delete' }))) return;
             dc.servers = dc.servers.filter(x => x !== sv); dcSel = 'dms'; save(); api.redraw();
           },
-        }, 'delete server') : null);
+        }, 'delete server') : canSv(sv) ? h('button', {
+          type: 'button', class: 'pa-dc-leave', onclick: async () => {
+            if (!(await confirmDialog(`leave ${sv.name}?`, { danger: true, okLabel: 'leave' }))) return;
+            sv.members = sv.members.filter(x => x.ref?.id !== char.id); saveSv(sv); dcSel = 'dms'; api.redraw();
+          },
+        }, 'leave server') : null);
     } else {
       panel = h('div', { class: 'pa-dc-panel' },
         h('div', { class: 'pa-dc-svname' }, h('b', {}, 'messages'), mine ? h('button', { type: 'button', class: 'pa-dc-catadd', title: 'new message', onclick: newDm }, '+') : null),
         h('div', { class: 'ph-scroll' },
-          dc.dms.length ? [...dc.dms].sort((a, b) => (b.msgs.at(-1)?.at || 0) - (a.msgs.at(-1)?.at || 0)).map(dm => {
-            const last = dm.msgs.at(-1);
+          dc.dms.length ? [...dc.dms].sort((a, b) => (dmMsgs(b).at(-1)?.at || 0) - (dmMsgs(a).at(-1)?.at || 0)).map(dm => {
+            const last = dmMsgs(dm).at(-1);
             return h('button', { type: 'button', class: 'pa-dc-dm', 'data-id': dm.id, onclick: () => show('discord', { view: 'chat', dm: dm.id }, 'push') },
               dcFace(dm.who, dm.status || 'online'),
               h('div', { class: 'pa-dc-dm-main' }, h('b', {}, who(dm.who).name), h('span', {}, last ? (isMe(last.by) ? 'you: ' : '') + (last.text || (last.video ? 'sent a video' : 'sent a picture')) : '')),
@@ -507,12 +545,27 @@ export function install(api) {
   };
 
   function dcChat(p) {
-    const sv = p.sv ? dc.servers.find(x => x.id === p.sv) : null;
+    const sv = p.sv ? allServers().find(x => x.id === p.sv) : null;
     const ch = sv?.channels.find(x => x.id === p.ch);
     const dm = p.dm ? dc.dms.find(x => x.id === p.dm) : null;
     const room = ch || dm;
     if (!room) return SCREENS.discord({});
     let as = me();
+    const msgsOf = () => (ch ? ch.msgs : dmMsgs(dm));
+    const saveMsg = m => {
+      if (ch) return saveSv(sv);
+      const o = msgOwner.get(m);
+      if (!o) save(); else if (store.isMine(o)) store.save('char', o);
+    };
+    const removeMsg = m => {
+      if (ch) { ch.msgs = ch.msgs.filter(x => x !== m); saveSv(sv); return; }
+      const o = msgOwner.get(m);
+      if (!o) { dm.msgs = dm.msgs.filter(x => x !== m); save(); return; }
+      if (!store.isMine(o)) return;
+      const other = mateDm(dm);
+      other.x.msgs = other.x.msgs.filter(x => x !== m);
+      store.save('char', o);
+    };
     const list = h('div', { class: 'ph-scroll pa-dc-msgs' });
     const input = h('input', { type: 'text', class: 'pa-dc-input', maxLength: 1000, placeholder: ch ? `message #${ch.name}` : `message @${who(dm.who).name}`, onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); send(); } } });
     // media = { imageId } or { video } from the + button
@@ -520,17 +573,18 @@ export function install(api) {
       const text = input.value.trim();
       if (!text && !media) return;
       room.msgs.push({ id: 'dmsg_' + uid(), by: freshRef(as), text, imageId: media?.imageId || null, ...(media?.video ? { video: media.video } : {}), at: Date.now(), reacts: {} });
-      if (sv && !isMe(as) && !sv.members.some(m => sameRef(m.ref, as))) sv.members.push({ ref: freshRef(as), status: 'online' });
+      if (sv && !isMe(as) && !svPeople(sv).some(m => sameRef(m.ref, as))) sv.members.push({ ref: freshRef(as), status: 'online' });
       input.value = '';
-      save();
+      if (sv) saveSv(sv); else save();
       draw();
     }
     function picker(m, row) {
       list.querySelectorAll('.pa-dc-pick').forEach(x => x.remove());
-      if (!mine) return;
+      if (!mine || (sv && !canSv(sv))) return;
+      const theirs = !ch && msgOwner.get(m);
       row.append(h('div', { class: 'pa-dc-pick' },
-        REACTS_DC.map(r => h('button', { type: 'button', onclick: e => { e.stopPropagation(); m.reacts[r] = (m.reacts[r] || 0) + 1; save(); draw(); } }, r)),
-        h('button', { type: 'button', class: 'pa-dc-del', title: 'delete', onclick: e => { e.stopPropagation(); room.msgs = room.msgs.filter(x => x !== m); dropMedia(m); save(); draw(); } }, '✕')));
+        REACTS_DC.map(r => h('button', { type: 'button', onclick: e => { e.stopPropagation(); m.reacts ||= {}; m.reacts[r] = (m.reacts[r] || 0) + 1; saveMsg(m); draw(); } }, r)),
+        !theirs || store.isMine(theirs) ? h('button', { type: 'button', class: 'pa-dc-del', title: 'delete', onclick: e => { e.stopPropagation(); removeMsg(m); dropMedia(m); draw(); } }, '✕') : null));
     }
     function draw() {
       let prev = null;
@@ -539,7 +593,7 @@ export function install(api) {
           ch ? h('span', { class: 'pa-dc-hash' }, '#') : face(dm.who, 'lg'),
           h('h3', {}, ch ? `welcome to #${ch.name}` : who(dm.who).name),
           dm ? h('span', {}, handleOf(dm.who)) : null),
-        room.msgs.map(m => {
+        msgsOf().map(m => {
           const head = !prev || !sameRef(prev.by, m.by) || m.at - prev.at > 7 * 60e3;
           prev = m;
           const row = h('div', { class: 'pa-dc-msg' + (head ? ' head' : ''), onclick: () => picker(m, row) },
@@ -550,7 +604,7 @@ export function install(api) {
               m.imageId ? pic(m.imageId, 'pa-dc-pic') : null,
               m.video ? h('div', { class: 'pa-dc-vid', onclick: e => e.stopPropagation() }, vid(m.video, '', { controls: true, sound: true, loop: false })) : null,
               Object.keys(m.reacts || {}).length ? h('div', { class: 'pa-dc-reacts' }, Object.entries(m.reacts).map(([r, n]) => h('button', {
-                type: 'button', class: 'pa-dc-react', onclick: e => { e.stopPropagation(); if (!mine) return; m.reacts[r] = n - 1; if (m.reacts[r] <= 0) delete m.reacts[r]; save(); draw(); },
+                type: 'button', class: 'pa-dc-react', onclick: e => { e.stopPropagation(); if (!mine) return; m.reacts[r] = n - 1; if (m.reacts[r] <= 0) delete m.reacts[r]; saveMsg(m); draw(); },
               }, r, h('b', {}, n)))) : null));
           return row;
         }));
@@ -571,19 +625,19 @@ export function install(api) {
   }
 
   function dcMembers(p) {
-    const sv = dc.servers.find(x => x.id === p.sv);
+    const sv = allServers().find(x => x.id === p.sv);
     if (!sv) return SCREENS.discord({});
-    const all = [{ ref: me(), status: dc.status, self: true }, ...sv.members];
+    const all = svPeople(sv);
     const groups = [['online', all.filter(m => m.status !== 'offline')], ['offline', all.filter(m => m.status === 'offline')]];
     return h('div', { class: 'ph-app-screen pa-dc pa-dc-chat' },
       h('div', { class: 'pa-dc-chathead' },
         h('button', { type: 'button', class: 'pa-ibtn', title: 'back', onclick: () => show('discord', p.back || {}, 'pop') }, ico.back()),
         h('b', {}, 'members'), h('span', { class: 'pa-grow' }),
-        mine ? h('button', {
+        canSv(sv) ? h('button', {
           type: 'button', class: 'pa-ibtn', title: 'add member', onclick: async () => {
             const ref = await pickWho({ title: 'add to server', not: char.id, okLabel: 'add' });
-            if (!ref || sv.members.some(m => sameRef(m.ref, ref))) return;
-            sv.members.push({ ref, status: 'online' }); save(); api.redraw();
+            if (!ref || all.some(m => sameRef(m.ref, ref))) return;
+            sv.members.push({ ref, status: 'online' }); saveSv(sv); api.redraw();
           },
         }, ico.plus()) : null),
       h('div', { class: 'ph-scroll' },
@@ -592,14 +646,14 @@ export function install(api) {
           ms.map(m => h('div', { class: 'pa-dc-member' + (m.status === 'offline' ? ' off' : '') },
             dcFace(m.ref, m.status),
             h('b', { style: { color: dcColor(m.ref) } }, who(m.ref).name),
-            mine ? h('button', {
+            canSv(sv) && !m.owner ? h('button', {
               type: 'button', class: 'pa-dc-statbtn', title: 'status', onclick: () => {
                 const nx = STATUS[(STATUS.indexOf(m.status) + 1) % STATUS.length];
-                if (m.self) dc.status = nx; else m.status = nx;
-                save(); api.redraw();
+                if (m.self && !m.real) { dc.status = nx; save(); } else { (m.real || m).status = nx; saveSv(sv); }
+                api.redraw();
               },
             }, h('i', { class: 'pa-dot ' + m.status })) : null,
-            mine && !m.self ? h('button', { type: 'button', class: 'pa-dc-kick', title: 'remove', onclick: () => { sv.members = sv.members.filter(x => x !== m); save(); api.redraw(); } }, '✕') : null)),
+            canSv(sv) && !m.self && !m.owner ? h('button', { type: 'button', class: 'pa-dc-kick', title: 'remove', onclick: () => { sv.members = sv.members.filter(x => x !== m); saveSv(sv); api.redraw(); } }, '✕') : null)),
         ] : null)));
   }
 

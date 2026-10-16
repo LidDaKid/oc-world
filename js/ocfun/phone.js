@@ -15,7 +15,7 @@ import { cropAll } from '../crop.js';
 import { store } from '../store.js';
 import { dataFor, pic, sticker, appBar, portrait, nameOf, allOcs, ocById } from './kit.js';
 import { who, face, freshRef, pickWho, hm, hmA, stamp, dayLabel, shortDate, addPhotos, dropImage, relLabel, inkOn, mirrorSend, mirrorReact, mirrorDelete, refOf, addVideo, vid,
-  mirrorGroupSend, mirrorGroupReact, mirrorGroupDelete, mirrorGroupInfo } from './phone-bits.js';
+  mirrorGroupSend, mirrorGroupReact, mirrorGroupDelete, mirrorGroupInfo, catchUp } from './phone-bits.js';
 import * as callsApps from './phone-calls.js';
 import * as lifeApps from './phone-life.js';
 import * as webApps from './phone-web.js';
@@ -99,6 +99,7 @@ export function render(el, ctx) {
   d.lock = { imageId: null, ...d.lock };
   d.home = { imageId: null, ...d.home };
   for (const t of d.threads) { t.msgs ||= []; t.read ??= true; }
+  d.cleared ||= {};
   d.hidden = (d.hidden || []).filter(id => !FIXED.includes(id));
   d.custom ||= [];
   // phones from before downloading: stock apps + anything already used, minus what was taken off
@@ -602,7 +603,7 @@ export function render(el, ctx) {
             queued ? h('span', { class: 'ph-later-n' }, `${queued} on the way`) : null),
           !g && w.char ? h('a', { class: 'btn ghost sm', href: ctx.ocLink(w.char) }, 'their page') : null),
         actions: [
-          { label: g ? 'delete group' : 'delete chat', kind: 'danger', onClick: async close => { if (await confirmDialog(g ? `delete ${title()}?` : `delete the chat with ${w.name}?`, { danger: true, okLabel: 'delete' })) { close(); d.threads = d.threads.filter(x => x !== t); d.later = d.later.filter(x => x.threadId !== t.id); t.msgs.forEach(dropMsg); if (g) dropImage(g.imageId); save(); show('messages', {}, 'pop'); } } },
+          { label: g ? 'delete group' : 'delete chat', kind: 'danger', onClick: async close => { if (await confirmDialog(g ? `delete ${title()}?` : `delete the chat with ${w.name}?`, { danger: true, okLabel: 'delete' })) { close(); d.threads = d.threads.filter(x => x !== t); d.later = d.later.filter(x => x.threadId !== t.id); if (g) d.cleared[g.gid] = Date.now(); else if (t.who?.id) d.cleared[t.who.id] = Date.now(); t.msgs.forEach(dropMsg); if (g) dropImage(g.imageId); save(); show('messages', {}, 'pop'); } } },
           { label: 'done', kind: 'primary', onClick: close => close() },
         ],
       });
@@ -1034,6 +1035,8 @@ export function render(el, ctx) {
     save();
   }
   timers.push(setInterval(deliverLater, 1000));
+  // pull in texts other phones have that this one missed (the texts land right away, pictures a moment later)
+  catchUp(char, d).then(changed => { if (changed && ['messages', 'thread'].includes(cur?.name)) redraw(); });
 
   // ---- the other apps ----
   const api = {

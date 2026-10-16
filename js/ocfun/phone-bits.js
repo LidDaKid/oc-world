@@ -344,3 +344,66 @@ export function mirrorGroupDelete(fromChar, t, ids) {
     store.save('char', other);
   }
 }
+
+
+// ---- catching up ----
+// texts only get copied over when they're sent, so anything sent before two ocs shared a world (or before copying
+// existed) is only on one phone. opening a phone pulls in whatever a worldmate's phone has that this one is missing.
+// d.cleared = { <oc id or group gid>: when this phone deleted that chat }: older texts don't come back after that.
+export async function catchUp(char, d) {
+  if (!store.isMine(char)) return false;
+  d.cleared ||= {};
+  let changed = false;
+  const copies = [];
+  for (const mate of worldmates(char.id)) {
+    if (!store.isMine(mate)) continue;
+    for (const theirs of mate.fun?.phone?.threads || []) {
+      const msgs = theirs.msgs || [];
+      if (!msgs.length) continue;
+      if (theirs.group) {
+        // a group with this oc in it
+        if (!theirs.group.members?.some(m => m.id === char.id)) continue;
+        const gid = theirs.group.gid;
+        const since = d.cleared[gid] || 0;
+        const fresh = msgs.filter(m => m.at > since);
+        if (!fresh.length) continue;
+        let t = d.threads.find(x => x.group?.gid === gid);
+        if (!t) {
+          const members = [{ id: mate.id, name: nameOf(mate) }, ...theirs.group.members.filter(m => m.id !== char.id).map(m => ({ id: m.id || null, name: m.name }))];
+          t = { id: 't_' + uid(), group: { gid, name: theirs.group.name, imageId: null, members }, who: { id: null, name: theirs.group.name }, msgs: [], read: true, typing: false, at: Date.now() };
+          d.threads.push(t);
+        }
+        for (const m of fresh) {
+          if (t.msgs.some(x => x.id === m.id)) continue;
+          const copy = { id: m.id, ...seenBy(mate, m, char), text: m.text, imageId: null, at: m.at, react: m.react || null };
+          t.msgs.push(copy);
+          copies.push([m, copy]);
+          changed = true;
+        }
+        t.msgs.sort((a, b) => a.at - b.at);
+        continue;
+      }
+      if (theirs.who?.id !== char.id) continue;
+      const since = d.cleared[mate.id] || 0;
+      const fresh = msgs.filter(m => m.at > since);
+      if (!fresh.length) continue;
+      let t = d.threads.find(x => !x.group && x.who?.id === mate.id);
+      if (!t) {
+        t = { id: 't_' + uid(), who: { id: mate.id, name: nameOf(mate) }, msgs: [], read: true, typing: false, at: Date.now() };
+        d.threads.push(t);
+      }
+      for (const m of fresh) {
+        if (t.msgs.some(x => x.id === m.id)) continue;
+        const copy = { id: m.id, from: m.from === 'me' ? 'them' : 'me', text: m.text, imageId: null, at: m.at, react: m.react || null };
+        t.msgs.push(copy);
+        copies.push([m, copy]);
+        changed = true;
+      }
+      t.msgs.sort((a, b) => a.at - b.at);
+    }
+  }
+  if (changed) store.save('char', char);
+  // pictures + videos get their own copies (so deleting one side never breaks the other)
+  for (const [m, copy] of copies) await copyMedia(m, copy, char);
+  return changed;
+}

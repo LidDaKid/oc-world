@@ -2,12 +2,47 @@
 // "more" tab (char.fun.social), so a post made in either place shows up in both.
 // see the plug-in notes at the top of phone.js
 
-import { h, s, fill, uid, confirmDialog } from '../ui.js';
+import { h, s, fill, uid, confirmDialog, pickFiles, shrinkImage, toast } from '../ui.js';
 import { store } from '../store.js';
+import { cropAll } from '../crop.js';
 import { pic, ocById, allOcs } from './kit.js';
 // portrait/nameOf here show an oc as their account on the open app (see phone-accounts.js)
 import { portrait, nameOf, acctId, instaSd, activeOf, updateAccount } from './phone-accounts.js';
-import { who, face, freshRef, pickWho, refOf, ago, bigNum, addPhotos, dropImage, relLabel } from './phone-bits.js';
+import { who, face, freshRef, pickWho, refOf, ago, bigNum, addPhotos, dropImage, relLabel, addVideo, vid, tapToPause, soundBtn } from './phone-bits.js';
+
+// one picker for pictures + videos, like the app's own gallery. resolves { imageId, width, height } or { video } or null
+async function pickMedia(maxDim = 1400) {
+  if (window.__testVideo) { const v = await addVideo(); return v ? { video: v } : null; }
+  const [file] = await pickFiles('image/*,video/*', false);
+  if (!file) return null;
+  if (file.type.startsWith('video/')) {
+    const v = await addVideo(file); return v ? { video: v } : null;
+  }
+  const [img] = await cropAll([file]);
+  if (!img) return null;
+  try {
+    const { blob, width, height } = await shrinkImage(img, maxDim);
+    return { imageId: await store.putImage(blob), width, height };
+  } catch (err) {
+    console.error(err);
+    toast("couldn't read that picture", 'bad');
+    return null;
+  }
+}
+// a feed video (plays while 60%+ on screen). right after the page opens the file can still be loading when vid()
+// first tries to play, so try once more as soon as it can play, if it's on screen
+function liveVid(video, cls, opts = {}) {
+  const v = vid(video, cls, { ...opts, inView: true });
+  v.addEventListener('canplay', () => {
+    const io = new IntersectionObserver(([e]) => { io.disconnect(); if (v.paused && e.intersectionRatio >= 0.6) v.playNow(); });
+    io.observe(v);
+  }, { once: true });
+  return v;
+}
+const hasMedia = p => !!(p?.imageId || p?.video);
+// a post's picture, its video's first frame, or the text card
+const thumbOf = (p, size = 'sm') => (p.imageId ? pic(p.imageId) : p.video ? vid(p.video, 'ps-tvid') : h('div', { class: 'ps-text-post ' + size }, h('span', {}, p.caption)));
+const fakeViews = likes => Math.round((likes || 100) * (6 + Math.random() * 14));
 
 export const APPS = {
   insta: { label: 'snapshot', icon: '1f933', bg: 'radial-gradient(circle at 28% 108%, #ffd76a 0%, #ff8a4c 26%, #ff3f8e 52%, #b544e0 76%, #6a4cff 100%)' },
@@ -65,6 +100,10 @@ const ico = {
   plus: () => svg('', s('path', { d: 'M12 5v14M5 12h14', ...SW, 'stroke-width': 2.2 })),
   pin: () => svg('', s('path', { d: 'M9 3h6l-1 6 3 3v2h-4v7l-1 1-1-1v-7H7v-2l3-3Z', fill: 'currentColor' })),
   pen: () => svg('',s('path', { d: 'M4 20h4L19.5 8.5a2.8 2.8 0 0 0-4-4L4 16Z', ...SW })),
+  reels: on => svg('', s('rect', { x: 3, y: 3, width: 18, height: 18, rx: 5, ...SW, fill: on ? 'currentColor' : 'none' }), s('path', { d: 'M3 8.5h18M9.2 3l3 5.5M15 3l3 5.5', ...SW, stroke: on ? 'var(--ps-bg)' : 'currentColor' }), s('path', { d: 'M10 11.6v5.8l4.9-2.9z', fill: on ? 'var(--ps-bg)' : 'currentColor' })),
+  play: () => svg('', s('path', { d: 'M7 4.5v15l12.5-7.5z', fill: 'currentColor' })),
+  music: () => svg('', s('path', { d: 'M9 17.5V5.5l11-2v12', ...SW }), s('circle', { cx: 6.5, cy: 17.5, r: 2.5, ...SW }), s('circle', { cx: 17.5, cy: 15.5, r: 2.5, ...SW })),
+  cam: () => svg('', s('path', { d: 'M3 8.5A2.5 2.5 0 0 1 5.5 6h2l1.6-2.2h5.8L16.5 6h2A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5Z', ...SW }), s('circle', { cx: 12, cy: 12.5, r: 3.6, ...SW })),
 };
 const check = () => s('svg', { viewBox: '0 0 22 22', class: 'ps-check' },
   s('path', { d: 'M20.4 11c0-1.3-.8-2.4-2-3 .4-1.3.2-2.7-.7-3.6s-2.3-1.1-3.6-.7c-.6-1.2-1.7-2-3.1-2s-2.4.8-3 2c-1.3-.4-2.7-.2-3.6.7s-1.2 2.3-.7 3.6c-1.2.6-2 1.8-2 3.1s.8 2.4 2 3c-.4 1.3-.2 2.7.7 3.6s2.3 1.2 3.6.7c.6 1.2 1.8 2 3.1 2s2.5-.8 3.1-2c1.3.4 2.7.2 3.6-.7s1.2-2.3.7-3.6c1.2-.6 2-1.8 2-3.1z', fill: '#0095f6' }),
@@ -124,12 +163,13 @@ export function install(api) {
   const allPosts = () => people().flatMap(c => sdOf(c).posts.map(p => ({ c, p }))).sort((a, b) => b.p.at - a.p.at);
   const handleC = c => handleOf(c, sdOf(c));
   const av = (c, size = 'sm') => portrait(c, 'ps-av ' + size);
-  const hasStory = c => { const sd = sdOf(c); return sd.highlights.some(x => x.imageId) || sd.posts.some(p => p.imageId); };
+  const hasStory = c => { const sd = sdOf(c); return sd.highlights.some(hasMedia) || sd.posts.some(hasMedia); };
 
   // ---- app state (kept while the phone is open) ----
   let tab = 'home';
   let stack = []; // pages on top of the tab: { kind: 'profile' | 'post' | 'dms' | 'edit' | 'compose', ... }
   let feedScroll = 0;
+  let reelScroll = 0;
 
   SCREENS.insta = (params = {}) => {
     if (params.tab) { tab = params.tab; stack = []; }
@@ -155,9 +195,11 @@ export function install(api) {
       else if (page?.kind === 'dms') el = dmsPage();
       else if (page?.kind === 'edit') el = editPage();
       else if (page?.kind === 'compose') el = composePage(page);
-      else el = { home: homePage, explore: explorePage, activity: activityPage, profile: () => profilePage(char) }[tab]();
+      else if (page?.kind === 'reels') el = reelsPage(page);
+      else el = { home: homePage, explore: explorePage, activity: activityPage, reels: () => reelsPage(null), profile: () => profilePage(char) }[tab]();
       if (anim) el.classList.add('ps-in-' + anim);
       fill(body, el);
+      root.classList.toggle('ps-dark', el.classList.contains('ps-reels-page'));
       if (!page && tab === 'home' && feedScroll) { const sc = el.querySelector('.ph-scroll'); if (sc) sc.scrollTop = feedScroll; }
       drawTabs();
     }
@@ -168,7 +210,7 @@ export function install(api) {
         h('button', { type: 'button', class: 'ps-tab' + (on === 'home' ? ' on' : ''), title: 'home', 'data-tab': 'home', onclick: () => goTab('home') }, ico.home(tab === 'home')),
         h('button', { type: 'button', class: 'ps-tab', title: 'search', 'data-tab': 'explore', onclick: () => goTab('explore') }, ico.search(tab === 'explore')),
         mine ? h('button', { type: 'button', class: 'ps-tab', title: 'new post', 'data-tab': 'new', onclick: () => goTab('new') }, ico.add()) : null,
-        h('button', { type: 'button', class: 'ps-tab', title: 'activity', 'data-tab': 'activity', onclick: () => goTab('activity') }, ico.heart(false), tab === 'activity' ? h('i', { class: 'ps-tab-dot' }) : freshComments(char, me.seen).length ? h('i', { class: 'ps-tab-dot red' }) : null),
+        h('button', { type: 'button', class: 'ps-tab', title: 'reels', 'data-tab': 'reels', onclick: () => goTab('reels') }, ico.reels(on === 'reels')),
         h('button', { type: 'button', class: 'ps-tab', title: 'profile', 'data-tab': 'profile', onclick: () => goTab('profile') }, pfpTab));
     }
     const bar = (left, title, right, cls = '') => h('div', { class: 'ps-bar' + (cls ? ' ' + cls : '') }, h('div', { class: 'ps-bar-l' }, left), title, h('div', { class: 'ps-bar-r' }, right));
@@ -185,7 +227,7 @@ export function install(api) {
         list.length ? list.map(x => postCard(x.c, x.p)) : h('div', { class: 'ps-empty' }, h('span', { class: 'ps-empty-ring' }, ico.add()), mine ? h('button', { type: 'button', class: 'ps-btn blue', onclick: newPost }, 'first post') : null));
       return h('div', { class: 'ps-page' },
         bar(homeBtn(), h('b', { class: 'ps-logo' }, 'snapshot'),
-          [h('button', { type: 'button', class: 'ps-ibtn', title: 'activity', onclick: () => goTab('activity') }, ico.heart(false)),
+          [h('button', { type: 'button', class: 'ps-ibtn', title: 'activity', onclick: () => goTab('activity') }, ico.heart(false), freshComments(char, me.seen).length ? h('i', { class: 'ps-heart-dot' }) : null),
             h('button', { type: 'button', class: 'ps-ibtn', title: 'messages', onclick: () => push({ kind: 'dms' }) }, ico.send(), unreadDms() ? h('i', { class: 'ps-count' }, Math.min(9, unreadDms())) : null)], 'home'),
         sc);
     }
@@ -212,7 +254,12 @@ export function install(api) {
       };
       heart.onclick = () => { like(c, p, media); drawLike(); heart.classList.remove('boing'); void heart.offsetWidth; heart.classList.add('boing'); };
       drawLike();
-      const media = h('div', { class: 'ps-media' }, p.imageId ? pic(p.imageId) : h('div', { class: 'ps-text-post' }, h('span', {}, p.caption)));
+      const media = h('div', { class: 'ps-media' + (p.video && !p.imageId ? ' vid' : '') }, p.imageId ? pic(p.imageId) : p.video ? null : h('div', { class: 'ps-text-post' }, h('span', {}, p.caption)));
+      if (p.video && !p.imageId) {
+        const v = liveVid(p.video, '', { sound: true });
+        media.append(v, soundBtn('ps-snd'));
+        tapToPause(v, media);
+      }
       doubleTap(media, () => { if (!p.liked) { like(c, p, media); drawLike(); } else pop2(media); });
       const saved = me.saved.includes(p.id);
       const saveBtn = h('button', {
@@ -237,7 +284,7 @@ export function install(api) {
           h('button', { type: 'button', class: 'ps-act', title: 'share', onclick: () => shareSheet(c, p) }, ico.send()),
           saveBtn),
         likes,
-        p.caption && p.imageId ? h('p', { class: 'ps-cap' }, h('b', {}, handleC(c)), ' ', captionBits(p.caption)) : null,
+        p.caption && hasMedia(p) ? h('p', { class: 'ps-cap' }, h('b', {}, handleC(c)), ' ', captionBits(p.caption)) : null,
         comments.length > 2 ? h('button', { type: 'button', class: 'ps-view-c', onclick: () => openComments(c, p) }, `view all ${comments.length} comments`) : null,
         comments.slice(-2).map(x => h('p', { class: 'ps-cap' }, h('b', {}, handleFor(x.who)), ' ', x.text)),
         h('span', { class: 'ps-ago' }, timeAgo(p.at)));
@@ -279,8 +326,9 @@ export function install(api) {
             sd.posts = sd.posts.filter(x => x !== p);
             if (sd.pinned === p.id) sd.pinned = null;
             dropImage(p.imageId);
+            dropImage(p.video?.imageId);
             saveOf(c);
-            if (top()?.kind === 'post') stack.pop();
+            if (top()?.kind === 'post' || (top()?.kind === 'reels' && !sd.posts.some(x => x.video))) stack.pop();
             draw();
           },
         }, 'delete'),
@@ -323,7 +371,7 @@ export function install(api) {
       }
       function drawList(anim = false) {
         fill(list,
-          p.caption && p.imageId ? h('div', { class: 'ps-c cap' }, av(c, 'sm'), h('div', { class: 'ps-c-main' }, h('p', {}, h('b', {}, handleC(c)), ' ', captionBits(p.caption)), h('span', { class: 'ps-ago' }, shortAgo(p.at)))) : null,
+          p.caption && hasMedia(p) ? h('div', { class: 'ps-c cap' }, av(c, 'sm'), h('div', { class: 'ps-c-main' }, h('p', {}, h('b', {}, handleC(c)), ' ', captionBits(p.caption)), h('span', { class: 'ps-ago' }, shortAgo(p.at)))) : null,
           p.comments.length ? p.comments.map((x, i) => {
             const w = who(x.who);
             const heart = h('button', { type: 'button', class: 'ps-c-heart' + (x.liked ? ' on' : ''), title: 'like', onclick: () => { if (!edit) return; x.liked = !x.liked; saveOf(c); heart.classList.toggle('on', !!x.liked); fill(heart, ico.heart(!!x.liked)); } }, ico.heart(!!x.liked));
@@ -369,9 +417,9 @@ export function install(api) {
     // stories: the oc's highlights, or their newest pictures if they don't have any
     function storyFrames(c) {
       const sd = sdOf(c);
-      const hl = sd.highlights.filter(x => x.imageId).map(x => ({ imageId: x.imageId, label: x.label, at: null }));
+      const hl = sd.highlights.filter(hasMedia).map(x => ({ imageId: x.imageId || null, video: x.video || null, label: x.label, at: null }));
       if (hl.length) return hl;
-      return [...sd.posts].filter(p => p.imageId).sort((a, b) => b.at - a.at).slice(0, 4).map(p => ({ imageId: p.imageId, label: '', at: p.at, caption: p.caption }));
+      return [...sd.posts].filter(hasMedia).sort((a, b) => b.at - a.at).slice(0, 4).map(p => ({ imageId: p.imageId || null, video: p.imageId ? null : p.video || null, label: '', at: p.at, caption: p.caption }));
     }
     function openStory(c, startAt = 0) {
       const ring = people().filter(hasStory);
@@ -395,17 +443,25 @@ export function install(api) {
         const frames = storyFrames(who2);
         const f = frames[fi];
         if (!f) { close(); return; }
+        // a video frame lasts as long as the video (the bar fills along with it)
+        const ms = f.video ? Math.max(1, Math.min(60, f.video.dur || 5)) * 1000 : 4500;
+        let media;
+        if (f.video) {
+          media = vid(f.video, 'ps-story-img', { autoplay: true, sound: true, loop: false });
+          media.addEventListener('ended', () => { if (box.isConnected) step(1); });
+        } else media = pic(f.imageId, 'ps-story-img');
         fill(box,
-          pic(f.imageId, 'ps-story-img'),
+          media,
           h('div', { class: 'ps-story-shade' }),
-          h('div', { class: 'ps-story-bars' }, frames.map((_, k) => h('i', { class: k < fi ? 'done' : k === fi ? 'now' : '' }, h('b')))),
+          h('div', { class: 'ps-story-bars', style: { '--dur': ms + 'ms' } }, frames.map((_, k) => h('i', { class: k < fi ? 'done' : k === fi ? 'now' : '' }, h('b')))),
           h('div', { class: 'ps-story-who' }, av(who2, 'xs'), h('b', {}, handleC(who2)), h('span', {}, f.label || (f.at ? shortAgo(f.at) : '')),
+            f.video ? soundBtn('ps-story-snd') : null,
             h('button', { type: 'button', class: 'ps-story-x', title: 'close', onclick: e => { e.stopPropagation(); close(); } }, ico.x())),
           f.caption ? h('div', { class: 'ps-story-cap' }, f.caption) : null,
           h('div', { class: 'ps-story-reply' }, h('span', {}, 'send message'), ico.heart(false), ico.send()),
           h('button', { type: 'button', class: 'ps-story-tap l', title: 'back', onclick: () => step(-1) }),
           h('button', { type: 'button', class: 'ps-story-tap r', title: 'next', onclick: () => step(1) }));
-        timer = setTimeout(() => { if (box.isConnected) step(1); }, 4500);
+        timer = setTimeout(() => { if (box.isConnected) step(1); }, f.video ? ms + 1500 : ms);
       }
       layer.append(box);
       paint();
@@ -413,7 +469,7 @@ export function install(api) {
 
     async function newHighlight() {
       if (!mine) return;
-      const [p] = await addPhotos(false, 1200);
+      const p = await pickMedia(1200);
       if (!p) return;
       const sd = own();
       sheet('new highlight', close => {
@@ -421,12 +477,12 @@ export function install(api) {
         setTimeout(() => label.focus(), 250);
         let kept = false;
         const wrap = layer.lastChild;
-        const obs = new MutationObserver(() => { if (!wrap?.isConnected) { obs.disconnect(); if (!kept) dropImage(p.imageId); } });
+        const obs = new MutationObserver(() => { if (!wrap?.isConnected) { obs.disconnect(); if (!kept) { dropImage(p.imageId); dropImage(p.video?.imageId); } } });
         setTimeout(() => obs.observe(layer, { childList: true }), 0);
         return [
-          h('div', { class: 'ps-hl-prev' }, pic(p.imageId)),
+          h('div', { class: 'ps-hl-prev' }, p.video ? vid(p.video, '', { autoplay: true }) : pic(p.imageId)),
           label,
-          h('button', { type: 'button', class: 'ps-btn blue wide', onclick: () => { kept = true; sd.highlights.push({ id: 'h_' + uid(), label: label.value.trim() || 'xoxo', imageId: p.imageId }); api.save(); close(); draw(); } }, 'add'),
+          h('button', { type: 'button', class: 'ps-btn blue wide', onclick: () => { kept = true; sd.highlights.push({ id: 'h_' + uid(), label: label.value.trim() || 'xoxo', imageId: p.imageId || null, ...(p.video ? { video: p.video } : {}) }); api.save(); close(); draw(); } }, 'add'),
         ];
       });
     }
@@ -444,19 +500,83 @@ export function install(api) {
         sc);
     }
 
+    // ================= reels (full screen, one video per swipe) =================
+    // page = null for the reels tab (everyone's), or { c, id } for one person's reels starting at one
+    function reelsPage(page) {
+      let list = page ? [...sdOf(page.c).posts].sort((a, b) => b.at - a.at).map(p => ({ c: page.c, p })) : allPosts();
+      list = list.filter(x => x.p.video && !x.p.imageId);
+      const sc = h('div', { class: 'ps-reels', onscroll: () => { if (!page) reelScroll = sc.scrollTop; } }, list.length ? list.map(x => reelCard(x.c, x.p)) :
+        h('div', { class: 'ps-reels-empty' }, h('span', { class: 'ps-empty-ring' }, ico.reels(false)), mine ? h('button', { type: 'button', class: 'ps-btn blue sm', onclick: newReel }, 'new reel') : null));
+      requestAnimationFrame(() => {
+        const el = page?.id && sc.querySelector(`[data-post="${page.id}"]`);
+        sc.scrollTop = el ? el.offsetTop : page ? 0 : reelScroll;
+      });
+      return h('div', { class: 'ps-page ps-reels-page' },
+        h('div', { class: 'ps-reels-top' },
+          page ? backBtn() : homeBtn(),
+          h('b', {}, page ? handleC(page.c) : 'reels'),
+          mine && !page ? h('button', { type: 'button', class: 'ps-ibtn', title: 'new reel', onclick: newReel }, ico.cam()) : h('span', { class: 'ps-ibtn' })),
+        sc);
+    }
+    function reelCard(c, p) {
+      const v = liveVid(p.video, 'ps-reel-vid', { sound: true });
+      const card = h('div', { class: 'ps-reel', 'data-post': p.id }, v);
+      tapToPause(v, card);
+      const heart = h('button', { type: 'button', class: 'ps-reel-act', title: 'like' });
+      const drawHeart = () => fill(heart, ico.heart(!!p.liked), h('span', {}, bigNum(p.likes)));
+      drawHeart();
+      heart.onclick = () => { like(c, p, card); drawHeart(); };
+      doubleTap(card, () => { if (!p.liked) { like(c, p, card); drawHeart(); } else pop2(card); });
+      const self = c.id === char.id;
+      const f = me.following.includes(c.id);
+      const followBtn = !self ? h('button', {
+        type: 'button', class: 'ps-reel-follow', onclick: e => {
+          e.stopPropagation();
+          if (!mine) return;
+          const on = !me.following.includes(c.id);
+          me.following = on ? [...me.following, c.id] : me.following.filter(x => x !== c.id);
+          api.save();
+          e.currentTarget.textContent = on ? 'following' : 'follow';
+        },
+      }, f ? 'following' : 'follow') : null;
+      card.append(
+        h('div', { class: 'ps-reel-shade' }),
+        soundBtn('ps-reel-snd'),
+        h('div', { class: 'ps-reel-rail' },
+          heart,
+          h('button', { type: 'button', class: 'ps-reel-act', title: 'comment', onclick: () => openComments(c, p) }, ico.comment(), h('span', {}, bigNum(p.comments.length))),
+          h('button', { type: 'button', class: 'ps-reel-act', title: 'share', onclick: () => shareSheet(c, p) }, ico.send()),
+          canEdit(c) ? h('button', { type: 'button', class: 'ps-reel-act', title: 'more', onclick: () => postMenu(c, p) }, ico.dots()) : h('span', { class: 'ps-reel-act' }, ico.dots()),
+          h('span', { class: 'ps-reel-disc' }, av(c, 'xs'))),
+        h('div', { class: 'ps-reel-info' },
+          h('div', { class: 'ps-reel-who' },
+            h('button', { type: 'button', class: 'ps-reel-name', onclick: () => openProfile(c) }, av(c, 'xs'), h('b', {}, handleC(c)), sdOf(c).verified ? check() : null),
+            followBtn),
+          p.caption ? h('p', { class: 'ps-reel-cap' }, captionBits(p.caption)) : null,
+          h('div', { class: 'ps-reel-audio' }, ico.music(), h('span', {}, `${handleC(c)} · original audio`))));
+      return card;
+    }
+
     // ================= new post / edit post =================
     async function newPost() {
       if (!mine) return;
-      const [p] = await addPhotos(false, 1400);
+      const p = await pickMedia(1400);
       if (!p) return;
-      push({ kind: 'compose', c: char, imageId: p.imageId, upload: true });
+      push({ kind: 'compose', c: char, imageId: p.imageId || null, video: p.video || null, upload: true });
+    }
+    async function newReel() {
+      if (!mine) return;
+      const v = await addVideo();
+      if (!v) return;
+      push({ kind: 'compose', c: char, imageId: null, video: v, upload: true });
     }
     function composePage(page) {
       const post = page.post || null;
       const c = page.c;
       const imageId = post ? post.imageId : page.imageId;
+      const video = post ? post.video || null : page.video || null;
       const cap = h('textarea', { class: 'ps-compose-cap', placeholder: 'write a caption', maxLength: 1000, value: post?.caption || '' });
-      const cancel = () => { if (page.upload) dropImage(imageId); pop(); };
+      const cancel = () => { if (page.upload) { dropImage(imageId); dropImage(video?.imageId); } pop(); };
       const share = () => {
         const sd = ensure(c);
         if (post) {
@@ -465,7 +585,9 @@ export function install(api) {
           pop();
           return;
         }
-        const np = { id: 'p_' + uid(), imageId, caption: cap.value.trim(), likes: Math.floor(80 + Math.random() * 900), at: Date.now(), liked: false, comments: [] };
+        const likes = Math.floor(80 + Math.random() * 900);
+        const np = { id: 'p_' + uid(), imageId, caption: cap.value.trim(), likes, at: Date.now(), liked: false, comments: [] };
+        if (video) Object.assign(np, { video, views: fakeViews(likes) });
         sd.posts.push(np);
         page.upload = false;
         saveOf(c);
@@ -475,10 +597,10 @@ export function install(api) {
       };
       setTimeout(() => cap.focus(), 350);
       return h('div', { class: 'ps-page ps-compose' },
-        bar(h('button', { type: 'button', class: 'ps-ibtn', title: 'cancel', onclick: cancel }, ico.x()), h('b', { class: 'ps-bar-title' }, post ? 'edit' : 'new post'),
+        bar(h('button', { type: 'button', class: 'ps-ibtn', title: 'cancel', onclick: cancel }, ico.x()), h('b', { class: 'ps-bar-title' }, post ? 'edit' : video ? 'new reel' : 'new post'),
           h('button', { type: 'button', class: 'ps-text-btn', onclick: share }, post ? 'done' : 'share')),
         h('div', { class: 'ph-scroll ps-scroll' },
-          h('div', { class: 'ps-compose-pic' }, imageId ? pic(imageId) : h('div', { class: 'ps-text-post' }, h('span', {}, post?.caption || ''))),
+          h('div', { class: 'ps-compose-pic' + (video && !imageId ? ' vid' : '') }, imageId ? pic(imageId) : video ? vid(video, '', { autoplay: true }) : h('div', { class: 'ps-text-post' }, h('span', {}, post?.caption || ''))),
           h('div', { class: 'ps-compose-row' }, av(char, 'sm'), cap)));
     }
 
@@ -498,9 +620,13 @@ export function install(api) {
           return;
         }
         const all = allPosts();
-        fill(results, all.length ? h('div', { class: 'ps-explore' }, all.map((x, i) => h('button', {
-          type: 'button', class: 'ps-tile' + (i % 10 === 2 ? ' big' : ''), onclick: () => openPost(x.c, x.p),
-        }, x.p.imageId ? pic(x.p.imageId) : h('div', { class: 'ps-text-post sm' }, h('span', {}, x.p.caption))))) : h('div', { class: 'ps-c-none' }, h('b', {}, 'nothing here yet')));
+        // like the real explore page, reels show up as tall tiles that play muted
+        fill(results, all.length ? h('div', { class: 'ps-explore' }, all.map((x, i) => {
+          const reel = x.p.video && !x.p.imageId;
+          return h('button', {
+            type: 'button', class: 'ps-tile' + (reel ? ' tall' : i % 10 === 2 ? ' big' : ''), onclick: () => (reel ? push({ kind: 'reels', c: x.c, id: x.p.id }) : openPost(x.c, x.p)),
+          }, reel ? liveVid(x.p.video, 'ps-tvid') : thumbOf(x.p), reel ? h('i', { class: 'ps-tile-ico' }, ico.reels(false)) : null);
+        })) : h('div', { class: 'ps-c-none' }, h('b', {}, 'nothing here yet')));
       }
       drawResults();
       return h('div', { class: 'ps-page' },
@@ -540,7 +666,7 @@ export function install(api) {
           rows.length ? rows : h('div', { class: 'ps-c-none' }, h('b', {}, 'nothing yet'))));
     }
     function activityRow(it) {
-      const thumb = it.p ? h('button', { type: 'button', class: 'ps-act-thumb', onclick: () => openPost(char, it.p) }, it.p.imageId ? pic(it.p.imageId) : h('div', { class: 'ps-text-post xs' }, h('span', {}, it.p.caption))) : null;
+      const thumb = it.p ? h('button', { type: 'button', class: 'ps-act-thumb', onclick: () => openPost(char, it.p) }, thumbOf(it.p, 'xs')) : null;
       if (it.kind === 'comment') {
         return h('div', { class: 'ps-act-row' }, face(it.ref, 'ps-av md'),
           h('p', {}, h('b', {}, handleFor(it.ref)), ' commented: ', it.text, ' ', h('span', { class: 'ps-ago in' }, shortAgo(it.at))), thumb);
@@ -584,18 +710,28 @@ export function install(api) {
       if (which === 'saved' && !(self && mine)) which = 'grid';
       const gridEl = h('div', { class: 'ps-grid' });
       const tabRow = h('div', { class: 'ps-ptabs' });
+      const reels = posts.filter(p => p.video && !p.imageId);
       const drawGrid = () => {
-        const list = which === 'grid' ? ordered.map(p => ({ c, p })) : which === 'tagged' ? tagged : savedPosts;
+        const list = which === 'grid' ? ordered.map(p => ({ c, p })) : which === 'reels' ? reels.map(p => ({ c, p })) : which === 'tagged' ? tagged : savedPosts;
+        const tabBtn = (id, title, icon) => h('button', { type: 'button', class: which === id ? 'on' : '', title, 'data-ptab': id, onclick: () => { which = profTab[c.id] = id; drawGrid(); } }, icon);
         fill(tabRow,
-          h('button', { type: 'button', class: which === 'grid' ? 'on' : '', title: 'posts', onclick: () => { which = profTab[c.id] = 'grid'; drawGrid(); } }, ico.grid()),
-          h('button', { type: 'button', class: which === 'tagged' ? 'on' : '', title: 'tagged', onclick: () => { which = profTab[c.id] = 'tagged'; drawGrid(); } }, ico.tag()),
-          self && mine ? h('button', { type: 'button', class: which === 'saved' ? 'on' : '', title: 'saved', onclick: () => { which = profTab[c.id] = 'saved'; drawGrid(); } }, ico.save(false)) : null);
-        fill(gridEl, list.length ? list.map(x => h('button', { type: 'button', class: 'ps-tile', onclick: () => openPost(x.c, x.p) },
-          x.p.imageId ? pic(x.p.imageId) : h('div', { class: 'ps-text-post sm' }, h('span', {}, x.p.caption)),
-          x.p.id === sd.pinned && which === 'grid' ? h('i', { class: 'ps-tile-pin' }, ico.pin()) : null)) :
-          h('div', { class: 'ps-grid-empty' }, h('span', { class: 'ps-empty-ring' }, which === 'tagged' ? ico.tag() : which === 'saved' ? ico.save(false) : ico.grid()),
-            h('b', {}, which === 'tagged' ? 'no tagged posts' : which === 'saved' ? 'nothing saved' : 'no posts yet'),
-            which === 'grid' && self && mine ? h('button', { type: 'button', class: 'ps-text-btn', onclick: newPost }, 'share your first photo') : null));
+          tabBtn('grid', 'posts', ico.grid()),
+          tabBtn('reels', 'reels', ico.reels(false)),
+          tabBtn('tagged', 'tagged', ico.tag()),
+          self && mine ? tabBtn('saved', 'saved', ico.save(false)) : null);
+        gridEl.classList.toggle('reels', which === 'reels');
+        fill(gridEl, list.length ? list.map(x => {
+          const reel = x.p.video && !x.p.imageId;
+          return h('button', { type: 'button', class: 'ps-tile' + (reel ? ' is-reel' : ''), 'data-post': x.p.id, onclick: () => (reel ? push({ kind: 'reels', c: x.c, id: x.p.id }) : openPost(x.c, x.p)) },
+            thumbOf(x.p),
+            x.p.id === sd.pinned && which === 'grid' ? h('i', { class: 'ps-tile-pin' }, ico.pin()) : null,
+            reel && which !== 'reels' ? h('i', { class: 'ps-tile-ico' }, ico.reels(false)) : null,
+            reel && which === 'reels' ? h('span', { class: 'ps-tile-views' }, ico.play(), bigNum(x.p.views || fakeViews(x.p.likes))) : null);
+        }) :
+          h('div', { class: 'ps-grid-empty' }, h('span', { class: 'ps-empty-ring' }, which === 'tagged' ? ico.tag() : which === 'saved' ? ico.save(false) : which === 'reels' ? ico.reels(false) : ico.grid()),
+            h('b', {}, which === 'tagged' ? 'no tagged posts' : which === 'saved' ? 'nothing saved' : which === 'reels' ? 'no reels yet' : 'no posts yet'),
+            which === 'grid' && self && mine ? h('button', { type: 'button', class: 'ps-text-btn', onclick: newPost }, 'share your first photo') : null,
+            which === 'reels' && self && mine ? h('button', { type: 'button', class: 'ps-text-btn', onclick: newReel }, 'new reel') : null));
       };
       drawGrid();
       const following = me.following.includes(c.id);
@@ -645,11 +781,11 @@ export function install(api) {
     }
     function highlightsRow(c, self) {
       const sd = sdOf(c);
-      const hls = sd.highlights.filter(x => x.imageId);
+      const hls = sd.highlights.filter(hasMedia);
       if (!hls.length && !(self && mine)) return null;
       return h('div', { class: 'ps-hls' },
         hls.map((hl, i) => h('button', { type: 'button', class: 'ps-hl', onclick: () => openStory(c, i) },
-          h('span', { class: 'ps-hl-pic' }, pic(hl.imageId)), h('span', { class: 'ps-hl-label' }, hl.label))),
+          h('span', { class: 'ps-hl-pic' }, thumbOf(hl)), h('span', { class: 'ps-hl-label' }, hl.label))),
         self && mine ? h('button', { type: 'button', class: 'ps-hl new', onclick: newHighlight }, h('span', { class: 'ps-hl-pic' }, ico.plus()), h('span', { class: 'ps-hl-label' }, 'new')) : null);
     }
 

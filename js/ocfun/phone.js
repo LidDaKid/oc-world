@@ -10,10 +10,12 @@
 // api = { d, char, mine, ctx, save, show, redraw, goHome, openApp, header, plusBtn, screen, SCREENS, onLeave(fn), drawStatus, APPS, appOf, FIXED }
 // apps can be taken off the home screen (d.hidden) and made from scratch in the app store (d.custom, see phone-store.js)
 
-import { h, s, fill, uid, openModal, confirmDialog, swatches, segmented, toast } from '../ui.js';
+import { h, s, fill, uid, openModal, confirmDialog, swatches, segmented, toast, pickFiles, shrinkImage } from '../ui.js';
+import { cropAll } from '../crop.js';
 import { store } from '../store.js';
 import { dataFor, pic, sticker, appBar, portrait, nameOf, allOcs, ocById } from './kit.js';
-import { who, face, freshRef, pickWho, hm, hmA, stamp, dayLabel, shortDate, addPhotos, dropImage, relLabel, inkOn, mirrorSend, mirrorReact, mirrorDelete } from './phone-bits.js';
+import { who, face, freshRef, pickWho, hm, hmA, stamp, dayLabel, shortDate, addPhotos, dropImage, relLabel, inkOn, mirrorSend, mirrorReact, mirrorDelete, refOf, addVideo, vid,
+  mirrorGroupSend, mirrorGroupReact, mirrorGroupDelete, mirrorGroupInfo } from './phone-bits.js';
 import * as callsApps from './phone-calls.js';
 import * as lifeApps from './phone-life.js';
 import * as webApps from './phone-web.js';
@@ -216,7 +218,7 @@ export function render(el, ctx) {
   function allNotifs(perThread = 1) {
     return [
       ...d.threads.flatMap(t => t.msgs.filter(m => m.from === 'them').slice(-perThread).map(m => ({
-        app: 'messages', title: who(t.who).name, text: m.imageId && !m.text ? '📷 photo' : m.text, at: m.at, faceOf: t.who, open: () => show('thread', { id: t.id }, 'unlock'),
+        app: 'messages', title: threadName(t), text: msgPreview(t, m), at: m.at, faceOf: t.group ? m.by : t.who, open: () => show('thread', { id: t.id }, 'unlock'),
       }))),
       ...EXTRA.flatMap(m => { try { return m.lockNotifs?.(api) || []; } catch (err) { console.error(err); return []; } }),
     ].filter(n => APPS[n.app]).sort((a, b) => b.at - a.at);
@@ -373,8 +375,20 @@ export function render(el, ctx) {
   let homePage = 0;
 
   // messages
+  // a thread is with one person (t.who), or a group chat (t.group, see the group notes in phone-bits.js)
   const threadById = id => d.threads.find(t => t.id === id);
   const toHome = { label: '', go: () => goHome() };
+  const threadName = t => (t.group ? t.group.name || t.group.members.map(m => who(m).name.split(' ')[0]).join(', ') : who(t.who).name);
+  // a group's picture, or two of its people overlapping
+  const threadFace = (t, cls = 'md') => {
+    if (!t.group) return face(t.who, cls);
+    if (t.group.imageId || !t.group.members.length) return portrait({ name: threadName(t), color: '#9b8aa8', imageId: t.group.imageId }, cls);
+    return h('div', { class: 'ph-gface ' + cls }, t.group.members.slice(0, 2).map(m => face(m, 'xs')));
+  };
+  const msgPreview = (t, m) => {
+    const what = m.video && !m.text ? '🎥 video' : m.imageId && !m.text ? '📷 photo' : m.text;
+    return t.group && m.from === 'them' ? `${who(m.by).name}: ${what}` : what;
+  };
   SCREENS.messages = () => {
     const list = [...d.threads].sort((a, b) => (b.msgs.at(-1)?.at || b.at || 0) - (a.msgs.at(-1)?.at || a.at || 0));
     return h('div', { class: 'ph-app-screen' },
@@ -382,20 +396,59 @@ export function render(el, ctx) {
       h('div', { class: 'ph-scroll' },
         list.length ? list.map(t => {
           const last = t.msgs.at(-1);
-          const w = who(t.who);
           return h('button', { type: 'button', class: 'ph-row ph-thread-row', onclick: () => show('thread', { id: t.id }) },
             last?.from === 'them' ? h('i', { class: 'ph-unread' }) : h('i', { class: 'ph-unread off' }),
-            face(t.who, 'md'),
+            threadFace(t, 'md'),
             h('div', { class: 'ph-row-main' },
-              h('div', { class: 'ph-row-top' }, h('b', {}, w.name), h('span', {}, last ? shortDate(last.at) : '')),
-              h('div', { class: 'ph-row-sub' }, last ? (last.imageId && !last.text ? '📷 photo' : last.text) : ' ')),
+              h('div', { class: 'ph-row-top' }, h('b', {}, threadName(t)), h('span', {}, last ? shortDate(last.at) : '')),
+              h('div', { class: 'ph-row-sub' }, last ? msgPreview(t, last) : ' ')),
             h('span', { class: 'ph-chev' }, '›'));
         }) : h('div', { class: 'ph-empty' }, sticker('1f4ac', 'ph-empty-stk'), mine ? h('button', { type: 'button', class: 'ph-pill', onclick: newThread }, 'new message') : null)));
   };
+
+  // pick one person (a normal chat) or a few (a group chat)
+  function pickPeople() {
+    return new Promise(resolve => {
+      let done = null;
+      const picked = [];
+      const key = r => (r.id ? 'oc:' + r.id : 'n:' + r.name.toLowerCase());
+      const has = r => picked.some(x => key(x) === key(r));
+      const chips = h('div', { class: 'ph-to-chips' });
+      const nameBox = h('input', { type: 'text', class: 'ph-group-name', placeholder: 'group name', maxLength: 60 });
+      const nameRow = h('label', { class: 'field ph-group-name-row' }, h('span', { class: 'field-label' }, 'group name'), nameBox);
+      const typed = h('input', { type: 'text', placeholder: 'type a name', maxLength: 60, onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addTyped(); } } });
+      const grid = h('div', { class: 'who-pick-grid' });
+      const toggle = r => { if (has(r)) picked.splice(picked.findIndex(x => key(x) === key(r)), 1); else picked.push(r); paint(); };
+      const addTyped = () => { const v = typed.value.trim(); if (!v) return; if (!has({ id: null, name: v })) picked.push({ id: null, name: v }); typed.value = ''; paint(); };
+      const paint = () => {
+        fill(chips, h('span', { class: 'ph-to-label' }, 'to:'), picked.map(r => h('button', { type: 'button', class: 'ph-to-chip', onclick: () => toggle(r) }, who(r).name, ' ×')));
+        fill(grid, allOcs(char.id).map(o => h('button', {
+          type: 'button', class: 'who-pick-oc' + (has(refOf(o)) ? ' on' : ''), style: { '--c': o.color }, onclick: () => toggle(refOf(o)),
+        }, portrait(o, 'md'), h('span', {}, nameOf(o)))));
+        nameRow.hidden = picked.length < 2;
+      };
+      paint();
+      const m = openModal({
+        title: 'new message',
+        body: h('div', { class: 'who-pick ph-pick-people' }, chips, grid, h('div', { class: 'who-pick-typed ph-typed-add' }, typed, h('button', { type: 'button', class: 'btn ghost sm', onclick: addTyped }, 'add')), nameRow),
+        actions: [{ label: 'text', kind: 'primary', onClick: close => { addTyped(); if (!picked.length) return; done = { people: [...picked], name: nameBox.value.trim() }; close(); } }],
+        onClose: () => resolve(done),
+      });
+    });
+  }
   async function newThread() {
-    const ref = await pickWho({ title: 'new message', not: char.id, okLabel: 'text them' });
-    if (!ref) return;
-    let t = d.threads.find(x => (ref.id && x.who.id === ref.id) || (!ref.id && !x.who.id && x.who.name.toLowerCase() === ref.name.toLowerCase()));
+    const got = await pickPeople();
+    if (!got) return;
+    if (got.people.length > 1) {
+      const t = { id: 't_' + uid(), group: { gid: 'g_' + uid(), name: got.name, imageId: null, members: got.people.map(freshRef) }, who: null, msgs: [], read: true, typing: false, at: Date.now() };
+      t.who = { id: null, name: threadName(t) };
+      d.threads.push(t);
+      save();
+      show('thread', { id: t.id });
+      return;
+    }
+    const ref = got.people[0];
+    let t = d.threads.find(x => !x.group && ((ref.id && x.who.id === ref.id) || (!ref.id && !x.who.id && x.who.name.toLowerCase() === ref.name.toLowerCase())));
     if (!t) {
       t = { id: 't_' + uid(), who: ref, msgs: [], read: true, typing: false, at: Date.now() };
       d.threads.push(t);
@@ -404,62 +457,102 @@ export function render(el, ctx) {
     show('thread', { id: t.id });
   }
 
+  // send a picture or a video in a chat. resolves with { imageId } or { video } or null
+  async function pickMedia() {
+    const file = window.__testVideo || (await pickFiles('image/*,video/*', false))[0];
+    if (!file) return null;
+    if (file.type.startsWith('video/')) { const v = await addVideo(file); return v ? { video: v } : null; }
+    const [cropped] = await cropAll([file]);
+    if (!cropped) return null;
+    try {
+      const { blob } = await shrinkImage(cropped, 1000);
+      return { imageId: await store.putImage(blob) };
+    } catch (err) { console.error(err); toast("couldn't read that picture", 'bad'); return null; }
+  }
+
   SCREENS.thread = ({ id }) => {
     const t = threadById(id);
     if (!t) return SCREENS.messages();
+    const g = t.group;
     const w = who(t.who);
+    const title = () => threadName(t);
+    // who's texting: 'me', 'them' (1 on 1) or a member's index (group)
     let as = 'me';
+    const asRef = () => (as === 'me' ? null : g ? g.members[as] : t.who);
     const list = h('div', { class: 'ph-scroll ph-chat' });
-    const input = h('input', { type: 'text', class: 'ph-input', maxLength: 600, placeholder: 'message', onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); send(); } } });
-    const asBtn = h('button', { type: 'button', class: 'ph-as', title: 'switch who is texting', onclick: () => { as = as === 'me' ? 'them' : 'me'; drawAs(); input.focus(); } });
+    const input = h('input', { type: 'text', class: 'ph-input', maxLength: 600, placeholder: g ? 'imessage' : 'message', onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); send(); } } });
+    const asBtn = h('button', {
+      type: 'button', class: 'ph-as', title: 'switch who is texting', onclick: () => {
+        if (g) as = !g.members.length ? 'me' : as === 'me' ? 0 : as + 1 >= g.members.length ? 'me' : as + 1;
+        else as = as === 'me' ? 'them' : 'me';
+        drawAs(); input.focus();
+      },
+    });
     const drawAs = () => {
-      fill(asBtn, as === 'me' ? portrait(char, 'xs') : face(t.who, 'xs'));
-      asBtn.classList.toggle('them', as === 'them');
-      input.placeholder = as === 'me' ? 'message' : `as ${w.name}`;
+      fill(asBtn, as === 'me' ? portrait(char, 'xs') : face(asRef(), 'xs'));
+      asBtn.classList.toggle('them', as !== 'me');
+      input.placeholder = as === 'me' ? (g ? 'imessage' : 'message') : `as ${who(asRef()).name}`;
     };
-    function send(imageId = null) {
+    const mirror = {
+      send: m => (g ? mirrorGroupSend(char, t, m) : mirrorSend(char, t.who, m)),
+      react: (mid, r) => (g ? mirrorGroupReact(char, t, mid, r) : mirrorReact(char, t.who, mid, r)),
+      del: ids => (g ? mirrorGroupDelete(char, t, ids) : mirrorDelete(char, t.who, ids)),
+    };
+    function send(media = {}) {
       const text = input.value.trim();
-      if (!text && !imageId) return;
-      t.who = freshRef(t.who);
-      const m = { id: 'm_' + uid(), from: as, text, imageId, at: Date.now(), react: null };
+      if (!text && !media.imageId && !media.video) return;
+      if (g) g.members = g.members.map(freshRef); else t.who = freshRef(t.who);
+      const m = { id: 'm_' + uid(), from: as === 'me' ? 'me' : 'them', text, imageId: media.imageId || null, at: Date.now(), react: null };
+      if (media.video) m.video = media.video;
+      if (g && as !== 'me') m.by = freshRef(asRef());
       t.msgs.push(m);
       input.value = '';
       save();
-      mirrorSend(char, t.who, m);
+      mirror.send(m);
       drawMsgs(true);
     }
-    async function sendPic() {
-      const [p] = await addPhotos(false, 1000);
-      if (p) send(p.imageId);
+    async function sendMedia() {
+      const got = await pickMedia();
+      if (got) send(got);
     }
+    const dropMsg = m => { dropImage(m.imageId); dropImage(m.video?.imageId); };
     function drawMsgs(animateLast = false) {
       let prev = null;
       const lastMine = t.msgs.map(m => m.from).lastIndexOf('me');
+      const sender = m => (m.from === 'me' ? 'me' : g ? 'by:' + (m.by?.id || m.by?.name) : 'them');
       fill(list,
-        h('div', { class: 'ph-chat-top' }, face(t.who, 'lg'), h('b', {}, w.name), w.gone ? null : relLabel(char, t.who.id) ? h('span', {}, relLabel(char, t.who.id)) : null),
+        h('div', { class: 'ph-chat-top' }, threadFace(t, 'lg'), h('b', {}, title()),
+          g ? h('span', {}, `${g.members.length + 1} people`) : w.gone ? null : relLabel(char, t.who.id) ? h('span', {}, relLabel(char, t.who.id)) : null),
         t.msgs.map((m, i) => {
           const gap = !prev || m.at - prev.at > 3600e3;
-          const tail = !t.msgs[i + 1] || t.msgs[i + 1].from !== m.from || t.msgs[i + 1].at - m.at > 3600e3;
+          const next = t.msgs[i + 1];
+          const tail = !next || sender(next) !== sender(m) || next.at - m.at > 3600e3;
+          const first = gap || !prev || sender(prev) !== sender(m);
+          const media = m.video ? vid(m.video, 'ph-msg-vid', { controls: true, sound: true, loop: false }) : m.imageId ? pic(m.imageId, 'ph-msg-pic') : null;
           const bubble = h('div', {
-            class: `ph-bubble ${m.from}${tail ? ' tail' : ''}${m.imageId ? ' has-pic' : ''}${animateLast && i === t.msgs.length - 1 ? ' pop' : ''}`,
-            onclick: e => { e.stopPropagation(); tapback(m, bubble); },
-          }, m.imageId ? pic(m.imageId, 'ph-msg-pic') : null, m.text ? h('span', {}, m.text) : null,
+            class: `ph-bubble ${m.from}${tail ? ' tail' : ''}${media ? ' has-pic' : ''}${animateLast && i === t.msgs.length - 1 ? ' pop' : ''}`,
+            onclick: e => { if (e.target.closest('video')) return; e.stopPropagation(); tapback(m, bubble); },
+          }, media, m.text ? h('span', {}, m.text) : null,
             m.react ? h('span', { class: 'ph-react' }, m.react) : null);
           prev = m;
+          const inGroup = g && m.from === 'them';
           return [
             gap ? h('div', { class: 'ph-stamp' }, h('b', {}, dayLabel(m.at)), ' ', hmA(m.at)) : null,
-            h('div', { class: `ph-msg-row ${m.from}${m.react ? ' reacted' : ''}` }, bubble),
-            i === lastMine && i === t.msgs.length - 1 && m.from === 'me' ? h('div', { class: 'ph-receipt' }, t.read ? h('span', {}, h('b', {}, 'read '), hmA(m.at + 60e3)) : 'delivered') : null,
+            inGroup && first ? h('div', { class: 'ph-sender' }, who(m.by).name) : null,
+            h('div', { class: `ph-msg-row ${m.from}${m.react ? ' reacted' : ''}${inGroup ? ' grp' : ''}` },
+              inGroup && tail ? h('div', { class: 'ph-msg-face' }, face(m.by, 'xs')) : null, bubble),
+            !g && i === lastMine && i === t.msgs.length - 1 && m.from === 'me' ? h('div', { class: 'ph-receipt' }, t.read ? h('span', {}, h('b', {}, 'read '), hmA(m.at + 60e3)) : 'delivered') : null,
           ];
         }),
-        t.typing ? h('div', { class: 'ph-msg-row them' }, h('div', { class: 'ph-bubble them tail ph-typing' }, h('i'), h('i'), h('i'))) : null);
+        t.typing ? h('div', { class: 'ph-msg-row them' + (g ? ' grp' : '') }, g && g.members[t.typingBy || 0] ? h('div', { class: 'ph-msg-face' }, face(g.members[t.typingBy || 0], 'xs')) : null,
+          h('div', { class: 'ph-bubble them tail ph-typing' }, h('i'), h('i'), h('i'))) : null);
       requestAnimationFrame(() => { list.scrollTop = list.scrollHeight; });
     }
     function tapback(m, bubble) {
       closeTapback();
       const bar = h('div', { class: 'ph-tapback ' + m.from },
-        REACTS.map(r => h('button', { type: 'button', class: m.react === r ? 'on' : '', disabled: !mine, onclick: e => { e.stopPropagation(); m.react = m.react === r ? null : r; save(); mirrorReact(char, t.who, m.id, m.react); closeTapback(); drawMsgs(); } }, r)),
-        mine ? h('button', { type: 'button', class: 'ph-tb-del', title: 'delete', onclick: e => { e.stopPropagation(); t.msgs = t.msgs.filter(x => x !== m); dropImage(m.imageId); save(); mirrorDelete(char, t.who, [m.id]); closeTapback(); drawMsgs(); } }, '🗑') : null);
+        REACTS.map(r => h('button', { type: 'button', class: m.react === r ? 'on' : '', disabled: !mine, onclick: e => { e.stopPropagation(); m.react = m.react === r ? null : r; save(); mirror.react(m.id, m.react); closeTapback(); drawMsgs(); } }, r)),
+        mine ? h('button', { type: 'button', class: 'ph-tb-del', title: 'delete', onclick: e => { e.stopPropagation(); t.msgs = t.msgs.filter(x => x !== m); dropMsg(m); save(); mirror.del([m.id]); closeTapback(); drawMsgs(); } }, '🗑') : null);
       bubble.closest('.ph-msg-row').prepend(bar);
       bubble.classList.add('lifted');
       setTimeout(() => document.addEventListener('click', closeTapback, { once: true }), 0);
@@ -469,44 +562,65 @@ export function render(el, ctx) {
       const readBox = h('input', { type: 'checkbox', checked: t.read, onchange: e => { t.read = e.target.checked; save(); drawMsgs(); } });
       const typingBox = h('input', { type: 'checkbox', checked: !!t.typing, onchange: e => { t.typing = e.target.checked; save(); drawMsgs(); } });
       // a text from them that shows up in a bit (as a banner wherever you are)
-      const laterText = h('input', { type: 'text', class: 'ph-later-text', placeholder: `text from ${w.name}`, maxLength: 600 });
+      const laterText = h('input', { type: 'text', class: 'ph-later-text', placeholder: 'text', maxLength: 600 });
       const laterWhen = h('select', { class: 'ph-later-when' }, [[5, '5 sec'], [30, '30 sec'], [60, '1 min'], [300, '5 min']].map(([v, l]) => h('option', { value: v }, l)));
+      const laterWho = g ? h('select', { class: 'ph-later-who' }, g.members.map((m, i) => h('option', { value: i }, who(m).name))) : null;
+      const typingWho = g ? h('select', { class: 'ph-typing-who', onchange: e => { t.typingBy = Number(e.target.value); save(); drawMsgs(); } }, g.members.map((m, i) => h('option', { value: i, selected: (t.typingBy || 0) === i }, who(m).name))) : null;
       const queued = d.later.filter(x => x.threadId === t.id).length;
+      // group stuff: name, picture, people
+      const groupBox = g ? h('div', { class: 'ph-group-edit' }) : null;
+      const syncGroup = () => { t.who = { id: null, name: threadName(t) }; save(); mirrorGroupInfo(char, t); drawMsgs(); paintHead(); };
+      const paintGroup = () => g && fill(groupBox,
+        h('div', { class: 'ph-group-pic' }, threadFace(t, 'lg'),
+          h('button', { type: 'button', class: 'btn ghost sm', onclick: async () => { const [p] = await addPhotos(false, 600); if (p) { dropImage(g.imageId); g.imageId = p.imageId; syncGroup(); paintGroup(); } } }, g.imageId ? 'change photo' : 'add photo'),
+          g.imageId ? h('button', { type: 'button', class: 'btn ghost sm', onclick: () => { dropImage(g.imageId); g.imageId = null; syncGroup(); paintGroup(); } }, 'remove') : null),
+        h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'group name'),
+          h('input', { type: 'text', value: g.name, maxLength: 60, placeholder: threadName({ group: { ...g, name: '' } }), oninput: e => { g.name = e.target.value.trim(); syncGroup(); } })),
+        h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'people'),
+          h('div', { class: 'ph-group-people' },
+            g.members.map(m => h('div', { class: 'ph-group-person' }, face(m, 'sm'), h('span', {}, who(m).name),
+              g.members.length > 2 ? h('button', { type: 'button', class: 'ph-group-kick', title: 'remove', onclick: () => { g.members = g.members.filter(x => x !== m); as = 'me'; drawAs(); syncGroup(); paintGroup(); } }, '×') : null)),
+            h('button', { type: 'button', class: 'btn ghost sm', onclick: async () => { const r = await pickWho({ title: 'add someone', not: char.id, okLabel: 'add' }); if (r && !g.members.some(x => (r.id && x.id === r.id) || (!r.id && !x.id && x.name === r.name))) { g.members.push(freshRef(r)); syncGroup(); paintGroup(); } } }, 'add someone'))));
+      paintGroup();
       openModal({
-        title: w.name,
+        title: title(),
         body: h('div', { class: 'ph-info' },
-          h('label', { class: 'check' }, readBox, 'read receipts'),
-          h('label', { class: 'check' }, typingBox, `${w.name} is typing`),
+          groupBox,
+          g ? null : h('label', { class: 'check' }, readBox, 'read receipts'),
+          h('div', { class: 'ph-typing-row' }, h('label', { class: 'check' }, typingBox, g ? 'typing' : `${w.name} is typing`), typingWho),
           h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'text me in'),
-            h('div', { class: 'ph-later' }, laterWhen, laterText,
+            h('div', { class: 'ph-later' }, laterWhen, laterWho, laterText,
               h('button', {
                 type: 'button', class: 'btn sm ph-later-go', onclick: () => {
                   if (!laterText.value.trim()) return laterText.focus();
-                  d.later.push({ id: 'l_' + uid(), threadId: t.id, text: laterText.value.trim(), due: Date.now() + Number(laterWhen.value) * 1000 });
+                  d.later.push({ id: 'l_' + uid(), threadId: t.id, text: laterText.value.trim(), due: Date.now() + Number(laterWhen.value) * 1000, by: g ? freshRef(g.members[Number(laterWho.value)]) : undefined });
                   save();
                   laterText.value = '';
                   toast(`coming in ${laterWhen.selectedOptions[0].textContent}`);
                 },
               }, 'set')),
             queued ? h('span', { class: 'ph-later-n' }, `${queued} on the way`) : null),
-          w.char ? h('a', { class: 'btn ghost sm', href: ctx.ocLink(w.char) }, 'their page') : null),
+          !g && w.char ? h('a', { class: 'btn ghost sm', href: ctx.ocLink(w.char) }, 'their page') : null),
         actions: [
-          { label: 'delete chat', kind: 'danger', onClick: async close => { if (await confirmDialog(`delete the chat with ${w.name}?`, { danger: true, okLabel: 'delete' })) { close(); d.threads = d.threads.filter(x => x !== t); d.later = d.later.filter(x => x.threadId !== t.id); t.msgs.forEach(m => dropImage(m.imageId)); save(); show('messages', {}, 'pop'); } } },
+          { label: g ? 'delete group' : 'delete chat', kind: 'danger', onClick: async close => { if (await confirmDialog(g ? `delete ${title()}?` : `delete the chat with ${w.name}?`, { danger: true, okLabel: 'delete' })) { close(); d.threads = d.threads.filter(x => x !== t); d.later = d.later.filter(x => x.threadId !== t.id); t.msgs.forEach(dropMsg); if (g) dropImage(g.imageId); save(); show('messages', {}, 'pop'); } } },
           { label: 'done', kind: 'primary', onClick: close => close() },
         ],
       });
     }
+    const headWho = h('div', { class: 'ph-chat-who' });
+    const paintHead = () => fill(headWho, threadFace(t, 'sm'), h('span', {}, title(), ' ›'));
+    paintHead();
     drawAs();
     drawMsgs();
-    return h('div', { class: 'ph-app-screen ph-thread' },
+    return h('div', { class: 'ph-app-screen ph-thread' + (g ? ' ph-group-thread' : '') },
       h('div', { class: 'ph-head ph-chat-head' },
         h('div', { class: 'ph-head-row' },
           h('button', { type: 'button', class: 'ph-back-btn', onclick: () => show('messages', {}, 'pop') }, '‹'),
-          h('div', { class: 'ph-chat-who' }, face(t.who, 'sm'), h('span', {}, w.name, ' ›')),
+          headWho,
           h('div', { class: 'ph-head-right' }, mine ? h('button', { type: 'button', class: 'ph-ibtn', title: 'details', onclick: info }, 'i') : null))),
       list,
       mine ? h('div', { class: 'ph-composer' },
-        h('button', { type: 'button', class: 'ph-cam-btn', title: 'send a picture', onclick: sendPic }, '📷'),
+        h('button', { type: 'button', class: 'ph-cam-btn', title: 'send a picture or video', onclick: sendMedia }, '📷'),
         asBtn,
         h('div', { class: 'ph-input-wrap' }, input,
           h('button', { type: 'button', class: 'ph-send', title: 'send', onclick: () => send() }, '↑'))) : null);
@@ -723,10 +837,10 @@ export function render(el, ctx) {
   SCREENS.contacts = () => {
     const people = [
       ...allOcs(char.id).map(o => ({ ref: { id: o.id, name: nameOf(o) }, rel: relLabel(char, o.id) })),
-      ...d.threads.filter(t => !t.who.id || !ocById(t.who.id)).map(t => ({ ref: t.who, rel: '' })),
+      ...d.threads.filter(t => !t.group && (!t.who.id || !ocById(t.who.id))).map(t => ({ ref: t.who, rel: '' })),
     ].sort((a, b) => (b.rel ? 1 : 0) - (a.rel ? 1 : 0) || who(a.ref).name.localeCompare(who(b.ref).name));
     const textThem = ref => {
-      let t = d.threads.find(x => (ref.id && x.who.id === ref.id) || (!ref.id && x.who === ref));
+      let t = d.threads.find(x => !x.group && ((ref.id && x.who.id === ref.id) || (!ref.id && x.who === ref)));
       if (!t && !mine) return;
       if (!t) { t = { id: 't_' + uid(), who: ref, msgs: [], read: true, typing: false, at: Date.now() }; d.threads.push(t); save(); }
       show('thread', { id: t.id }, 'zoom');
@@ -908,10 +1022,11 @@ export function render(el, ctx) {
       const t = threadById(x.threadId);
       if (!t) continue;
       const m = { id: 'm_' + uid(), from: 'them', text: x.text, imageId: null, at: Math.max(x.due, (t.msgs.at(-1)?.at || 0) + 1), react: null };
+      if (t.group) m.by = x.by || t.group.members[0] || { id: null, name: 'someone' };
       t.msgs.push(m);
       t.typing = false;
-      mirrorSend(char, t.who, m);
-      const n = { app: 'messages', title: who(t.who).name, text: x.text, at: m.at, faceOf: t.who, open: () => show('thread', { id: t.id }, cur?.name === 'lock' ? 'unlock' : 'zoom') };
+      if (t.group) mirrorGroupSend(char, t, m); else mirrorSend(char, t.who, m);
+      const n = { app: 'messages', title: threadName(t), text: msgPreview(t, m), at: m.at, faceOf: t.group ? m.by : t.who, open: () => show('thread', { id: t.id }, cur?.name === 'lock' ? 'unlock' : 'zoom') };
       if (cur?.name === 'thread' && cur.params.id === t.id) redraw();
       else if (cur?.name === 'lock') { redraw(); screen.classList.remove('wake'); void screen.offsetWidth; screen.classList.add('wake'); }
       else { banner(n); if (cur?.name === 'home' || cur?.name === 'messages') redraw(); }

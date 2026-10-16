@@ -300,3 +300,70 @@
 .ps-app .ps-story-reply .ps-ico { color: #fff; width: 24px; height: 24px; }
 .ps-app .ps-story-cap { bottom: 80px; }
 .ph-screen .ps-edit-pfp-btn { display: flex; flex-direction: column; align-items: center; gap: 8px; border: 0; background: none; padding: 0; color: #0095f6; font-weight: 600; font-size: 14px; }
+
+/* ---- videos ---- */
+.ps-app .ps-media.vid { aspect-ratio: 4 / 5; background: #000; }
+.ps-app .ps-media .ph-vid { position: absolute; inset: 0; }
+.ps-app .ps-snd { right: 10px; bottom: 10px; width: 28px; height: 28px; font-size: 12px; }
+.ps-app .ps-heart-dot { position: absolute; top: 6px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: #ff3040; border: 1.5px solid var(--ps-bg); }
+.ps-app .ps-tvid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.ps-app .ps-tile .ps-tvid, .ps-app .ps-act-thumb .ps-tvid, .ps-app .ps-hl-pic .ps-tvid { position: static; }
+.ps-app .ps-act-thumb, .ps-app .ps-hl-pic { position: relative; }
+.ps-app .ps-hl-pic .ps-tvid { border-radius: 50%; }
+.ps-app .ps-hl-prev .ph-vid { border-radius: 50%; }
+.ps-app .ps-tile-ico { position: absolute; top: 6px; right: 6px; pointer-events: none; }
+.ps-app .ps-tile-ico .ps-ico { width: 18px; height: 18px; color: #fff; --ps-bg: transparent; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .6)); }
+.ps-app .ps-tile.tall { grid-row: span 2; aspect-ratio: auto; }
+.ps-app .ps-grid.reels { grid-template-columns: repeat(3, 1fr); }
+.ps-app .ps-grid.reels .ps-tile { aspect-ratio: 9 / 16; }
+.ps-app .ps-tile-views { position: absolute; left: 6px; bottom: 6px; display: flex; align-items: center; gap: 3px; color: #fff; font-size: 12px; font-weight: 700; text-shadow: 0 1px 3px rgba(0, 0, 0, .7); pointer-events: none; }
+.ps-app .ps-tile-views .ps-ico { width: 12px; height: 12px; color: #fff; }
+.ps-app .ps-compose-pic.vid { aspect-ratio: 9 / 14; max-height: 330px; margin: 0 auto; background: #000; }
+.ps-app .ps-story-bars i.now b { animation-duration: var(--dur, 4.5s); }
+.ps-app .ps-story-img.ph-vid { background: #000; }
+.ps-app .ps-story-snd { position: static; margin-left: auto; width: 28px; height: 28px; font-size: 12px; }
+.ps-app .ps-story-snd + .ps-story-x { margin-left: 0; }
+
+/* reels: full screen, swipe one at a time */
+.ps-app.ps-dark { background: #000; }
+.ps-app.ps-dark .ps-tabs { background: #000; border-top-color: #262626; }
+.ps-app.ps-dark .ps-tabs .ps-ico { color: #fff; --ps-bg: #000; }
+.ps-app.ps-dark .ps-tab-pfp.on { border-color: #fff; }
+.ph-screen:has(.ph-view:not(.leaving) .ps-app.ps-dark) .ph-status { color: #fff; }
+.ps-app .ps-reels-page { position: relative; background: #000; color: #fff; }
+.ps-app .ps-reels-top { position: absolute; left: 0; right: 0; top: 0; z-index: 3; display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; padding: 2px 6px; pointer-events: none; }
+.ps-app .ps-reels-top > * { pointer-events: auto; }
+.ps-app .ps-reels-top b { font-size: 20px; font-weight: 700; color: #fff; text-shadow: 0 1px 4px rgba(0, 0, 0, .4); }
+.ps-app .ps-reels-top .ps-ico { color: #fff; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .5)); }
+.ps-app .ps-reels { flex: 1; min-height: 0; overflow-y: auto; scroll-snap-type: y mandatory; scrollbar-width: none; overscroll-behavior: contain; }
+.ps-app .ps-reels::-webkit-scrollbar { display: none; }
+.ps-app .ps-reel { position: relative; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; overflow: hidden; background: #000; }
+.ps-app .ps-reel-vid { position: absolute; inset: 0; object-fit: cover; }
+.ps-app .ps-reel-shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(rgba(0, 0, 0, .3), transparent 18%, transparent 60%, rgba(0, 0, 0, .6)); }
+.ps-app .ps-reel-snd { right: 12px; top: 48px; width: 28px; height: 28px; font-size: 12px; }
+.ps-app .ps-reel-rail { position: absolute; right: 6px; bottom: 16px; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.ps-app .ps-reel-act { border: 0; background: none; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; color: #fff; font-size: 12px; font-weight: 600; min-width: 40px; }
+.ps-app .ps-reel-act .ps-ico { width: 27px; height: 27px; color: #fff; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .45)); }
+.ps-app .ps-reel-act .ps-ico.red { color: #ff3040; }
+.ps-app .ps-reel-act:active { transform: scale(.88); }
+.ps-app .ps-reel-disc { width: 28px; height: 28px; border-radius: 7px; border: 2px solid #fff; overflow: hidden; display: grid; place-items: center; }
+.ps-app .ps-reel-disc .ps-av.xs { width: 100%; height: 100%; border-radius: 0 !important; }
+.ps-app .ps-reel-info { position: absolute; left: 12px; right: 62px; bottom: 16px; z-index: 2; display: flex; flex-direction: column; gap: 6px; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
+.ps-app .ps-reel-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ps-app .ps-reel-name { display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 0; color: #fff; min-width: 0; }
+.ps-app .ps-reel-name b { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-app .ps-reel-name .ps-av.xs { width: 30px; height: 30px; }
+.ps-app .ps-reel-follow { flex: none; border: 1px solid rgba(255, 255, 255, .8); background: none; color: #fff !important; border-radius: 8px; padding: 3px 10px; font-size: 13px; font-weight: 600 !important; }
+.ps-app .ps-reel-cap { margin: 0; font-size: 13.5px; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.ps-app .ps-reel-cap .ps-tagged { color: #fff; font-weight: 600; }
+.ps-app .ps-reel-audio { display: flex; align-items: center; gap: 6px; font-size: 12.5px; min-width: 0; }
+.ps-app .ps-reel-audio .ps-ico { width: 13px; height: 13px; color: #fff; flex: none; }
+.ps-app .ps-reel-audio span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-app .ps-reels-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+.ps-app .ps-reels-empty .ps-empty-ring { border-color: #fff; }
+.ps-app .ps-reels-empty .ps-ico { color: #fff; --ps-bg: #000; }
+.ps-app .ps-reel .ps-burst { z-index: 3; }
+
+/* snapshot video posts on the socials page (social.js) */
+.so-media .so-vid { height: auto; max-height: 36rem; }
+.so-pm-media .so-vid { height: auto; max-height: 70vh; object-fit: contain; }

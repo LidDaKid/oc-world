@@ -3,10 +3,11 @@
 // posts, comments, streams + shows can be "by" any oc or a typed name (pickWho).
 
 import { h, s, fill, uid, openModal, confirmDialog, toast, swatches } from '../ui.js';
-import { sticker, pic, allOcs } from './kit.js';
+import { sticker, pic, allOcs, worldmates } from './kit.js';
+import { store } from '../store.js';
 // portrait/nameOf here show an oc as their account on the open app (see phone-accounts.js)
 import { portrait, nameOf, acctId, accountBox } from './phone-accounts.js';
-import { who, face, freshRef, refOf, ago, bigNum, addPhotos, dropImage } from './phone-bits.js';
+import { who, face, freshRef, refOf, ago, bigNum, addPhotos, dropImage, vid, tapToPause, soundBtn, videoField, clock } from './phone-bits.js';
 
 const MV = 'music + video';
 export const APPS = {
@@ -98,7 +99,38 @@ const P = {
   edit: ['M4 20h4L19 9l-4-4L4 16ZM14 6l4 4', 0],
   trash: ['M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13', 0],
   live: ['M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6ZM6.3 6.3a8 8 0 0 0 0 11.4M17.7 6.3a8 8 0 0 1 0 11.4', 0],
+  vol: ['M4 9.5h4l5-4.5v14l-5-4.5H4ZM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12', 0],
+  mute: ['M4 9.5h4l5-4.5v14l-5-4.5H4ZM16.5 9.5l5 5M21.5 9.5l-5 5', 0],
+  full: ['M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5', 0],
+  shrink: ['M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5', 0],
+  rew: ['M12 5a7.5 7.5 0 1 1-7.5 7.5M12 2 8.5 5 12 8', 0],
+  fwd: ['M12 5a7.5 7.5 0 1 0 7.5 7.5M12 2l3.5 3L12 8', 0],
+  shorts: ['M15.6 2.6c1.9-1 4.2-.3 5.2 1.6s.3 4.2-1.6 5.2l-1.6.9c1.4.1 2.7.9 3.4 2.2 1 1.9.3 4.2-1.6 5.2l-8.6 4.6c-1.9 1-4.2.3-5.2-1.6s-.3-4.2 1.6-5.2l1.6-.9c-1.4-.1-2.7-.9-3.4-2.2-1-1.9-.3-4.2 1.6-5.2ZM10 9v6l5-3Z', 0],
 };
+const shortsLogo = () => s('svg', { viewBox: '0 0 24 24', class: 'pb-shorts-logo' },
+  s('path', { fill: '#ff0033', d: P.shorts[0].split('ZM')[0] + 'Z' }), s('path', { fill: '#fff', d: 'M10 9v6l5-3Z' }));
+
+// a scrub bar for a <video>: follows along while it plays, tap or drag to jump
+function scrubber(v, cls = '', onTime = null, fallbackDur = 0) {
+  const bit = h('i');
+  const bar = h('div', { class: 'pb-scrub ' + cls }, h('span', { class: 'pb-scrub-track' }, bit));
+  const dur = () => (Number.isFinite(v.duration) && v.duration > 0 ? v.duration : fallbackDur);
+  const paint = () => { const d = dur(); bit.style.width = (d ? Math.min(1, v.currentTime / d) * 100 : 0) + '%'; onTime?.(v.currentTime, d); };
+  let raf = 0, drag = false;
+  const loop = () => { paint(); raf = !v.paused && v.isConnected ? requestAnimationFrame(loop) : 0; };
+  v.addEventListener('play', () => { if (!raf) raf = requestAnimationFrame(loop); });
+  for (const ev of ['timeupdate', 'loadedmetadata', 'seeked', 'pause']) v.addEventListener(ev, paint);
+  const seek = e => { const d = dur(); if (!d) return; const r = bar.getBoundingClientRect(); v.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * d * .999; paint(); };
+  bar.addEventListener('pointerdown', e => { e.stopPropagation(); drag = true; bar.classList.add('drag'); try { bar.setPointerCapture(e.pointerId); } catch { /* fine */ } seek(e); });
+  bar.addEventListener('pointermove', e => { if (drag) seek(e); });
+  const up = () => { drag = false; bar.classList.remove('drag'); };
+  bar.addEventListener('pointerup', up);
+  bar.addEventListener('pointercancel', up);
+  bar.addEventListener('click', e => e.stopPropagation());
+  bar.addEventListener('dblclick', e => e.stopPropagation());
+  paint();
+  return bar;
+}
 function ic(name, { fill: filled = false, cls = '' } = {}) {
   const [d, solid] = P[name] || P.dots;
   const useFill = solid && filled;
@@ -154,9 +186,14 @@ function pickWho({ title = 'who?' } = {}) {
 // fields: { key, label, type: text|area|number|who|pic|select|check|color, value, options, max }
 function form(title, fields, onSave, { okLabel = 'save', extra, top } = {}) {
   const vals = {};
+  const vidFields = fields.filter(f => f.type === 'video');
+  let saved = false;
   const rows = fields.map(f => {
-    vals[f.key] = f.value ?? (f.type === 'number' ? 0 : f.type === 'check' ? false : f.type === 'who' || f.type === 'pic' ? null : '');
+    vals[f.key] = f.value ?? (f.type === 'number' ? 0 : f.type === 'check' ? false : f.type === 'who' || f.type === 'pic' || f.type === 'video' ? null : '');
     const label = t => h('span', { class: 'field-label' }, t);
+    if (f.type === 'video') {
+      return h('div', { class: 'field pb-vid-row' }, label(f.label), videoField(vals[f.key], v => { vals[f.key] = v; }));
+    }
     if (f.type === 'who') {
       const btn = h('button', { type: 'button', class: 'btn ghost sm pb-who-btn' });
       const paint = () => fill(btn, av(vals[f.key], 22), h('span', {}, who(vals[f.key]).name));
@@ -193,8 +230,18 @@ function form(title, fields, onSave, { okLabel = 'save', extra, top } = {}) {
     title, body: h('div', { class: 'pb-form' }, top?.el || null, rows),
     actions: [
       extra || null,
-      { label: okLabel, kind: 'primary', onClick: close => { if (top && !top.check()) return; top?.commit(); if (onSave(vals) !== false) close(); } },
+      { label: okLabel, kind: 'primary', onClick: close => {
+        if (top && !top.check()) return;
+        top?.commit();
+        if (onSave(vals) === false) return;
+        saved = true;
+        // a video that got swapped out or removed while editing is gone for good now
+        for (const f of vidFields) if (f.value?.imageId && vals[f.key]?.imageId !== f.value.imageId) dropImage(f.value.imageId);
+        close();
+      } },
     ].filter(Boolean),
+    // closed without saving: a newly added video isn't kept
+    onClose: () => { if (!saved) for (const f of vidFields) if (vals[f.key]?.imageId && vals[f.key].imageId !== f.value?.imageId) dropImage(vals[f.key].imageId); },
   });
 }
 
@@ -286,6 +333,67 @@ export function install(api) {
   const empty = (code, label, onclick) => h('div', { class: 'ph-empty pb-empty' }, sticker(code, 'ph-empty-stk'), mine && onclick ? h('button', { type: 'button', class: 'ph-pill', onclick }, label) : null);
   const topBack = (onclick = home) => h('button', { type: 'button', class: 'pb-top-back', title: 'back', onclick }, ic('back'));
 
+  // ---------- one shared feed ----------
+  // ocs in the same world see each other's posts, like a real app. a worldmate's posts stay in *their* phone data:
+  // only ones they posted as themselves get pulled in, likes/comments on them save to that oc (if it's yours),
+  // and nobody edits or deletes them from here.
+  const owners = new WeakMap(); // post -> the worldmate whose phone it lives on
+  function mateItems(key, listKey) {
+    const out = [];
+    for (const m of worldmates(char.id)) {
+      const list = m.fun?.phone?.[key]?.[listKey];
+      if (!Array.isArray(list)) continue;
+      for (const p of list) if (p && p.id && p.who?.id === m.id) { owners.set(p, m); out.push(p); }
+    }
+    return out;
+  }
+  // own list + worldmates', no repeats, newest first
+  function merged(key, listKey, own) {
+    const seen = new Set(own.map(p => p.id));
+    const extra = mateItems(key, listKey).filter(p => !seen.has(p.id) && seen.add(p.id));
+    return [...own, ...extra].sort((a, b) => (b.at || 0) - (a.at || 0));
+  }
+  const canTouch = p => { const m = owners.get(p); return mine && (!m || store.isMine(m)); };
+  const canDel = p => mine && !owners.has(p);
+  const saveFor = p => { const m = owners.get(p); if (m) { if (store.isMine(m)) store.save('char', m); } else save(); };
+
+  // ---------- videos inside posts ----------
+  // inline (twitter / reddit / tumblr): muted + playing while on screen, tap for big with sound
+  function inlineVid(video, cls = '') {
+    const v = vid(video, 'pb-ivid-v', { inView: true });
+    const left = h('span', { class: 'pb-ivid-time' }, clock(video.dur));
+    v.addEventListener('timeupdate', () => { const d = Number.isFinite(v.duration) ? v.duration : video.dur; left.textContent = clock(Math.max(0, d - v.currentTime)); });
+    const mute = h('button', { type: 'button', class: 'pb-ivid-mute', title: 'sound' }, ic('mute'));
+    const paintMute = () => fill(mute, ic(v.muted ? 'mute' : 'vol'));
+    v.addEventListener('volumechange', paintMute);
+    mute.onclick = e => { e.stopPropagation(); v.muted = !v.muted; if (v.paused) v.playNow(); };
+    const ratio = video.w && video.h ? Math.max(4 / 5, Math.min(16 / 9, video.w / video.h)) : 16 / 9;
+    const wrap = h('div', { class: 'pb-ivid ' + cls, style: { aspectRatio: String(ratio) } }, v, left, mute);
+    wrap.addEventListener('click', e => {
+      e.stopPropagation();
+      if (e.target.closest('button')) return;
+      v.pause();
+      bigVid(video, v.currentTime, () => { if (wrap.isConnected) v.playNow(); });
+    });
+    return wrap;
+  }
+  // a video taking up the whole phone screen, with sound
+  function bigVid(video, at = 0, onClose = null) {
+    const v = vid(video, 'pb-vbig-v', { autoplay: true, sound: true, loop: true });
+    if (at) v.addEventListener('loadedmetadata', () => { v.currentTime = at; }, { once: true });
+    const t = h('span', { class: 'pb-vbig-time' });
+    const close = () => { v.pause(); wrap.remove(); onClose?.(); };
+    const wrap = h('div', { class: 'pb-vbig' }, v,
+      h('button', { type: 'button', class: 'pb-vbig-x', title: 'close', onclick: e => { e.stopPropagation(); close(); } }, ic('x')),
+      soundBtn('pb-vbig-snd'),
+      h('div', { class: 'pb-vbig-foot' }, scrubber(v, 'pb-vbig-bar', (c, d) => { t.textContent = `${clock(c)} / ${clock(d)}`; }, video.dur), t));
+    tapToPause(v, wrap);
+    scr().append(wrap);
+    return { close };
+  }
+  // a still of a video (its first frame)
+  const still = (video, cls = '') => { const v = vid(video, cls); v.muted = true; return v; };
+
   // =====================================================================
   // tiktok
   // =====================================================================
@@ -305,21 +413,23 @@ export function install(api) {
     function upload() {
       if (!mine) return;
       form('new post', [
+        { key: 'video', label: 'video', type: 'video' },
         { key: 'imageId', label: 'picture', type: 'pic' },
         { key: 'caption', label: 'caption', type: 'area', max: 300 },
         { key: 'sound', label: 'sound', placeholder: 'original sound' },
         { key: 'who', label: 'posted by', type: 'who', value: me() },
         { key: 'likes', label: 'likes', type: 'number', value: 0 },
       ], v => {
-        if (!v.imageId && !v.caption.trim()) return false;
-        tt.posts.push({ id: uid(), who: freshRef(v.who), imageId: v.imageId, caption: v.caption.trim(), sound: v.sound.trim(), likes: v.likes, liked: false, saved: false, shares: 0, comments: [], at: Date.now() });
+        if (!v.video && !v.imageId && !v.caption.trim()) return false;
+        tt.posts.push({ id: uid(), who: freshRef(v.who), video: v.video || null, imageId: v.imageId, caption: v.caption.trim(), sound: v.sound.trim(), likes: v.likes, liked: false, saved: false, shares: 0, comments: [], at: Date.now() });
         save();
         ttPage = 'feed'; ttTab = 'foryou'; ttJump = tt.posts.at(-1).id;
         draw();
       }, { okLabel: 'post' });
     }
+    const ttAll = () => merged('tiktok', 'posts', tt.posts);
     function feed() {
-      const list = [...tt.posts].reverse().filter(p => ttTab === 'foryou' || ttFollowing(p.who) || isMe(p.who));
+      const list = ttAll().filter(p => ttTab === 'foryou' || ttFollowing(p.who) || isMe(p.who));
       const sc = h('div', { class: 'pb-tt-feed ph-scroll' }, list.length ? list.map(post) : empty('1f3b5', 'post', upload));
       if (ttJump) { const id = ttJump; ttJump = null; requestAnimationFrame(() => sc.querySelector(`[data-id="${id}"]`)?.scrollIntoView({ block: 'start' })); }
       return h('div', { class: 'pb-tt-feedwrap' }, sc,
@@ -327,25 +437,36 @@ export function install(api) {
           h('div', { class: 'pb-tt-tabs' }, [['following', 'following'], ['foryou', 'for you']].map(([v, l]) => h('button', { type: 'button', class: ttTab === v ? 'on' : '', onclick: () => { ttTab = v; draw(); } }, l))),
           h('button', { type: 'button', class: 'pb-tt-x', title: 'home', onclick: home }, ic('x'))));
     }
+    // caption words: #tags + @names in bold like the app
+    const capWords = str => String(str).split(/([#@][\w.]+)/).map(w => /^[#@]/.test(w) ? h('b', { class: 'pb-tt-tag' }, w) : w);
     function post(p) {
-      const likeBtn = h('button', { type: 'button', class: 'pb-tt-act pb-tt-like' + (p.liked ? ' on' : ''), disabled: !mine, onclick: () => toggleLike() }, ic('heart', { fill: true }), h('span', {}, n(p.likes)));
+      p.comments ||= [];
+      const touch = canTouch(p);
+      const likeBtn = h('button', { type: 'button', class: 'pb-tt-act pb-tt-like' + (p.liked ? ' on' : ''), disabled: !touch, onclick: () => toggleLike() }, ic('heart', { fill: true }), h('span', {}, n(p.likes)));
       const toggleLike = (force) => {
         const want = force ?? !p.liked;
         if (want === p.liked) return;
-        p.liked = want; p.likes = Math.max(0, p.likes + (want ? 1 : -1)); save();
+        p.liked = want; p.likes = Math.max(0, (p.likes || 0) + (want ? 1 : -1)); saveFor(p);
         likeBtn.classList.toggle('on', want); likeBtn.lastChild.textContent = n(p.likes);
         likeBtn.classList.remove('pop'); void likeBtn.offsetWidth; likeBtn.classList.add('pop');
       };
       const cCount = h('span', {}, n(p.comments.length));
+      let media, v = null;
+      if (p.video) {
+        v = vid(p.video, 'pb-tt-vid' + (p.video.w > p.video.h ? ' wide' : ''), { inView: true, sound: true, loop: true });
+        media = h('div', { class: 'pb-tt-media' }, v);
+        tapToPause(v, media);
+      } else media = p.imageId ? pic(p.imageId, 'pb-tt-img') : h('div', { class: 'pb-tt-text', style: { '--c': who(p.who).color } }, h('span', {}, p.caption));
+      const hasMedia = p.video || p.imageId;
       const card = h('div', {
-        class: 'pb-tt-post', 'data-id': p.id,
-        ondblclick: e => { if (!mine || e.target.closest('button')) return; burst(card, e.clientX, e.clientY, 'pb-tt-burst'); toggleLike(true); },
+        class: 'pb-tt-post' + (v ? ' paused' : ''), 'data-id': p.id,
+        ondblclick: e => { if (!touch || e.target.closest('button, .pb-scrub')) return; burst(card, e.clientX, e.clientY, 'pb-tt-burst'); toggleLike(true); },
       },
-        p.imageId ? pic(p.imageId, 'pb-tt-img') : h('div', { class: 'pb-tt-text', style: { '--c': who(p.who).color } }, h('span', {}, p.caption)),
+        media,
         h('div', { class: 'pb-tt-shade' }),
         h('div', { class: 'pb-tt-info' },
           h('b', { class: 'pb-tt-handle', onclick: () => { ttWho = p.who; ttPage = 'profile'; draw(); } }, who(p.who).name),
-          p.caption && p.imageId ? h('p', { class: 'pb-tt-cap' }, p.caption.split(/(#\w+)/).map(w => w.startsWith('#') ? h('b', {}, w) : w)) : null,
+          p.caption && hasMedia ? h('p', { class: 'pb-tt-cap' }, capWords(p.caption)) : null,
           h('div', { class: 'pb-tt-sound' }, h('span', { class: 'pb-tt-note' }, '♫'), h('div', { class: 'pb-marquee' }, h('span', {}, `${p.sound || 'original sound'} - ${who(p.who).name}`)))),
         h('div', { class: 'pb-tt-rail' },
           h('div', { class: 'pb-tt-pfp' }, av(p.who, 44), isMe(p.who) ? null : h('button', {
@@ -354,19 +475,26 @@ export function install(api) {
           }, ic('plus'))),
           likeBtn,
           h('button', { type: 'button', class: 'pb-tt-act', onclick: () => openCmts() }, ic('comment', { fill: true }), cCount),
-          h('button', { type: 'button', class: 'pb-tt-act pb-tt-save' + (p.saved ? ' on' : ''), disabled: !mine, onclick: e => { p.saved = !p.saved; save(); e.currentTarget.classList.toggle('on', p.saved); } }, ic('bookmark', { fill: true }), h('span', {}, p.saved ? '1' : '0')),
-          h('button', { type: 'button', class: 'pb-tt-act', disabled: !mine, onclick: e => { p.shares = (p.shares || 0) + 1; save(); e.currentTarget.lastChild.textContent = n(p.shares); } }, ic('share', { fill: true }), h('span', {}, n(p.shares || 0))),
-          h('div', { class: 'pb-tt-disc' }, av(p.who, 26))),
-        mine ? h('button', { type: 'button', class: 'pb-tt-del', title: 'delete', onclick: () => del('post', () => { tt.posts = tt.posts.filter(x => x !== p); dropImage(p.imageId); save(); draw(); }) }, ic('dots')) : null);
+          h('button', { type: 'button', class: 'pb-tt-act pb-tt-save' + (p.saved ? ' on' : ''), disabled: !touch, onclick: e => { p.saved = !p.saved; saveFor(p); e.currentTarget.classList.toggle('on', p.saved); e.currentTarget.lastChild.textContent = p.saved ? '1' : '0'; } }, ic('bookmark', { fill: true }), h('span', {}, p.saved ? '1' : '0')),
+          h('button', { type: 'button', class: 'pb-tt-act', disabled: !touch, onclick: e => { p.shares = (p.shares || 0) + 1; saveFor(p); e.currentTarget.lastChild.textContent = n(p.shares); } }, ic('share', { fill: true }), h('span', {}, n(p.shares || 0))),
+          h('div', { class: 'pb-tt-discwrap' }, h('i', { class: 'pb-tt-fly a' }, '♪'), h('i', { class: 'pb-tt-fly b' }, '♫'), h('div', { class: 'pb-tt-disc' }, av(p.who, 24)))),
+        v ? scrubber(v, 'pb-tt-prog', null, p.video.dur) : null,
+        v ? soundBtn('pb-tt-snd') : null,
+        canDel(p) ? h('button', { type: 'button', class: 'pb-tt-del', title: 'delete', onclick: () => del('post', () => { tt.posts = tt.posts.filter(x => x !== p); dropImage(p.imageId); dropImage(p.video?.imageId); save(); draw(); }) }, ic('dots')) : null);
+      if (v) {
+        v.addEventListener('play', () => card.classList.remove('paused'));
+        v.addEventListener('pause', () => card.classList.add('paused'));
+      }
       function openCmts() {
         const t = h('b', {}, `${p.comments.length} comments`);
-        sheet(scr(), t, comments(p.comments, { mine, me: me(), save, onChange: () => { cCount.textContent = n(p.comments.length); t.textContent = `${p.comments.length} comments`; } }), { cls: 'pb-tt-sheet' });
+        sheet(scr(), t, comments(p.comments, { mine: touch, me: me(), save: () => saveFor(p), onChange: () => { cCount.textContent = n(p.comments.length); t.textContent = `${p.comments.length} comments`; } }), { cls: 'pb-tt-sheet' });
       }
       return card;
     }
+    const ttViews = p => p.views || (p.likes || 0) * 7 + 12;
     function profile() {
       const ref = ttWho || me();
-      const posts = [...tt.posts].reverse().filter(p => sameWho(p.who, ref));
+      const posts = ttAll().filter(p => sameWho(p.who, ref));
       const likes = posts.reduce((a, p) => a + (p.likes || 0), 0);
       const own = isMe(ref);
       const hs = hashStr(keyOf(ref));
@@ -382,16 +510,16 @@ export function install(api) {
         own && tt.bio ? h('p', { class: 'pb-tt-bio' }, tt.bio) : null,
         h('div', { class: 'pb-tt-gridtabs' }, h('i', { class: 'on' }, ic('grid'))),
         posts.length ? h('div', { class: 'pb-tt-grid' }, posts.map(p => h('button', { type: 'button', class: 'pb-tt-cell', onclick: () => { ttPage = 'feed'; ttTab = 'foryou'; ttJump = p.id; draw(); } },
-          p.imageId ? pic(p.imageId) : h('div', { class: 'pb-tt-cell-text', style: { '--c': who(p.who).color } }, p.caption),
-          h('span', { class: 'pb-tt-views' }, ic('play', { fill: true }), n((p.likes || 0) * 7 + 12))))) : empty('1f3b5', 'post', own ? upload : null));
+          p.video ? still(p.video, 'pb-tt-cellvid') : p.imageId ? pic(p.imageId) : h('div', { class: 'pb-tt-cell-text', style: { '--c': who(p.who).color } }, p.caption),
+          h('span', { class: 'pb-tt-views' }, ic('play', { fill: false }), n(ttViews(p)))))) : empty('1f3b5', 'post', own ? upload : null));
     }
     function inbox() {
-      const acts = tt.posts.filter(p => isMe(p.who)).flatMap(p => p.comments.filter(c => !isMe(c.who)).map(c => ({ p, c }))).sort((a, b) => b.c.at - a.c.at);
+      const acts = tt.posts.filter(p => isMe(p.who)).flatMap(p => (p.comments || []).filter(c => !isMe(c.who)).map(c => ({ p, c }))).sort((a, b) => b.c.at - a.c.at);
       return h('div', { class: 'pb-tt-inbox ph-scroll' },
         h('div', { class: 'pb-tt-prof-top' }, h('span'), h('b', {}, 'inbox'), h('span')),
         acts.length ? acts.map(({ p, c }) => h('button', { type: 'button', class: 'pb-tt-note-row', onclick: () => { ttPage = 'feed'; ttTab = 'foryou'; ttJump = p.id; draw(); } },
           av(c.who, 40), h('div', { class: 'pb-tt-note-main' }, h('b', {}, who(c.who).name), h('span', {}, `commented: ${c.text}`), h('em', {}, shortAgo(c.at))),
-          p.imageId ? pic(p.imageId, 'pb-tt-note-pic') : null)) : h('div', { class: 'pb-cmt-empty light' }, 'no activity yet'));
+          p.video ? still(p.video, 'pb-tt-note-pic') : p.imageId ? pic(p.imageId, 'pb-tt-note-pic') : null)) : h('div', { class: 'pb-cmt-empty light' }, 'no activity yet'));
     }
     draw();
     return root;
@@ -403,25 +531,43 @@ export function install(api) {
   const yt = d.youtube;
   for (const v of yt.videos) v.comments ||= [];
   let ytTab = 'home', ytCat = 'all';
+  const ytAll = () => merged('youtube', 'videos', yt.videos);
+  const ytFind = id => ytAll().find(x => x.id === id);
+  const ytShort = v => !!v.short || !!(v.video && v.video.h > v.video.w);
+  const ytNav = cur => navBar([['home', 'home', 'home'], ['shorts', 'shorts', 'shorts'], ['add'], ['subs', 'sub', 'subscriptions'], ['you', 'user', 'you']], cur, id => {
+    if (id === 'add') return upload();
+    if (id === 'shorts') { if (cur !== 'shorts') show('youtube', { shorts: ytAll().find(ytShort)?.id || '-' }); return; }
+    ytTab = id;
+    show('youtube', {}, cur === 'shorts' ? 'pop' : null);
+  }, 'pb-yt-nav');
+  // a thumbnail: the picked one, else the video's first frame, else a colored card
+  const thumbOf = (v, cls = '') => (v.imageId ? pic(v.imageId, cls) : v.video ? still(v.video, cls) : h('div', { class: 'pb-yt-thumb-blank ' + cls, style: { '--c': who(v.who).color } }, v.title));
   SCREENS.youtube = (params = {}, view) => {
     if (params.v) return watch(params.v, view);
+    if (params.shorts) return shortsView(params.shorts, view);
     if (params.channel) return channel(params.channel);
     const root = h('div', { class: 'pb-yt' });
     const draw = () => {
       const subbed = v => yt.subs.includes(keyOf(v.who));
-      const cats = ['all', ...new Set(yt.videos.map(v => v.cat).filter(Boolean))];
-      let list = [...yt.videos].reverse();
+      const all = ytAll();
+      const cats = ['all', ...new Set(all.map(v => v.cat).filter(Boolean))];
+      let list = all;
       if (ytTab === 'subs') list = list.filter(subbed);
       if (ytTab === 'you') list = list.filter(v => isMe(v.who));
       if (ytTab === 'home' && ytCat !== 'all') list = list.filter(v => v.cat === ytCat);
+      const longs = list.filter(v => !ytShort(v)), shorts = list.filter(ytShort);
+      const shelf = shorts.length ? h('div', { class: 'pb-yt-shelf' },
+        h('div', { class: 'pb-yt-shelf-t' }, shortsLogo(), h('b', {}, 'Shorts')),
+        h('div', { class: 'pb-yt-sgrid' }, shorts.slice(0, 4).map(v => h('button', { type: 'button', class: 'pb-yt-scard', onclick: () => show('youtube', { shorts: v.id }) },
+          thumbOf(v, 'pb-yt-sthumb'), h('div', { class: 'pb-yt-scap' }, h('b', {}, v.title), h('span', {}, `${n(v.views)} views`)))))) : null;
       fill(root,
         h('div', { class: 'pb-yt-top' }, h('button', { type: 'button', class: 'pb-yt-home', onclick: home }, marks.youtube()),
           h('div', { class: 'pb-yt-icons' }, mine ? h('button', { type: 'button', class: 'pb-ib', title: 'upload', onclick: upload }, ic('plus')) : null, h('span', { class: 'pb-ib' }, ic('bell')), h('span', { class: 'pb-ib' }, ic('search')))),
         ytTab === 'home' && cats.length > 1 ? h('div', { class: 'pb-chips' }, cats.map(c => h('button', { type: 'button', class: 'pb-chip' + (c === ytCat ? ' on' : ''), onclick: () => { ytCat = c; draw(); } }, c))) : null,
-        ytTab === 'subs' ? h('div', { class: 'pb-yt-subrow' }, yt.subs.map(k => { const v = yt.videos.find(x => keyOf(x.who) === k); return v ? h('button', { type: 'button', onclick: () => show('youtube', { channel: k }) }, av(v.who, 46), h('span', {}, who(v.who).name)) : null; })) : null,
+        ytTab === 'subs' ? h('div', { class: 'pb-yt-subrow' }, yt.subs.map(k => { const v = all.find(x => keyOf(x.who) === k); return v ? h('button', { type: 'button', onclick: () => show('youtube', { channel: k }) }, av(v.who, 46), h('span', {}, who(v.who).name)) : null; })) : null,
         ytTab === 'you' ? h('div', { class: 'pb-yt-you' }, av(me(), 56), h('div', { 'data-acct-switch': true }, h('b', {}, nameOf(char)), h('span', {}, '@' + handleOf(me()) + ' · view channel')), h('button', { type: 'button', class: 'pb-yt-you-go', onclick: () => show('youtube', { channel: keyOf(me()) }) }, '›')) : null,
-        h('div', { class: 'ph-scroll pb-yt-feed' }, list.length ? list.map(card) : empty('1f4fa', 'upload', upload)),
-        navBar([['home', 'home', 'home'], ['subs', 'sub', 'subscriptions'], ['add'], ['you', 'user', 'you']], ytTab, id => { if (id === 'add') return upload(); ytTab = id; draw(); }, 'pb-yt-nav'));
+        h('div', { class: 'ph-scroll pb-yt-feed' }, list.length ? [longs.slice(0, 1).map(card), shelf, longs.slice(1).map(card)] : empty('1f4fa', 'upload', upload)),
+        ytNav(ytTab));
     };
     draw();
     return root;
@@ -429,32 +575,58 @@ export function install(api) {
   function ytUpload(after) {
     if (!mine) return;
     form('upload', [
+      { key: 'video', label: 'video', type: 'video' },
       { key: 'imageId', label: 'thumbnail', type: 'pic' },
       { key: 'title', label: 'title', focus: true, max: 100 },
       { key: 'who', label: 'channel', type: 'who', value: me() },
       { key: 'views', label: 'views', type: 'number', value: 1200 },
       { key: 'dur', label: 'length', value: '4:20', max: 8 },
-      { key: 'cat', label: 'category', placeholder: 'music, vlogs, gaming...' , max: 20 },
+      { key: 'short', label: 'short', type: 'check', value: false },
+      { key: 'cat', label: 'category', placeholder: 'music, vlogs, gaming...', max: 20 },
       { key: 'desc', label: 'description', type: 'area' },
     ], v => {
       if (!v.title.trim()) return false;
-      yt.videos.push({ id: uid(), who: freshRef(v.who), imageId: v.imageId, title: v.title.trim(), views: v.views, dur: Math.max(5, parseDur(v.dur) || 260), cat: v.cat.trim().toLowerCase(), desc: v.desc.trim(), likes: Math.round(v.views / 25), liked: false, comments: [], at: Date.now() });
+      const dur = v.video ? Math.max(1, Math.round(v.video.dur)) : Math.max(5, parseDur(v.dur) || 260);
+      yt.videos.push({ id: uid(), who: freshRef(v.who), video: v.video || null, imageId: v.imageId, title: v.title.trim(), views: v.views, dur, short: !!v.short, cat: v.cat.trim().toLowerCase(), desc: v.desc.trim(), likes: Math.round(v.views / 25), liked: false, comments: [], at: Date.now() });
       save();
       after?.();
     }, { okLabel: 'upload' });
   }
   const upload = () => ytUpload(() => api.redraw());
+  const ytDel = (v, after) => del('video', () => { yt.videos = yt.videos.filter(x => x !== v); dropImage(v.imageId); dropImage(v.video?.imageId); save(); after(); });
   function card(v) {
     return h('div', { class: 'pb-yt-card' },
-      h('button', { type: 'button', class: 'pb-yt-thumb', onclick: () => show('youtube', { v: v.id }) }, v.imageId ? pic(v.imageId) : h('div', { class: 'pb-yt-thumb-blank', style: { '--c': who(v.who).color } }, v.title), h('span', { class: 'pb-yt-dur' }, clockOf(v.dur))),
+      h('button', { type: 'button', class: 'pb-yt-thumb', onclick: () => show('youtube', { v: v.id }) }, thumbOf(v), h('span', { class: 'pb-yt-dur' }, clockOf(v.dur))),
       h('div', { class: 'pb-yt-meta' },
-        h('button', { type: 'button', class: 'pb-yt-ch', onclick: () => show('youtube', { channel: keyOf(v.who) }) }, av(v.who, 34)),
+        h('button', { type: 'button', class: 'pb-yt-ch', onclick: () => show('youtube', { channel: keyOf(v.who) }) }, av(v.who, 36)),
         h('button', { type: 'button', class: 'pb-yt-txt', onclick: () => show('youtube', { v: v.id }) }, h('b', {}, v.title), h('span', {}, `${who(v.who).name} · ${n(v.views)} views · ${longAgo(v.at)}`)),
-        mine ? h('button', { type: 'button', class: 'pb-ib sm', title: 'delete', onclick: () => del('video', () => { yt.videos = yt.videos.filter(x => x !== v); dropImage(v.imageId); save(); api.redraw(); }) }, ic('dots')) : null));
+        canDel(v) ? h('button', { type: 'button', class: 'pb-ib sm pb-yt-more', title: 'delete', onclick: () => ytDel(v, () => api.redraw()) }, ic('dots')) : h('span', { class: 'pb-ib sm pb-yt-more' }, ic('dots'))));
   }
-  function watch(id, view) {
-    const v = yt.videos.find(x => x.id === id);
-    if (!v) return SCREENS.youtube({});
+  // the real video player with youtube's controls
+  function realPlayer(v, root) {
+    const vv = vid(v.video, 'pb-yt-pvid', { autoplay: true, sound: true, loop: false, poster: v.imageId });
+    const time = h('span', { class: 'pb-yt-time' });
+    const playBtn = h('button', { type: 'button', class: 'pb-yt-bigplay', title: 'play' });
+    const fullBtn = h('button', { type: 'button', class: 'pb-yt-fullbtn', title: 'full screen' }, ic('full'));
+    const player = h('div', { class: 'pb-yt-player real ctl' }, vv,
+      h('div', { class: 'pb-yt-ctl' }, playBtn, time, fullBtn,
+        h('button', { type: 'button', class: 'pb-yt-pback', title: 'back', onclick: e => { e.stopPropagation(); if (root.classList.contains('full')) setFull(false); else show('youtube', {}, 'pop'); } }, ic('back'))),
+      scrubber(vv, 'pb-yt-scrub', (c, d) => { time.textContent = `${clock(c)} / ${clock(d)}`; }, v.video.dur));
+    let hideT = 0;
+    const showCtl = () => { player.classList.add('ctl'); clearTimeout(hideT); hideT = setTimeout(() => { if (!vv.paused) player.classList.remove('ctl'); }, 2600); };
+    const paint = () => { fill(playBtn, ic(vv.paused ? 'play' : 'pause', { fill: true })); playBtn.title = vv.paused ? 'play' : 'pause'; player.classList.toggle('playing', !vv.paused); };
+    vv.addEventListener('play', () => { paint(); showCtl(); });
+    vv.addEventListener('pause', () => { paint(); player.classList.add('ctl'); });
+    vv.addEventListener('ended', () => { paint(); player.classList.add('ctl'); });
+    player.addEventListener('click', e => { if (e.target.closest('button, .pb-scrub')) return; if (player.classList.contains('ctl') && !vv.paused) { player.classList.remove('ctl'); clearTimeout(hideT); } else showCtl(); });
+    playBtn.onclick = e => { e.stopPropagation(); if (vv.paused) { if (vv.ended) vv.currentTime = 0; vv.playNow(); } else vv.pause(); };
+    const setFull = on => { root.classList.toggle('full', on); fill(fullBtn, ic(on ? 'shrink' : 'full')); showCtl(); };
+    fullBtn.onclick = e => { e.stopPropagation(); setFull(!root.classList.contains('full')); };
+    paint();
+    return player;
+  }
+  // no video file: the made-up timer
+  function fakePlayer(v, view) {
     let playing = false, at = 0;
     const bar = h('i'), time = h('span', { class: 'pb-yt-time' });
     const playBtn = h('button', { type: 'button', class: 'pb-yt-bigplay', title: 'play' });
@@ -472,19 +644,28 @@ export function install(api) {
     const iv = setInterval(() => { if (!view.isConnected) return; if (playing) { at = Math.min(v.dur, at + .25); if (at >= v.dur) playing = false; paint(); } }, 250);
     api.onLeave(() => clearInterval(iv));
     paint();
+    return player;
+  }
+  function watch(id, view) {
+    const v = ytFind(id);
+    if (!v) return SCREENS.youtube({});
+    v.comments ||= [];
+    const touch = canTouch(v);
+    const root = h('div', { class: 'pb-yt pb-yt-watch' });
+    const player = v.video ? realPlayer(v, root) : fakePlayer(v, view);
     const subbed = () => yt.subs.includes(keyOf(v.who));
     const subBtn = h('button', { type: 'button', class: 'pb-yt-sub', disabled: !mine, onclick: () => { const k = keyOf(v.who); yt.subs = subbed() ? yt.subs.filter(x => x !== k) : [...yt.subs, k]; save(); paintSub(); } });
     const paintSub = () => { subBtn.textContent = subbed() ? 'subscribed' : 'subscribe'; subBtn.classList.toggle('on', subbed()); };
     paintSub();
-    const likeBtn = h('button', { type: 'button', class: 'pb-yt-like', disabled: !mine, onclick: () => { v.liked = !v.liked; v.likes = Math.max(0, (v.likes || 0) + (v.liked ? 1 : -1)); save(); paintLike(); } });
+    const likeBtn = h('button', { type: 'button', class: 'pb-yt-like', disabled: !touch, onclick: () => { v.liked = !v.liked; v.likes = Math.max(0, (v.likes || 0) + (v.liked ? 1 : -1)); saveFor(v); paintLike(); } });
     const paintLike = () => { fill(likeBtn, ic('thumb', { cls: v.liked ? 'on' : '' }), h('span', {}, n(v.likes || 0))); likeBtn.classList.toggle('on', !!v.liked); };
     paintLike();
     let descOpen = false;
     const desc = h('button', { type: 'button', class: 'pb-yt-desc', onclick: () => { descOpen = !descOpen; desc.classList.toggle('open', descOpen); } },
       h('b', {}, `${n(v.views)} views  ${longAgo(v.at)}`), v.desc ? h('p', {}, v.desc) : null);
     const cHead = h('b', {}, `comments ${v.comments.length}`);
-    const others = [...yt.videos].reverse().filter(x => x !== v);
-    return h('div', { class: 'pb-yt pb-yt-watch' },
+    const others = ytAll().filter(x => x !== v && !ytShort(x));
+    fill(root,
       player,
       h('div', { class: 'ph-scroll pb-yt-wbody' },
         h('h3', { class: 'pb-yt-title' }, v.title),
@@ -493,11 +674,58 @@ export function install(api) {
           h('button', { type: 'button', class: 'pb-yt-chbtn', onclick: () => show('youtube', { channel: keyOf(v.who) }) }, av(v.who, 36), h('div', {}, h('b', {}, who(v.who).name), h('span', {}, `${n(hashStr(keyOf(v.who)) % 900000 + 1000)} subscribers`))),
           subBtn),
         h('div', { class: 'pb-yt-acts' }, likeBtn, h('span', { class: 'pb-yt-pillbtn' }, ic('share', { fill: false }), 'share'), h('span', { class: 'pb-yt-pillbtn' }, ic('download'), 'download')),
-        h('div', { class: 'pb-yt-cmts' }, cHead, comments(v.comments, { mine, me: me(), save, onChange: () => { cHead.textContent = `comments ${v.comments.length}`; } })),
+        h('div', { class: 'pb-yt-cmts' }, cHead, comments(v.comments, { mine: touch, me: me(), save: () => saveFor(v), onChange: () => { cHead.textContent = `comments ${v.comments.length}`; } })),
         others.length ? h('div', { class: 'pb-yt-next' }, others.slice(0, 6).map(card)) : null));
+    return root;
+  }
+  // shorts: a vertical swipe feed like tiktok, in youtube's look
+  function shortsView(startId, view) {
+    const list = ytAll().filter(ytShort);
+    const root = h('div', { class: 'pb-yt pb-yt-shorts' });
+    const feedEl = h('div', { class: 'pb-yt-sfeed ph-scroll' }, list.length ? list.map(shortEl) : empty('1f4fa', 'upload', upload));
+    if (startId) requestAnimationFrame(() => feedEl.querySelector(`[data-id="${startId}"]`)?.scrollIntoView({ block: 'start' }));
+    fill(root,
+      h('div', { class: 'pb-yt-swrap' }, feedEl,
+        h('div', { class: 'pb-yt-stop' }, h('button', { type: 'button', class: 'pb-ib', title: 'back', onclick: () => show('youtube', {}, 'pop') }, ic('back')), h('span'), h('span', { class: 'pb-ib' }, ic('search')))),
+      ytNav('shorts'));
+    function shortEl(v) {
+      v.comments ||= [];
+      const touch = canTouch(v);
+      let media, vv = null;
+      if (v.video) {
+        vv = vid(v.video, 'pb-yt-svid' + (v.video.w > v.video.h ? ' wide' : ''), { inView: true, sound: true, loop: true, poster: v.imageId });
+        media = h('div', { class: 'pb-yt-smedia' }, vv);
+        tapToPause(vv, media);
+      } else media = h('div', { class: 'pb-yt-smedia' }, thumbOf(v, 'pb-yt-svid'));
+      const like = h('button', { type: 'button', class: 'pb-yt-sact' + (v.liked ? ' on' : ''), disabled: !touch });
+      const paintLike = () => { fill(like, h('span', { class: 'pb-yt-sic' }, ic('thumb')), h('em', {}, n(v.likes || 0))); like.classList.toggle('on', !!v.liked); };
+      like.onclick = () => { v.liked = !v.liked; v.likes = Math.max(0, (v.likes || 0) + (v.liked ? 1 : -1)); saveFor(v); paintLike(); };
+      paintLike();
+      const cCount = h('em', {}, n(v.comments.length));
+      const subbed = () => yt.subs.includes(keyOf(v.who));
+      const subBtn = h('button', { type: 'button', class: 'pb-yt-ssub', disabled: !mine, onclick: () => { const k = keyOf(v.who); yt.subs = subbed() ? yt.subs.filter(x => x !== k) : [...yt.subs, k]; save(); paintSub(); } });
+      const paintSub = () => { subBtn.textContent = subbed() ? 'subscribed' : 'subscribe'; subBtn.classList.toggle('on', subbed()); };
+      paintSub();
+      return h('div', { class: 'pb-yt-short', 'data-id': v.id },
+        media,
+        h('div', { class: 'pb-tt-shade' }),
+        h('div', { class: 'pb-yt-sinfo' },
+          h('div', { class: 'pb-yt-srow' }, h('button', { type: 'button', class: 'pb-yt-sch', onclick: () => show('youtube', { channel: keyOf(v.who) }) }, av(v.who, 30), h('b', {}, '@' + handleOf(v.who))), isMe(v.who) ? null : subBtn),
+          h('p', { class: 'pb-yt-stitle' }, v.title)),
+        h('div', { class: 'pb-yt-srail' },
+          like,
+          h('span', { class: 'pb-yt-sact' }, h('span', { class: 'pb-yt-sic' }, ic('thumb', { cls: 'pb-flip' })), h('em', {}, 'dislike')),
+          h('button', { type: 'button', class: 'pb-yt-sact', onclick: () => { const t = h('b', {}, 'comments'); sheet(scr(), t, comments(v.comments, { mine: touch, me: me(), save: () => saveFor(v), onChange: () => { cCount.textContent = n(v.comments.length); } }), { cls: 'pb-yt-sheet' }); } }, h('span', { class: 'pb-yt-sic' }, ic('comment')), cCount),
+          h('span', { class: 'pb-yt-sact' }, h('span', { class: 'pb-yt-sic' }, ic('share')), h('em', {}, 'share')),
+          canDel(v) ? h('button', { type: 'button', class: 'pb-yt-sact', title: 'delete', onclick: () => ytDel(v, () => show('youtube', {}, 'pop')) }, h('span', { class: 'pb-yt-sic' }, ic('dots'))) : null,
+          h('span', { class: 'pb-yt-sav' }, av(v.who, 30))),
+        vv ? scrubber(vv, 'pb-yt-sprog', null, v.video.dur) : null,
+        vv ? soundBtn('pb-yt-ssnd') : null);
+    }
+    return root;
   }
   function channel(k) {
-    const vids = [...yt.videos].reverse().filter(v => keyOf(v.who) === k);
+    const vids = ytAll().filter(v => keyOf(v.who) === k);
     const ref = vids[0]?.who || (k === keyOf(me()) ? me() : { name: k.slice(2) });
     const subbed = () => yt.subs.includes(k);
     const subBtn = h('button', { type: 'button', class: 'pb-yt-sub big', disabled: !mine, onclick: () => { yt.subs = subbed() ? yt.subs.filter(x => x !== k) : [...yt.subs, k]; save(); subBtn.textContent = subbed() ? 'subscribed' : 'subscribe'; subBtn.classList.toggle('on', subbed()); } }, subbed() ? 'subscribed' : 'subscribe');
@@ -519,7 +747,8 @@ export function install(api) {
   const tw = d.twitter;
   for (const t of tw.tweets) { t.replies ||= []; }
   let twTab = 'home', twFeed = 'foryou', twWho = null;
-  const isBlue = ref => tw.blue.includes(keyOf(ref));
+  const twAll = () => merged('twitter', 'tweets', tw.tweets);
+  const isBlue = ref => tw.blue.includes(keyOf(ref)) || worldmates(char.id).some(m => m.id === ref?.id && (m.fun?.phone?.twitter?.blue || []).includes(keyOf(ref)));
   const nameLine = (ref, ts) => h('div', { class: 'pb-tw-name' }, h('b', {}, who(ref).name), isBlue(ref) ? verified() : null, h('span', {}, `@${handleOf(ref)}`), ts ? h('span', {}, `· ${shortAgo(ts)}`) : null);
   SCREENS.twitter = (params = {}) => {
     if (params.t) return thread(params.t);
@@ -532,7 +761,7 @@ export function install(api) {
       mine && twTab !== 'profile' ? h('button', { type: 'button', class: 'pb-tw-fab', title: 'post', onclick: () => compose() }, ic('plus')) : null,
       navBar([['home', 'home'], ['explore', 'search'], ['notifs', 'bell'], ['profile', 'user']], twTab, id => { twTab = id; twWho = null; draw(); }, 'pb-tw-nav'));
     function feedList() {
-      let list = [...tw.tweets].reverse();
+      let list = twAll();
       if (twFeed === 'following') list = list.filter(t => !isMe(t.who) && who(t.who).char);
       return list.length ? list.map(t => tweet(t, draw)) : empty('1f426', 'post', () => compose());
     }
@@ -541,16 +770,16 @@ export function install(api) {
       form(replyTo ? 'reply' : 'new post', [
         { key: 'who', label: 'posted by', type: 'who', value: me() },
         { key: 'text', label: 'what\'s happening?', type: 'area', max: 280, focus: true },
+        replyTo ? null : { key: 'video', label: 'video', type: 'video' },
         replyTo ? null : { key: 'imageId', label: 'picture', type: 'pic' },
         { key: 'likes', label: 'likes', type: 'number', value: 0 },
         { key: 'blue', label: 'verified', type: 'check', value: false },
       ].filter(Boolean), v => {
-        if (!v.text.trim() && !v.imageId) return false;
+        if (!v.text.trim() && !v.imageId && !v.video) return false;
         const ref = freshRef(v.who);
         if (v.blue && !isBlue(ref)) tw.blue.push(keyOf(ref));
-        const t = { id: uid(), who: ref, text: v.text.trim(), imageId: v.imageId || null, likes: v.likes, rts: Math.round(v.likes / 6), liked: false, rted: false, views: v.likes * 31 + 40, replies: [], at: Date.now() };
-        if (replyTo) replyTo.replies.push(t); else tw.tweets.push(t);
-        save();
+        const t = { id: uid(), who: ref, text: v.text.trim(), imageId: v.imageId || null, video: v.video || null, likes: v.likes, rts: Math.round(v.likes / 6), liked: false, rted: false, views: v.likes * 31 + 40, replies: [], at: Date.now() };
+        if (replyTo) { (replyTo.replies ||= []).push(t); saveFor(replyTo); } else { tw.tweets.push(t); save(); }
         after();
       }, { okLabel: replyTo ? 'reply' : 'post' });
     }
@@ -559,7 +788,7 @@ export function install(api) {
       const res = h('div');
       const paintRes = () => {
         const v = q.value.trim().toLowerCase();
-        fill(res, v ? [...tw.tweets].reverse().filter(t => t.text.toLowerCase().includes(v) || who(t.who).name.toLowerCase().includes(v)).map(t => tweet(t, draw)) : [
+        fill(res, v ? twAll().filter(t => (t.text || '').toLowerCase().includes(v) || who(t.who).name.toLowerCase().includes(v)).map(t => tweet(t, draw)) : [
           h('div', { class: 'pb-tw-sect' }, h('b', {}, 'what\'s happening'), mine ? h('button', { type: 'button', class: 'pb-ib sm', title: 'add', onclick: addTrend }, ic('plus')) : null),
           tw.trends.length ? tw.trends.map((t, i) => h('div', { class: 'pb-tw-trend' },
             h('div', {}, h('span', {}, `${i + 1} · trending`), h('b', {}, t.tag), h('span', {}, `${n(t.count)} posts`)),
@@ -585,7 +814,7 @@ export function install(api) {
     function profile() {
       const ref = twWho || me();
       const own = isMe(ref);
-      const posts = [...tw.tweets].reverse().filter(t => sameWho(t.who, ref));
+      const posts = twAll().filter(t => sameWho(t.who, ref));
       return h('div', { class: 'ph-scroll pb-tw-prof' },
         h('div', { class: 'pb-tw-banner', style: { '--c': who(ref).color } }, own && tw.bannerId ? pic(tw.bannerId) : null,
           h('button', { type: 'button', class: 'pb-tw-bback', title: 'back', onclick: () => { twTab = 'home'; twWho = null; draw(); } }, ic('back'))),
@@ -614,28 +843,31 @@ export function install(api) {
       }, { top: accountBox(api, 'twitter') });
     }
     function tweet(t, redrawFn, big = false, parent = null) {
-      const like = h('button', { type: 'button', class: 'pb-tw-act like' + (t.liked ? ' on' : ''), disabled: !mine, onclick: e => { e.stopPropagation(); t.liked = !t.liked; t.likes = Math.max(0, t.likes + (t.liked ? 1 : -1)); save(); fill(like, ic('heart', { fill: t.liked }), h('span', {}, n(t.likes))); like.classList.toggle('on', t.liked); like.classList.remove('pop'); void like.offsetWidth; like.classList.add('pop'); } }, ic('heart', { fill: t.liked }), h('span', {}, n(t.likes)));
-      const rt = h('button', { type: 'button', class: 'pb-tw-act rt' + (t.rted ? ' on' : ''), disabled: !mine, onclick: e => { e.stopPropagation(); t.rted = !t.rted; t.rts = Math.max(0, t.rts + (t.rted ? 1 : -1)); save(); fill(rt, ic('retweet'), h('span', {}, n(t.rts))); rt.classList.toggle('on', t.rted); } }, ic('retweet'), h('span', {}, n(t.rts)));
+      const top = parent || t, touch = canTouch(top), sv = () => saveFor(top);
+      const like = h('button', { type: 'button', class: 'pb-tw-act like' + (t.liked ? ' on' : ''), disabled: !touch, onclick: e => { e.stopPropagation(); t.liked = !t.liked; t.likes = Math.max(0, t.likes + (t.liked ? 1 : -1)); sv(); fill(like, ic('heart', { fill: t.liked }), h('span', {}, n(t.likes))); like.classList.toggle('on', t.liked); like.classList.remove('pop'); void like.offsetWidth; like.classList.add('pop'); } }, ic('heart', { fill: t.liked }), h('span', {}, n(t.likes)));
+      const rt = h('button', { type: 'button', class: 'pb-tw-act rt' + (t.rted ? ' on' : ''), disabled: !touch, onclick: e => { e.stopPropagation(); t.rted = !t.rted; t.rts = Math.max(0, t.rts + (t.rted ? 1 : -1)); sv(); fill(rt, ic('retweet'), h('span', {}, n(t.rts))); rt.classList.toggle('on', t.rted); } }, ic('retweet'), h('span', {}, n(t.rts)));
       return h('div', { class: 'pb-tw-tweet' + (big ? ' big' : ''), onclick: e => { if (!big && !parent && !e.target.closest('button')) show('twitter', { t: t.id }); } },
         h('button', { type: 'button', class: 'pb-tw-av', onclick: e => { e.stopPropagation(); if (big || parent) return; twWho = isMe(t.who) ? null : t.who; twTab = 'profile'; redrawFn(); } }, av(t.who, 38)),
         h('div', { class: 'pb-tw-body' },
           nameLine(t.who, big ? null : t.at),
           t.text ? h('div', { class: 'pb-tw-text' }, t.text.split(/([#@]\w+)/).map(w => /^[#@]/.test(w) ? h('span', { class: 'pb-tw-tag' }, w) : w)) : null,
           t.imageId ? pic(t.imageId, 'pb-tw-img') : null,
+          t.video ? inlineVid(t.video, 'pb-tw-vid') : null,
           big ? h('div', { class: 'pb-tw-when' }, new Date(t.at).toLocaleString(undefined, { hour: 'numeric', minute: '2-digit', month: 'short', day: 'numeric', year: 'numeric' }).toLowerCase(), ' · ', h('b', {}, n(t.views || 0)), ' views') : null,
           h('div', { class: 'pb-tw-acts' },
             h('span', { class: 'pb-tw-act' }, ic('comment'), h('span', {}, t.replies?.length ? n(t.replies.length) : '')),
             rt, like,
             h('span', { class: 'pb-tw-act' }, ic('views'), h('span', {}, n(t.views || 0))),
-            mine ? h('button', { type: 'button', class: 'pb-tw-act', title: 'delete', onclick: e => { e.stopPropagation(); del('post', () => { if (parent) parent.replies = parent.replies.filter(x => x !== t); else tw.tweets = tw.tweets.filter(x => x !== t); dropImage(t.imageId); save(); if (big) show('twitter', {}, 'pop'); else redrawFn(); }); } }, ic('trash')) : null)));
+            canDel(top) ? h('button', { type: 'button', class: 'pb-tw-act', title: 'delete', onclick: e => { e.stopPropagation(); del('post', () => { if (parent) parent.replies = parent.replies.filter(x => x !== t); else tw.tweets = tw.tweets.filter(x => x !== t); dropImage(t.imageId); dropImage(t.video?.imageId); save(); if (big) show('twitter', {}, 'pop'); else redrawFn(); }); } }, ic('trash')) : null)));
     }
     SCREENS.twitter.tweet = tweet; SCREENS.twitter.compose = compose;
     draw();
     return root;
   };
   function thread(id) {
-    const t = tw.tweets.find(x => x.id === id);
+    const t = twAll().find(x => x.id === id);
     if (!t) return SCREENS.twitter({});
+    t.replies ||= [];
     const root = h('div', { class: 'pb-tw pb-tw-thread' });
     const tmp = SCREENS.twitter({}); // builds the helpers
     const { tweet, compose } = SCREENS.twitter;
@@ -644,7 +876,7 @@ export function install(api) {
       h('div', { class: 'pb-tw-ptitle row' }, topBack(() => show('twitter', {}, 'pop')), h('b', {}, 'post')),
       h('div', { class: 'ph-scroll' }, tweet(t, draw, true),
         t.replies.map(r => tweet(r, draw, false, t))),
-      mine ? h('button', { type: 'button', class: 'pb-tw-replybar', onclick: () => compose(t, draw) }, av(me(), 26), h('span', {}, 'post your reply')) : null);
+      canTouch(t) ? h('button', { type: 'button', class: 'pb-tw-replybar', onclick: () => compose(t, draw) }, av(me(), 26), h('span', {}, 'post your reply')) : null);
     draw();
     return root;
   }
@@ -655,14 +887,16 @@ export function install(api) {
   const tb = d.tumblr;
   for (const p of tb.posts) { p.layers ||= []; p.tags ||= []; }
   let tbTab = 'home', tbBlog = null;
-  const blogOf = ref => ({ title: '', desc: '', color: who(ref).color, ...tb.blogs[keyOf(ref)] });
+  const tbAll = () => merged('tumblr', 'posts', tb.posts);
+  const mateBlog = ref => worldmates(char.id).find(m => m.id === ref?.id)?.fun?.phone?.tumblr?.blogs?.[keyOf(ref)];
+  const blogOf = ref => ({ title: '', desc: '', color: who(ref).color, ...(tb.blogs[keyOf(ref)] || mateBlog(ref)) });
   SCREENS.tumblr = () => {
     const root = h('div', { class: 'pb-tb' });
     const draw = () => fill(root,
       tbTab === 'blog' ? blog() : tbTab === 'explore' ? explore() : tbTab === 'activity' ? activity() : dash(),
       navBar([['home', 'home'], ['explore', 'compass'], ['add'], ['activity', 'bell'], ['blog', 'user']], tbTab, id => { if (id === 'add') return newPost(); tbTab = id; tbBlog = null; draw(); }, 'pb-tb-nav'));
     function dash() {
-      const list = [...tb.posts].reverse();
+      const list = tbAll();
       return h('div', { class: 'pb-tb-dash' },
         h('div', { class: 'pb-tb-top' }, h('button', { type: 'button', class: 'pb-tb-home', onclick: home }, h('b', { class: 'pb-tb-t' }, 't')), h('div', { class: 'pb-tb-tabs' }, h('b', { class: 'on' }, 'following'), h('b', {}, 'for you'))),
         h('div', { class: 'ph-scroll pb-tb-feed' }, list.length ? list.map(p => postEl(p, draw)) : empty('1f4dd', 'post', newPost)));
@@ -670,18 +904,19 @@ export function install(api) {
     function newPost() {
       if (!mine) return;
       form('new post', [
-        { key: 'kind', label: 'type', type: 'select', value: 'text', options: [['text', 'text'], ['photo', 'photo'], ['quote', 'quote']] },
+        { key: 'kind', label: 'type', type: 'select', value: 'text', options: [['text', 'text'], ['photo', 'photo'], ['video', 'video'], ['quote', 'quote']] },
         { key: 'who', label: 'blog', type: 'who', value: me() },
         { key: 'title', label: 'title', max: 100 },
         { key: 'text', label: 'text / quote', type: 'area', max: 1200 },
         { key: 'source', label: 'quote source', max: 60 },
+        { key: 'video', label: 'video', type: 'video' },
         { key: 'imageId', label: 'picture', type: 'pic' },
         { key: 'tags', label: 'tags', placeholder: 'tags, with, commas', max: 200 },
         { key: 'notes', label: 'notes', type: 'number', value: 0 },
       ], v => {
-        if (!v.title.trim() && !v.text.trim() && !v.imageId) return false;
+        if (!v.title.trim() && !v.text.trim() && !v.imageId && !v.video) return false;
         const ref = freshRef(v.who);
-        tb.posts.push({ id: uid(), who: ref, op: ref, content: { kind: v.kind, title: v.title.trim(), text: v.text.trim(), source: v.source.trim(), imageId: v.imageId }, layers: [], tags: tagsOf(v.tags), notes: v.notes, liked: false, at: Date.now() });
+        tb.posts.push({ id: uid(), who: ref, op: ref, content: { kind: v.kind, title: v.title.trim(), text: v.text.trim(), source: v.source.trim(), imageId: v.imageId, video: v.video || null }, layers: [], tags: tagsOf(v.tags), notes: v.notes, liked: false, at: Date.now() });
         save(); tbTab = 'home'; draw();
       }, { okLabel: 'post' });
     }
@@ -693,13 +928,14 @@ export function install(api) {
         { key: 'tags', label: 'tags', max: 200 },
       ], v => {
         const ref = freshRef(v.who);
-        p.notes = (p.notes || 0) + 1;
+        if (canTouch(p)) { p.notes = (p.notes || 0) + 1; if (owners.has(p)) saveFor(p); }
         tb.posts.push({ id: uid(), who: ref, op: p.op, content: { ...p.content }, layers: [...p.layers, ...(v.text.trim() ? [{ who: ref, text: v.text.trim() }] : [])], tags: tagsOf(v.tags), notes: p.notes, liked: false, at: Date.now(), reblog: true, from: p.who });
         save(); tbTab = 'home'; draw();
       }, { okLabel: 'reblog' });
     }
     function content(c) {
       return h('div', { class: 'pb-tb-content kind-' + c.kind },
+        c.video ? inlineVid(c.video, 'pb-tb-vid') : null,
         c.imageId ? pic(c.imageId, 'pb-tb-img') : null,
         c.title ? h('h4', {}, c.title) : null,
         c.kind === 'quote' ? h('blockquote', {}, `“${c.text}”`) : c.text ? h('p', {}, c.text) : null,
@@ -709,13 +945,20 @@ export function install(api) {
       return h('button', { type: 'button', class: 'pb-tb-blogname', onclick: () => { tbBlog = ref; tbTab = 'blog'; draw(); } }, handleOf(ref).replace(/_/g, '-'));
     }
     function postEl(p, redrawFn) {
-      const likeBtn = h('button', { type: 'button', class: 'pb-tb-act like' + (p.liked ? ' on' : ''), disabled: !mine, title: 'like', onclick: () => { p.liked = !p.liked; p.notes = Math.max(0, (p.notes || 0) + (p.liked ? 1 : -1)); save(); likeBtn.classList.toggle('on', p.liked); fill(likeBtn, ic('heart', { fill: p.liked })); notes.textContent = `${n(p.notes)} notes`; likeBtn.classList.remove('pop'); void likeBtn.offsetWidth; likeBtn.classList.add('pop'); } }, ic('heart', { fill: p.liked }));
+      p.layers ||= []; p.tags ||= [];
+      const likeBtn = h('button', { type: 'button', class: 'pb-tb-act like' + (p.liked ? ' on' : ''), disabled: !canTouch(p), title: 'like', onclick: () => { p.liked = !p.liked; p.notes = Math.max(0, (p.notes || 0) + (p.liked ? 1 : -1)); saveFor(p); likeBtn.classList.toggle('on', p.liked); fill(likeBtn, ic('heart', { fill: p.liked })); notes.textContent = `${n(p.notes)} notes`; likeBtn.classList.remove('pop'); void likeBtn.offsetWidth; likeBtn.classList.add('pop'); } }, ic('heart', { fill: p.liked }));
       const notes = h('span', { class: 'pb-tb-notes' }, `${n(p.notes || 0)} notes`);
       const reblogged = p.reblog || p.layers.length;
       return h('article', { class: 'pb-tb-post', style: { '--bc': blogOf(p.who).color } },
         h('header', { class: 'pb-tb-head' }, av(p.who, 30, 'pb-tb-av'), blogName(p.who),
           reblogged ? h('span', { class: 'pb-tb-rbfrom' }, ic('retweet'), blogName(p.from || p.op)) : null,
-          mine ? h('button', { type: 'button', class: 'pb-tb-more', title: 'delete', onclick: () => del('post', () => { tb.posts = tb.posts.filter(x => x !== p); if (p.content.imageId && !tb.posts.some(x => x.content.imageId === p.content.imageId)) dropImage(p.content.imageId); save(); redrawFn(); }) }, ic('dots')) : null),
+          canDel(p) ? h('button', { type: 'button', class: 'pb-tb-more', title: 'delete', onclick: () => del('post', () => {
+            tb.posts = tb.posts.filter(x => x !== p);
+            // reblogs share the original's picture/video, so only drop it once nothing uses it (here or on a worldmate's phone)
+            const used = id => [...tb.posts, ...mateItems('tumblr', 'posts')].some(x => x.content?.imageId === id || x.content?.video?.imageId === id);
+            if (p.content.imageId && !used(p.content.imageId)) dropImage(p.content.imageId);
+            if (p.content.video?.imageId && !used(p.content.video.imageId)) dropImage(p.content.video?.imageId);
+            save(); redrawFn(); }) }, ic('dots')) : null),
         reblogged
           ? h('div', { class: 'pb-tb-chain' },
             h('div', { class: 'pb-tb-layer' }, h('div', { class: 'pb-tb-lhead' }, av(p.op, 20, 'pb-tb-av'), blogName(p.op)), content(p.content)),
@@ -729,11 +972,11 @@ export function install(api) {
     function explore() {
       const q = h('input', { type: 'text', class: 'pb-tb-search', placeholder: 'search tumblr', maxLength: 60, oninput: () => paint() });
       const res = h('div', { class: 'ph-scroll pb-tb-feed' });
-      const allTags = [...new Set(tb.posts.flatMap(p => p.tags))];
+      const allTags = [...new Set(tbAll().flatMap(p => p.tags || []))];
       const paint = () => {
         const v = q.value.trim().toLowerCase().replace(/^#/, '');
         fill(res, !v ? h('div', { class: 'pb-tb-tagcloud' }, allTags.map(t => h('button', { type: 'button', onclick: () => { q.value = t; paint(); } }, '#' + t)))
-          : [...tb.posts].reverse().filter(p => p.tags.some(t => t.includes(v)) || (p.content.text + ' ' + p.content.title).toLowerCase().includes(v)).map(p => postEl(p, paint)));
+          : tbAll().filter(p => (p.tags || []).some(t => t.includes(v)) || (p.content.text + ' ' + p.content.title).toLowerCase().includes(v)).map(p => postEl(p, paint)));
       };
       paint();
       return h('div', { class: 'pb-tb-dash' }, h('div', { class: 'pb-tb-top' }, q), res);
@@ -748,7 +991,7 @@ export function install(api) {
       const ref = tbBlog || me();
       const b = blogOf(ref);
       const own = isMe(ref);
-      const list = [...tb.posts].reverse().filter(p => sameWho(p.who, ref));
+      const list = tbAll().filter(p => sameWho(p.who, ref));
       return h('div', { class: 'pb-tb-dash' },
         h('div', { class: 'ph-scroll pb-tb-feed' },
           h('div', { class: 'pb-tb-bloghead', style: { '--bc': b.color } },
@@ -778,19 +1021,23 @@ export function install(api) {
   for (const p of rd.posts) p.comments ||= [];
   let rdSort = 'best', rdSub = null, rdTab = 'home';
   const score = x => x.score + (x.vote || 0);
-  function voter(x, after, cls = '') {
+  function voter(x, after, cls = '', top = x) {
+    const touch = canTouch(top), sv = () => saveFor(top);
     const el = h('div', { class: 'pb-rd-vote ' + cls + (x.vote > 0 ? ' up' : x.vote < 0 ? ' down' : '') });
     const paint = () => {
       el.className = 'pb-rd-vote ' + cls + (x.vote > 0 ? ' up' : x.vote < 0 ? ' down' : '');
       fill(el,
-        h('button', { type: 'button', class: 'pb-rd-up', disabled: !mine, title: 'upvote', onclick: e => { e.stopPropagation(); x.vote = x.vote > 0 ? 0 : 1; save(); paint(); after?.(); } }, ic('up', { fill: x.vote > 0 })),
+        h('button', { type: 'button', class: 'pb-rd-up', disabled: !touch, title: 'upvote', onclick: e => { e.stopPropagation(); x.vote = x.vote > 0 ? 0 : 1; sv(); paint(); after?.(); } }, ic('up', { fill: x.vote > 0 })),
         h('b', {}, n(score(x))),
-        h('button', { type: 'button', class: 'pb-rd-down', disabled: !mine, title: 'downvote', onclick: e => { e.stopPropagation(); x.vote = x.vote < 0 ? 0 : -1; save(); paint(); after?.(); } }, ic('down', { fill: x.vote < 0 })));
+        h('button', { type: 'button', class: 'pb-rd-down', disabled: !touch, title: 'downvote', onclick: e => { e.stopPropagation(); x.vote = x.vote < 0 ? 0 : -1; sv(); paint(); after?.(); } }, ic('down', { fill: x.vote < 0 })));
     };
     paint();
     return el;
   }
-  const subOf = id => rd.subs.find(x => x.id === id);
+  const rdAll = () => merged('reddit', 'posts', rd.posts);
+  // communities are shared too: yours + the ones worldmates made
+  const allSubs = () => { const seen = new Set(rd.subs.map(x => x.id)); return [...rd.subs, ...worldmates(char.id).flatMap(m => m.fun?.phone?.reddit?.subs || []).filter(x => x?.id && !seen.has(x.id) && seen.add(x.id))]; };
+  const subOf = id => allSubs().find(x => x.id === id);
   const subName = id => 'r/' + (subOf(id)?.name || 'all');
   SCREENS.reddit = (params = {}) => {
     if (params.p) return rdPost(params.p);
@@ -799,7 +1046,7 @@ export function install(api) {
       rdTab === 'communities' ? communities() : rdTab === 'profile' ? profile() : feed(),
       navBar([['home', 'home', 'home'], ['communities', 'users', 'communities'], ['add', null, 'create'], ['profile', 'user', 'you']], rdTab, id => { if (id === 'add') return create(); rdTab = id; rdSub = id === 'home' ? rdSub : null; draw(); }, 'pb-rd-nav'));
     function feed() {
-      let list = rd.posts.filter(p => !rdSub || p.sub === rdSub);
+      let list = rdAll().filter(p => !rdSub || p.sub === rdSub);
       list = rdSort === 'new' ? [...list].sort((a, b) => b.at - a.at) : [...list].sort((a, b) => score(b) - score(a));
       const sub = rdSub && subOf(rdSub);
       const joined = sub && rd.joined.includes(sub.id);
@@ -816,7 +1063,7 @@ export function install(api) {
     function communities() {
       return h('div', { class: 'pb-rd-main' },
         h('div', { class: 'pb-rd-top' }, h('b', { class: 'pb-rd-ptitle' }, 'communities'), mine ? h('button', { type: 'button', class: 'pb-ib', title: 'create a community', onclick: newSub }, ic('plus')) : null),
-        h('div', { class: 'ph-scroll pb-rd-feed' }, rd.subs.length ? rd.subs.map(sb => h('button', { type: 'button', class: 'pb-rd-subrow', onclick: () => { rdSub = sb.id; rdTab = 'home'; draw(); } },
+        h('div', { class: 'ph-scroll pb-rd-feed' }, allSubs().length ? allSubs().map(sb => h('button', { type: 'button', class: 'pb-rd-subrow', onclick: () => { rdSub = sb.id; rdTab = 'home'; draw(); } },
           h('span', { class: 'pb-rd-sicon', style: { '--c': sb.color } }, 'r/'), h('div', {}, h('b', {}, 'r/' + sb.name), h('span', {}, `${n(sb.members)} members`)),
           rd.joined.includes(sb.id) ? h('em', {}, 'joined') : null)) : empty('1f47d', 'create a community', newSub)));
     }
@@ -837,17 +1084,19 @@ export function install(api) {
     }
     function create() {
       if (!mine) return;
-      if (!rd.subs.length) return newSub(() => { draw(); create(); });
+      const subs = allSubs();
+      if (!subs.length) return newSub(() => { draw(); create(); });
       form('create post', [
-        { key: 'sub', label: 'community', type: 'select', value: rdSub || rd.subs[0].id, options: rd.subs.map(x => [x.id, 'r/' + x.name]) },
+        { key: 'sub', label: 'community', type: 'select', value: rdSub || subs[0].id, options: subs.map(x => [x.id, 'r/' + x.name]) },
         { key: 'who', label: 'posted by', type: 'who', value: me() },
         { key: 'title', label: 'title', focus: true, max: 300 },
         { key: 'text', label: 'body text', type: 'area', max: 2000 },
+        { key: 'video', label: 'video', type: 'video' },
         { key: 'imageId', label: 'picture', type: 'pic' },
         { key: 'score', label: 'upvotes', type: 'number', value: 1 },
       ], v => {
         if (!v.title.trim()) return false;
-        rd.posts.push({ id: uid(), sub: v.sub, who: freshRef(v.who), title: v.title.trim(), text: v.text.trim(), imageId: v.imageId, score: v.score, vote: 0, comments: [], at: Date.now() });
+        rd.posts.push({ id: uid(), sub: v.sub, who: freshRef(v.who), title: v.title.trim(), text: v.text.trim(), imageId: v.imageId, video: v.video || null, score: v.score, vote: 0, comments: [], at: Date.now() });
         save(); rdTab = 'home'; draw();
       }, { okLabel: 'post' });
     }
@@ -868,13 +1117,14 @@ export function install(api) {
     const count = (list) => list.reduce((a, c) => a + 1 + count(c.replies || []), 0);
     return h('div', { class: 'pb-rd-post', onclick: e => { if (!e.target.closest('button')) show('reddit', { p: p.id }); } },
       h('div', { class: 'pb-rd-ptop' }, h('span', { class: 'pb-rd-sicon sm', style: { '--c': subOf(p.sub)?.color || '#ff4500' } }, 'r/'), h('b', {}, subName(p.sub)), h('span', {}, `· ${shortAgo(p.at)}`),
-        mine ? h('button', { type: 'button', class: 'pb-ib sm pb-rd-pdel', title: 'delete', onclick: () => del('post', () => { rd.posts = rd.posts.filter(x => x !== p); dropImage(p.imageId); save(); redrawFn(); }) }, ic('dots')) : null),
+        canDel(p) ? h('button', { type: 'button', class: 'pb-ib sm pb-rd-pdel', title: 'delete', onclick: () => del('post', () => { rd.posts = rd.posts.filter(x => x !== p); dropImage(p.imageId); dropImage(p.video?.imageId); save(); redrawFn(); }) }, ic('dots')) : null),
       h('h4', {}, p.title),
-      p.imageId ? pic(p.imageId, 'pb-rd-img') : p.text ? h('p', { class: 'pb-rd-text' }, p.text) : null,
-      h('div', { class: 'pb-rd-bar' }, voter(p), h('span', { class: 'pb-rd-pill' }, ic('comment'), n(count(p.comments))), h('span', { class: 'pb-rd-pill' }, ic('share'), 'share')));
+      p.video ? inlineVid(p.video, 'pb-rd-vid') : p.imageId ? pic(p.imageId, 'pb-rd-img') : p.text ? h('p', { class: 'pb-rd-text' }, p.text) : null,
+      h('div', { class: 'pb-rd-bar' }, voter(p), h('span', { class: 'pb-rd-pill' }, ic('comment'), n(count(p.comments || []))), h('span', { class: 'pb-rd-pill' }, ic('share'), 'share')));
   }
   function rdPost(id) {
-    const p = rd.posts.find(x => x.id === id);
+    const p = rdAll().find(x => x.id === id);
+    if (p) p.comments ||= [];
     if (!p) return SCREENS.reddit({});
     const root = h('div', { class: 'pb-rd pb-rd-thread' });
     const draw = () => fill(root,
@@ -883,16 +1133,17 @@ export function install(api) {
         h('div', { class: 'pb-rd-post big' },
           h('div', { class: 'pb-rd-ptop' }, h('b', {}, subName(p.sub)), h('span', {}, `· u/${handleOf(p.who)} · ${shortAgo(p.at)}`)),
           h('h4', {}, p.title),
+          p.video ? inlineVid(p.video, 'pb-rd-vid') : null,
           p.imageId ? pic(p.imageId, 'pb-rd-img') : null,
           p.text ? h('p', { class: 'pb-rd-text full' }, p.text) : null,
-          h('div', { class: 'pb-rd-bar' }, voter(p), mine ? h('button', { type: 'button', class: 'pb-rd-pill', onclick: () => reply(p.comments) }, ic('comment'), 'reply') : null)),
+          h('div', { class: 'pb-rd-bar' }, voter(p), canTouch(p) ? h('button', { type: 'button', class: 'pb-rd-pill', onclick: () => reply(p.comments) }, ic('comment'), 'reply') : null)),
         h('div', { class: 'pb-rd-cmts' }, p.comments.length ? p.comments.map(c => cmt(c, p.comments, 0)) : h('div', { class: 'pb-cmt-empty' }, 'no comments yet'))),
-      mine ? h('button', { type: 'button', class: 'pb-tw-replybar pb-rd-addc', onclick: () => reply(p.comments) }, h('span', {}, 'join the conversation')) : null);
+      canTouch(p) ? h('button', { type: 'button', class: 'pb-tw-replybar pb-rd-addc', onclick: () => reply(p.comments) }, h('span', {}, 'join the conversation')) : null);
     function reply(list) {
       form('comment', [{ key: 'who', label: 'as', type: 'who', value: me() }, { key: 'text', label: 'comment', type: 'area', focus: true, max: 1000 }, { key: 'score', label: 'upvotes', type: 'number', value: 1 }], v => {
         if (!v.text.trim()) return false;
         list.push({ id: uid(), who: freshRef(v.who), text: v.text.trim(), score: v.score, vote: 0, replies: [], at: Date.now() });
-        save(); draw();
+        saveFor(p); draw();
       }, { okLabel: 'comment' });
     }
     function cmt(c, list, depth) {
@@ -901,9 +1152,9 @@ export function install(api) {
         h('div', { class: 'pb-rd-chead' }, av(c.who, 22), h('b', {}, handleOf(c.who)), isSameOp(c) ? h('em', {}, 'op') : null, h('span', {}, `· ${shortAgo(c.at)}`)),
         h('p', { class: 'pb-rd-ctext' }, c.text),
         h('div', { class: 'pb-rd-cbar' },
-          mine ? h('button', { type: 'button', class: 'pb-rd-cbtn', onclick: () => reply(c.replies) }, ic('comment'), 'reply') : null,
-          voter(c, null, 'sm'),
-          mine ? h('button', { type: 'button', class: 'pb-rd-cbtn', title: 'delete', onclick: () => { list.splice(list.indexOf(c), 1); save(); draw(); } }, ic('trash')) : null),
+          canTouch(p) ? h('button', { type: 'button', class: 'pb-rd-cbtn', onclick: () => reply(c.replies) }, ic('comment'), 'reply') : null,
+          voter(c, null, 'sm', p),
+          canDel(p) ? h('button', { type: 'button', class: 'pb-rd-cbtn', title: 'delete', onclick: () => { list.splice(list.indexOf(c), 1); save(); draw(); } }, ic('trash')) : null),
         c.replies.length ? h('div', { class: 'pb-rd-kids' }, c.replies.map(r => cmt(r, c.replies, depth + 1))) : null);
     }
     const isSameOp = c => sameWho(c.who, p.who);
@@ -917,14 +1168,16 @@ export function install(api) {
   const tc = d.twitch;
   for (const st of tc.streams) st.chat ||= [];
   const CHAT_COLORS = ['#ff4f4f', '#2ecc71', '#5aa9ff', '#ff7ad9', '#ffd84d', '#b18cff', '#ff9b3d', '#3de0d0', '#9be564', '#ff6b8b'];
+  const tcAll = () => merged('twitch', 'streams', tc.streams);
   const FILLER = ['lol', 'W', 'LETS GO', 'omg', 'hiii', 'lmaooo', 'no way', 'chat is this real', 'W stream', 'clip that', 'HAHAHA', 'real'];
   SCREENS.twitch = (params = {}, view) => {
     if (params.s) return stream(params.s, view);
     let tab = params.tab || 'following';
     const root = h('div', { class: 'pb-tc' });
     const draw = () => {
-      const live = tc.streams.filter(x => x.live), off = tc.streams.filter(x => !x.live);
-      const games = [...new Set(tc.streams.map(x => x.game).filter(Boolean))];
+      const all = tcAll();
+      const live = all.filter(x => x.live), off = all.filter(x => !x.live);
+      const games = [...new Set(all.map(x => x.game).filter(Boolean))];
       fill(root,
         h('div', { class: 'pb-tc-top' }, h('button', { type: 'button', class: 'pb-tc-home', onclick: home }, marks.twitch()), h('b', {}, tab === 'following' ? 'following' : 'browse'),
           mine ? h('button', { type: 'button', class: 'pb-tc-golive', onclick: goLive }, 'go live') : h('span')),
@@ -935,15 +1188,15 @@ export function install(api) {
               live.map(chanRow),
               off.length ? h('div', { class: 'pb-tc-sect' }, 'offline') : null,
               off.map(chanRow),
-              !tc.streams.length ? empty('1f47e', 'go live', goLive) : null,
+              !all.length ? empty('1f47e', 'go live', goLive) : null,
             ]
             : h('div', { class: 'pb-tc-games' }, games.length ? games.map((g, i) => h('div', { class: 'pb-tc-game', style: { '--h': (hashStr(g) % 360) + 'deg' } },
-              h('div', { class: 'pb-tc-box' }, h('b', {}, g)), h('b', {}, g), h('span', {}, `${n(tc.streams.filter(x => x.game === g && x.live).reduce((a, x) => a + x.viewers, 0))} viewers`))) : h('div', { class: 'pb-cmt-empty light' }, 'nothing here yet'))),
+              h('div', { class: 'pb-tc-box' }, h('b', {}, g)), h('b', {}, g), h('span', {}, `${n(all.filter(x => x.game === g && x.live).reduce((a, x) => a + x.viewers, 0))} viewers`))) : h('div', { class: 'pb-cmt-empty light' }, 'nothing here yet'))),
         navBar([['following', 'heart', 'following'], ['browse', 'compass', 'browse']], tab, id => { tab = id; draw(); }, 'pb-tc-nav'));
     };
     function chanRow(st) {
       return h('button', { type: 'button', class: 'pb-tc-row' + (st.live ? ' live' : ''), onclick: () => show('twitch', { s: st.id }) },
-        h('div', { class: 'pb-tc-rowpic' }, st.imageId ? pic(st.imageId) : av(st.who, 60), st.live ? h('span', { class: 'pb-tc-badge' }, 'LIVE') : null, st.live ? h('span', { class: 'pb-tc-vc' }, `${n(st.viewers)} viewers`) : null),
+        h('div', { class: 'pb-tc-rowpic' }, st.imageId ? pic(st.imageId) : st.video ? still(st.video) : av(st.who, 60), st.live ? h('span', { class: 'pb-tc-badge' }, 'LIVE') : null, st.live ? h('span', { class: 'pb-tc-vc' }, `${n(st.viewers)} viewers`) : null),
         h('div', { class: 'pb-tc-rowtxt' }, h('div', { class: 'pb-tc-rowname' }, av(st.who, 22, st.live ? 'pb-tc-ring' : ''), h('b', {}, who(st.who).name)), h('span', {}, st.title || 'untitled stream'), st.game ? h('em', {}, st.game) : null));
     }
     function goLive() {
@@ -952,11 +1205,12 @@ export function install(api) {
         { key: 'who', label: 'streamer', type: 'who', value: me() },
         { key: 'title', label: 'stream title', focus: true, max: 140 },
         { key: 'game', label: 'category', placeholder: 'just chatting', max: 40 },
+        { key: 'video', label: 'stream video', type: 'video' },
         { key: 'imageId', label: 'stream picture', type: 'pic' },
         { key: 'viewers', label: 'viewers', type: 'number', value: 1337 },
         { key: 'live', label: 'live now', type: 'check', value: true },
       ], v => {
-        tc.streams.push({ id: uid(), who: freshRef(v.who), title: v.title.trim(), game: v.game.trim() || 'just chatting', imageId: v.imageId, viewers: v.viewers, live: v.live, chat: [], at: Date.now() });
+        tc.streams.push({ id: uid(), who: freshRef(v.who), title: v.title.trim(), game: v.game.trim() || 'just chatting', imageId: v.imageId, video: v.video || null, viewers: v.viewers, live: v.live, chat: [], at: Date.now() });
         save(); draw();
       }, { okLabel: 'save' });
     }
@@ -964,8 +1218,10 @@ export function install(api) {
     return root;
   };
   function stream(id, view) {
-    const st = tc.streams.find(x => x.id === id);
+    const st = tcAll().find(x => x.id === id);
     if (!st) return SCREENS.twitch({});
+    st.chat ||= [];
+    const touch = canTouch(st);
     let viewers = st.viewers, fast = false;
     const vc = h('b');
     const chat = h('div', { class: 'ph-scroll pb-tc-chat' });
@@ -980,7 +1236,7 @@ export function install(api) {
       st.chat.push({ id: uid(), who: freshRef(as.get()), text, at: Date.now() });
       if (st.chat.length > 200) st.chat.shift();
       input.value = '';
-      save();
+      saveFor(st);
       chat.append(line(st.chat.at(-1)));
       chat.scrollTop = chat.scrollHeight;
     }
@@ -1002,12 +1258,15 @@ export function install(api) {
     const followBtn = h('button', { type: 'button', class: 'pb-tc-follow', title: 'follow', disabled: !mine, onclick: () => { tc.follows = followed() ? tc.follows.filter(x => x !== st.id) : [...tc.follows, st.id]; save(); paintF(); } });
     const paintF = () => { fill(followBtn, ic('heart', { fill: followed() })); followBtn.classList.toggle('on', followed()); };
     paintF();
-    const subBtn = h('button', { type: 'button', class: 'pb-tc-sub', disabled: !mine, onclick: () => { st.subbed = !st.subbed; save(); subBtn.textContent = st.subbed ? 'subscribed' : 'subscribe'; subBtn.classList.toggle('on', !!st.subbed); } }, st.subbed ? 'subscribed' : 'subscribe');
+    const subBtn = h('button', { type: 'button', class: 'pb-tc-sub', disabled: !touch, onclick: () => { st.subbed = !st.subbed; saveFor(st); subBtn.textContent = st.subbed ? 'subscribed' : 'subscribe'; subBtn.classList.toggle('on', !!st.subbed); } }, st.subbed ? 'subscribed' : 'subscribe');
     subBtn.classList.toggle('on', !!st.subbed);
     const fastBtn = h('button', { type: 'button', class: 'pb-tc-fast', onclick: () => { fast = !fast; fastBtn.classList.toggle('on', fast); } }, 'fast chat');
     paintChat();
     return h('div', { class: 'pb-tc pb-tc-stream' },
-      h('div', { class: 'pb-tc-video' }, st.imageId ? pic(st.imageId, 'pb-tc-vimg') : h('div', { class: 'pb-tc-vblank', style: { '--c': who(st.who).color } }, av(st.who, 70)),
+      h('div', { class: 'pb-tc-video' + (st.video && st.live ? ' has-vid' : '') },
+        st.video && st.live ? vid(st.video, 'pb-tc-vvid', { autoplay: true, sound: true, loop: true, poster: st.imageId })
+          : st.imageId ? pic(st.imageId, 'pb-tc-vimg') : st.video ? still(st.video, 'pb-tc-vimg') : h('div', { class: 'pb-tc-vblank', style: { '--c': who(st.who).color } }, av(st.who, 70)),
+        st.video && st.live ? soundBtn('pb-tc-snd') : null,
         st.live ? h('span', { class: 'pb-tc-badge big' }, 'LIVE') : h('span', { class: 'pb-tc-badge off' }, 'offline'),
         st.live ? h('span', { class: 'pb-tc-vcount' }, s('svg', { viewBox: '0 0 24 24', class: 'pb-ic' }, s('path', { d: P.user[0], fill: 'currentColor' })), vc) : null,
         h('button', { type: 'button', class: 'pb-yt-pback', title: 'back', onclick: () => show('twitch', {}, 'pop') }, ic('back'))),
@@ -1016,11 +1275,11 @@ export function install(api) {
         h('div', { class: 'pb-tc-infotxt' }, h('b', {}, who(st.who).name), h('span', {}, st.title || 'untitled stream'), h('em', {}, st.game)),
         followBtn),
       h('div', { class: 'pb-tc-btnrow' }, subBtn, fastBtn,
-        mine ? h('button', { type: 'button', class: 'pb-tc-fast', onclick: () => { st.live = !st.live; save(); api.redraw(); } }, st.live ? 'end stream' : 'go live') : null,
-        mine ? h('button', { type: 'button', class: 'pb-tc-fast', title: 'delete', onclick: () => del('channel', () => { tc.streams = tc.streams.filter(x => x !== st); dropImage(st.imageId); save(); show('twitch', {}, 'pop'); }) }, ic('trash')) : null),
+        canDel(st) ? h('button', { type: 'button', class: 'pb-tc-fast', onclick: () => { st.live = !st.live; save(); api.redraw(); } }, st.live ? 'end stream' : 'go live') : null,
+        canDel(st) ? h('button', { type: 'button', class: 'pb-tc-fast', title: 'delete', onclick: () => del('channel', () => { tc.streams = tc.streams.filter(x => x !== st); dropImage(st.imageId); dropImage(st.video?.imageId); save(); show('twitch', {}, 'pop'); }) }, ic('trash')) : null),
       h('div', { class: 'pb-tc-chathead' }, 'stream chat'),
       chat,
-      mine ? h('div', { class: 'pb-tc-compose' }, as.el, input, h('button', { type: 'button', class: 'pb-tc-send', onclick: send }, 'chat')) : null);
+      touch ? h('div', { class: 'pb-tc-compose' }, as.el, input, h('button', { type: 'button', class: 'pb-tc-send', onclick: send }, 'chat')) : null);
   }
 
   // =====================================================================
@@ -1250,7 +1509,7 @@ export function install(api) {
             h('button', { type: 'button', class: 'pb-nf-pf', title: 'switch profiles', onclick: () => { nfWho = null; api.redraw(); } }, av(nfWho, 26, 'pb-nf-sq'))),
           h('div', { class: 'pb-chips dark' }, [['all', 'all'], ['show', 'shows'], ['movie', 'movies'], ['mylist', 'my list']].map(([v, l]) => h('button', { type: 'button', class: 'pb-chip' + (nfFilter === v ? ' on' : ''), onclick: () => { nfFilter = v; draw(); } }, l))),
           hero ? h('div', { class: 'pb-nf-hero', onclick: e => { if (!e.target.closest('button')) show('netflix', { show: hero.id }); } },
-            poster(hero, 'hero'),
+            poster(hero, 'hero', { play: true }),
             h('div', { class: 'pb-nf-herobtns' },
               h('button', { type: 'button', class: 'pb-nf-play', onclick: () => show('netflix', { show: hero.id, play: 1 }) }, ic('play', { fill: true }), 'play'),
               h('button', { type: 'button', class: 'pb-nf-mylist', disabled: !mine, onclick: () => { hero.mylist = !hero.mylist; save(); draw(); } }, ic(hero.mylist ? 'check' : 'plus'), 'my list'))) : empty('1f37f', 'add a show', add),
@@ -1267,15 +1526,24 @@ export function install(api) {
     draw();
     return root;
   };
-  function poster(x, cls = '') {
-    return h('div', { class: 'pb-nf-poster ' + cls, style: { '--h': (hashStr(x.title) % 360) + 'deg' } },
-      x.imageId ? pic(x.imageId) : null, h('span', { class: 'pb-nf-n' }, 'N'), h('b', { class: 'pb-nf-ptitle' }, x.title));
+  // play: the trailer autoplays muted over the poster, like the billboard on real netflix
+  function poster(x, cls = '', { play = false } = {}) {
+    let layer = null;
+    if (x.video && play) {
+      const v = vid(x.video, 'pb-nf-tvid', { autoplay: true, loop: true });
+      const mute = h('button', { type: 'button', class: 'pb-nf-mute', title: 'sound', onclick: e => { e.stopPropagation(); v.muted = !v.muted; fill(mute, ic(v.muted ? 'mute' : 'vol')); } }, ic('mute'));
+      layer = h('div', { class: 'pb-nf-trailer' }, v, mute);
+      v.addEventListener('playing', () => layer.classList.add('on'));
+    }
+    return h('div', { class: 'pb-nf-poster ' + cls + (layer ? ' has-trailer' : ''), style: { '--h': (hashStr(x.title) % 360) + 'deg' } },
+      x.imageId ? pic(x.imageId) : x.video ? still(x.video, 'pb-nf-still') : null, layer, h('span', { class: 'pb-nf-n' }, 'N'), h('b', { class: 'pb-nf-ptitle' }, x.title));
   }
   function nfForm(x, after) {
     if (!mine) return;
     form(x ? 'edit' : 'add a show', [
       { key: 'title', label: 'title', value: x?.title || '', focus: true, max: 60 },
       { key: 'imageId', label: 'poster', type: 'pic', value: x?.imageId || null },
+      { key: 'video', label: 'trailer / episode', type: 'video', value: x?.video || null },
       { key: 'kind', label: 'type', type: 'select', value: x?.kind || 'show', options: [['show', 'show'], ['movie', 'movie']] },
       { key: 'year', label: 'year', value: x?.year || String(new Date().getFullYear()), max: 4 },
       { key: 'seasons', label: 'seasons / length', value: x?.seasons || '1 season', max: 20 },
@@ -1284,7 +1552,7 @@ export function install(api) {
       { key: 'mylist', label: 'in my list', type: 'check', value: x?.mylist ?? false },
     ], v => {
       if (!v.title.trim()) return false;
-      const data = { title: v.title.trim(), imageId: v.imageId, kind: v.kind, year: v.year.trim(), seasons: v.seasons.trim(), desc: v.desc.trim(), progress: Math.max(0, Math.min(100, v.progress)), mylist: v.mylist };
+      const data = { title: v.title.trim(), imageId: v.imageId, video: v.video || null, kind: v.kind, year: v.year.trim(), seasons: v.seasons.trim(), desc: v.desc.trim(), progress: Math.max(0, Math.min(100, v.progress)), mylist: v.mylist };
       if (x) Object.assign(x, data); else nf.shows.push({ id: uid(), ...data, at: Date.now() });
       save(); after();
     }, { okLabel: x ? 'save' : 'add' });
@@ -1303,7 +1571,7 @@ export function install(api) {
     let playing = startPlaying;
     const draw = () => fill(root,
       h('div', { class: 'ph-scroll pb-nf-body' },
-        h('div', { class: 'pb-nf-back' }, poster(x, 'wide'), h('button', { type: 'button', class: 'pb-yt-pback', title: 'back', onclick: () => show('netflix', {}, 'pop') }, ic('back'))),
+        h('div', { class: 'pb-nf-back' }, poster(x, 'wide', { play: !playing }), h('button', { type: 'button', class: 'pb-yt-pback', title: 'back', onclick: () => show('netflix', {}, 'pop') }, ic('back'))),
         h('div', { class: 'pb-nf-info' },
           h('h3', {}, x.title),
           h('div', { class: 'pb-nf-meta' }, h('b', {}, `${90 + hashStr(x.title) % 10}% match`), h('span', {}, x.year), h('em', {}, '13+'), h('span', {}, x.seasons), h('em', {}, 'HD')),
@@ -1314,12 +1582,13 @@ export function install(api) {
             h('button', { type: 'button', disabled: !mine, onclick: () => { x.mylist = !x.mylist; save(); draw(); } }, ic(x.mylist ? 'check' : 'plus'), 'my list'),
             h('button', { type: 'button', disabled: !mine, onclick: () => { x.rated = !x.rated; save(); draw(); } }, ic('thumb', { cls: x.rated ? 'on' : '' }), 'rate'),
             mine ? h('button', { type: 'button', onclick: () => nfForm(x, draw) }, ic('edit'), 'edit') : null,
-            mine ? h('button', { type: 'button', onclick: () => del('show', () => { nf.shows = nf.shows.filter(y => y !== x); dropImage(x.imageId); save(); show('netflix', {}, 'pop'); }) }, ic('trash'), 'delete') : null),
+            mine ? h('button', { type: 'button', onclick: () => del('show', () => { nf.shows = nf.shows.filter(y => y !== x); dropImage(x.imageId); dropImage(x.video?.imageId); save(); show('netflix', {}, 'pop'); }) }, ic('trash'), 'delete') : null),
           x.kind === 'show' ? h('div', { class: 'pb-nf-eps' }, h('b', { class: 'pb-nf-rowt' }, 'episodes'),
             Array.from({ length: Math.min(8, (parseInt(x.seasons, 10) || 1) * 4) }, (_, i) => h('div', { class: 'pb-nf-ep' }, poster(x, 'ep'), h('div', {}, h('b', {}, `${i + 1}. episode ${i + 1}`), h('span', {}, `${40 + hashStr(x.title + i) % 20}m`))))) : null)),
       playing ? player() : null);
     function watchIt() { playing = true; draw(); }
     function player() {
+      if (x.video) return realPlayer();
       const bar = h('i');
       let p = x.progress >= 100 ? 0 : x.progress;
       const el = h('div', { class: 'pb-nf-player' },
@@ -1331,6 +1600,36 @@ export function install(api) {
       const iv = setInterval(() => { if (!el.isConnected) return clearInterval(iv); p = Math.min(100, p + .5); bar.style.width = p + '%'; }, 300);
       bar.style.width = p + '%';
       api.onLeave(() => { clearInterval(iv); if (mine && playing) { x.progress = Math.round(p); save(); } });
+      return el;
+    }
+    // the real video, full phone, netflix's controls
+    function realPlayer() {
+      const v = vid(x.video, 'pb-nf-pvid', { autoplay: true, sound: true, loop: false });
+      const start = x.progress > 0 && x.progress < 100 ? x.progress / 100 : 0;
+      if (start) v.addEventListener('loadedmetadata', () => { if (Number.isFinite(v.duration)) v.currentTime = start * v.duration; }, { once: true });
+      const dur = () => (Number.isFinite(v.duration) && v.duration ? v.duration : x.video.dur || 0);
+      const left = h('span', { class: 'pb-nf-left' });
+      const pp = h('button', { type: 'button', class: 'pb-nf-pp', title: 'play' });
+      const paint = () => { fill(pp, ic(v.paused ? 'play' : 'pause', { fill: true })); pp.title = v.paused ? 'play' : 'pause'; };
+      let done = false, hideT = 0;
+      const finish = () => { if (done) return; done = true; v.pause(); if (mine) { x.progress = v.ended ? 100 : Math.round(dur() ? Math.min(100, v.currentTime / dur() * 100) : 0); save(); } };
+      const showUi = () => { el.classList.remove('hide'); clearTimeout(hideT); hideT = setTimeout(() => { if (!v.paused) el.classList.add('hide'); }, 3000); };
+      const skip = sec => { v.currentTime = Math.max(0, Math.min(dur(), v.currentTime + sec)); showUi(); };
+      const el = h('div', { class: 'pb-nf-player real' }, v,
+        h('div', { class: 'pb-nf-pui real' },
+          h('div', { class: 'pb-nf-ptop' }, h('span'), h('b', {}, x.title), h('button', { type: 'button', class: 'pb-nf-pclose', title: 'close', onclick: e => { e.stopPropagation(); finish(); playing = false; draw(); } }, ic('x'))),
+          h('div', { class: 'pb-nf-pmid' },
+            h('button', { type: 'button', class: 'pb-nf-skip', title: 'back 10', onclick: e => { e.stopPropagation(); skip(-10); } }, ic('rew'), h('i', {}, '10')),
+            pp,
+            h('button', { type: 'button', class: 'pb-nf-skip', title: 'forward 10', onclick: e => { e.stopPropagation(); skip(10); } }, ic('fwd'), h('i', {}, '10'))),
+          h('div', { class: 'pb-nf-pbot' }, scrubber(v, 'pb-nf-scrub', (c, d) => { left.textContent = clock(Math.max(0, d - c)); }, x.video.dur), left)));
+      pp.onclick = e => { e.stopPropagation(); if (v.paused) { if (v.ended) v.currentTime = 0; v.playNow(); } else v.pause(); showUi(); };
+      el.addEventListener('click', e => { if (e.target.closest('button, .pb-scrub')) return; if (el.classList.contains('hide')) showUi(); else if (!v.paused) { el.classList.add('hide'); clearTimeout(hideT); } });
+      v.addEventListener('play', () => { paint(); showUi(); });
+      v.addEventListener('pause', () => { paint(); el.classList.remove('hide'); });
+      v.addEventListener('ended', () => { if (mine) { x.progress = 100; save(); } });
+      api.onLeave(finish);
+      paint();
       return el;
     }
     draw();

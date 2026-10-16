@@ -572,3 +572,81 @@
 /* headings use the app's font, not the site's display font */
 .ph-screen :is(.pa-pn, .pa-dc, .pa-fb, .pa-sc, .pa-wa, .pa-br, .pa-th) :is(h2, h3) { font-family: inherit; letter-spacing: -.01em; }
 .ph-screen .pa-br-word { font-family: Inter, -apple-system, 'Segoe UI', system-ui, sans-serif; }
+
+/* ---- videos ---- */
+.ph-screen .pa-vbox { position: relative; width: 100%; background: #000; overflow: hidden; }
+.ph-screen .pa-vbox > .ph-vid { position: absolute; inset: 0; }
+.ph-screen .pa-vsnd { right: 10px; bottom: 10px; width: 28px; height: 28px; font-size: 12px; }
+.ph-screen .pa-fb-vid { min-height: 180px; max-height: 420px; }
+.ph-screen .pa-still { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.pa-form-pics video { height: 120px; width: auto; border-radius: 12px; flex: none; object-fit: cover; }
+.pa-sc-sendprev video { width: 100%; height: 240px; max-height: 240px; object-fit: cover; grid-area: 1 / 1; }
+.ph-screen .pa-pin-img { position: relative; }
+.ph-screen .pa-pin-img video { position: absolute; inset: 0; }
+.ph-screen .pa-pin-dur { position: absolute; left: 8px; bottom: 8px; padding: 1px 6px; border-radius: 8px; background: rgba(0, 0, 0, .55); color: #fff; font-size: 11px; font-weight: 700; }
+.ph-screen .pa-pn-bigvid { position: relative; width: 100%; max-height: 480px; border-radius: 28px; overflow: hidden; background: #000; }
+.ph-screen .pa-pn-bigvid > .ph-vid { position: absolute; inset: 0; }
+.ph-screen .pa-pn-bigvid .pa-vsnd { right: 14px; bottom: 14px; }
+.ph-screen .pa-dc-vid { margin: 4px 0; max-width: 100%; width: 240px; border-radius: 8px; overflow: hidden; background: #000; }
+.ph-screen .pa-dc-vid video { display: block; width: 100%; height: auto; max-height: 260px; object-fit: contain; }
+
+/* full screen video feeds (facebook reels, snapchat spotlight) */
+.ph-screen .pa-dark-reels { position: relative; background: #000 !important; color: #fff; }
+.ph-screen:has(.ph-view:not(.leaving) .pa-dark-reels) .ph-status { color: #fff; }
+.ph-screen:has(.ph-view:not(.leaving) .pa-dark-reels) .ph-homebar { background: #fff; }
+.ph-screen .pa-reels-top { position: absolute; left: 0; right: 0; top: 44px; z-index: 3; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; padding: 0 6px; pointer-events: none; }
+.ph-screen .pa-reels-top > * { pointer-events: auto; justify-self: center; }
+.ph-screen .pa-reels-top b { justify-self: start; font-size: 20px; font-weight: 700; color: #fff; text-shadow: 0 1px 4px rgba(0, 0, 0, .45); }
+.ph-screen .pa-reels-top .pa-ibtn { color: #fff; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .5)); }
+.ph-screen .pa-reels { flex: 1; min-height: 0; overflow-y: auto; scroll-snap-type: y mandatory; scrollbar-width: none; overscroll-behavior: contain; margin-top: -46px; }
+.ph-screen .pa-reels::-webkit-scrollbar { display: none; }
+.ph-screen .pa-reel { position: relative; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; overflow: hidden; background: #000; }
+.ph-screen .pa-reel-vid { position: absolute; inset: 0; }
+.ph-screen .pa-reel-shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(rgba(0, 0, 0, .35), transparent 20%, transparent 58%, rgba(0, 0, 0, .65)); }
+.ph-screen .pa-reel-snd { right: 12px; top: 92px; width: 28px; height: 28px; font-size: 12px; }
+.ph-screen .pa-reel-rail { position: absolute; right: 6px; bottom: 18px; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.ph-screen .pa-reel-act { border: 0; background: none; padding: 0; min-width: 42px; display: flex; flex-direction: column; align-items: center; gap: 3px; color: #fff; font-size: 12px; font-weight: 600; text-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
+.ph-screen .pa-reel-act .pa-i { width: 28px; height: 28px; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .45)); }
+.ph-screen .pa-reel-act.on .pa-i { color: #ff3b5c; }
+.ph-screen .pa-reel-emo { font-size: 24px; line-height: 28px; height: 28px; display: grid; place-items: center; }
+.ph-screen .pa-reel-info { position: absolute; left: 12px; right: 64px; bottom: 18px; z-index: 2; display: flex; flex-direction: column; gap: 6px; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .55); }
+.ph-screen .pa-reel-who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ph-screen .pa-reel-who b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-screen .pa-reel-who .portrait { border: 0; }
+.ph-screen .pa-reel-follow { flex: none; border: 1px solid rgba(255, 255, 255, .8); border-radius: 8px; padding: 2px 9px; font-size: 12.5px; font-weight: 600; }
+.ph-screen .pa-reel-cap { margin: 0; font-size: 13.5px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.ph-screen .pa-reel-sub { font-size: 12px; opacity: .85; }
+.ph-screen .pa-reels-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: #fff; }
+.ph-screen .pa-reels-empty > .pa-i { width: 54px; height: 54px; opacity: .8; }
+
+/* snapchat */
+.ph-screen .pa-sc-timer .fg { animation-duration: var(--dur, 10s); }
+.ph-screen .pa-sc-bars i.now::after { animation-duration: var(--dur, 5s); }
+.ph-screen .pa-sc-snd { position: static; width: 30px; height: 30px; font-size: 13px; flex: none; }
+.ph-screen .pa-sc-view > video.pa-sc-full, .ph-screen .pa-wa-sview > video.pa-sc-full { background: #000; }
+.ph-screen .pa-sc-shape.vid.new, .ph-screen .pa-sc-shape.vid.sent { background: #9b55e8; }
+.ph-screen .pa-sc-shape.vid.got, .ph-screen .pa-sc-shape.vid.opened { border-color: #9b55e8; box-shadow: inset 0 0 0 2px #9b55e8; }
+.ph-screen .pa-sc-stat.vid.new em, .ph-screen .pa-sc-stat.vid.sent em { color: #9b55e8; }
+.ph-screen .pa-sc-tile video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ph-screen .pa-sc-tile > .pa-sc-tdur { position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; opacity: 1; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); z-index: 1; }
+.ph-screen .pa-sc-tdur .pa-i { width: 11px; height: 11px; }
+.pa-sc-spotico { width: 36px; height: 36px; border-radius: 50%; background: #fffc00; color: #000; display: grid; place-items: center; flex: none; }
+.pa-sc-spotico .pa-i { width: 20px; height: 20px; }
+.ph-screen .pa-sc-spot .pa-sc-nav { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; background: rgba(0, 0, 0, .85); border-top: 0; }
+.ph-screen .pa-sc-spot .pa-tab { color: rgba(255, 255, 255, .6); }
+.ph-screen .pa-sc-spot .pa-tab.on { color: #fff; }
+.ph-screen .pa-sc-spot .pa-reel-rail, .ph-screen .pa-sc-spot .pa-reel-info { bottom: 90px; }
+.ph-screen .pa-sc-spot .pa-reels-top b { justify-self: center; }
+.ph-screen .pa-sc-spotbtn { border: 0; border-radius: 20px; padding: 9px 18px; background: #fffc00; color: #000 !important; font-weight: 700 !important; }
+
+/* whatsapp video message */
+.ph-screen .pa-wa-vid { position: relative; width: 220px; max-width: 100%; aspect-ratio: 4 / 5; max-height: 280px; border-radius: 6px; overflow: hidden; background: #000; margin: -1px -4px 4px -5px; cursor: pointer; }
+.ph-screen .pa-wa-vid > video { position: absolute; inset: 0; }
+.ph-screen .pa-wa-vplay { position: absolute; left: 50%; top: 50%; translate: -50% -50%; width: 50px; height: 50px; border-radius: 50%; background: rgba(0, 0, 0, .5); color: #fff; display: grid; place-items: center; pointer-events: none; transition: opacity .15s; }
+.ph-screen .pa-wa-vplay .pa-i { width: 24px; height: 24px; margin-left: 3px; }
+.ph-screen .pa-wa-vdur { position: absolute; left: 8px; bottom: 6px; display: flex; align-items: center; gap: 4px; color: #fff; font-size: 12px; text-shadow: 0 1px 3px rgba(0, 0, 0, .7); pointer-events: none; }
+.ph-screen .pa-wa-vdur .pa-i { width: 15px; height: 15px; }
+.ph-screen .pa-wa-vid.playing .pa-wa-vplay, .ph-screen .pa-wa-vid.playing .pa-wa-vdur { opacity: 0; }
+.ph-screen .pa-wa-rsub .pa-i { width: 15px; height: 15px; vertical-align: -3px; }
+.ph-screen .pa-fb-whobtn { border: 0; background: none; padding: 0; display: grid; }
+.ph-screen .pa-fb-phead b, .ph-screen .pa-th-meta b { cursor: pointer; }

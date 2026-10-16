@@ -665,3 +665,38 @@ button.ph-row:active { background: var(--line); }
 @keyframes ph-dl-grey { 0% { filter: grayscale(1) brightness(.85); } 100% { filter: none; } }
 @keyframes ph-dl { from { --ph-dl: 0deg; } to { --ph-dl: 360deg; } }
 @keyframes ph-dl-out { to { opacity: 0; } }
+
+/* ---- videos (phone-bits.js vid) ---- */
+.ph-vid { display: block; width: 100%; height: 100%; object-fit: cover; background: #000; }
+.ph-vid-mark { position: absolute; left: 50%; top: 50%; translate: -50% -50%; z-index: 3; pointer-events: none; width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: rgba(0,0,0,.45); color: #fff; font-size: 24px; font-style: normal; opacity: 0; }
+.ph-vid-mark.show { animation: ph-vid-mark .7s ease-out; }
+@keyframes ph-vid-mark { 0% { opacity: 0; scale: .6; } 25% { opacity: 1; scale: 1; } 100% { opacity: 0; scale: 1.15; } }
+.ph-vid-sound { position: absolute; z-index: 4; width: 30px; height: 30px; border: 0; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff; font-size: 14px; display: grid; place-items: center; cursor: pointer; }
+.ph-vid-field { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ph-vid-field .ph-vid-prev { width: 120px; height: 160px; border-radius: 10px; flex: none; }
+
+/* ---- group chats ---- */
+.ph-gface { position: relative; flex: none; width: 44px; height: 44px; }
+.ph-gface.sm { width: 32px; height: 32px; }
+.ph-gface.lg { width: 64px; height: 64px; }
+.ph-gface .portrait { position: absolute; width: 64% !important; height: 64% !important; border: 2px solid var(--bg, #fff); }
+.ph-gface .portrait:first-child { left: 0; top: 0; }
+.ph-gface .portrait:nth-child(2) { right: 0; bottom: 0; }
+.ph-sender { font-size: 10.5px; color: var(--sub, #8e8e93); margin: 8px 0 1px 40px; }
+.ph-msg-row.grp { padding-left: 34px; }
+.ph-msg-face { position: absolute; left: 2px; bottom: 0; }
+.ph-msg-face .portrait { width: 26px; height: 26px; }
+.ph-msg-vid { display: block; width: 190px; max-height: 280px; border-radius: 16px; background: #000; object-fit: cover; }
+.ph-pick-people .who-pick-oc.on { outline: 3px solid var(--c); outline-offset: 2px; border-radius: 14px; }
+.ph-to-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 30px; margin-bottom: 8px; }
+.ph-to-label { font-size: 13px; opacity: .6; }
+.ph-to-chip { border: 0; border-radius: 99px; padding: 4px 10px; background: #0a84ff; color: #fff; font: inherit; font-size: 12.5px; cursor: pointer; }
+.ph-typed-add { display: flex; gap: 6px; }
+.ph-typed-add input { flex: 1; min-width: 0; }
+.ph-group-edit { display: flex; flex-direction: column; gap: 10px; margin-bottom: 6px; }
+.ph-group-pic { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ph-group-people { display: flex; flex-direction: column; gap: 6px; }
+.ph-group-person { display: flex; align-items: center; gap: 8px; }
+.ph-group-person span { flex: 1; }
+.ph-group-kick { border: 0; background: none; font-size: 18px; cursor: pointer; color: inherit; opacity: .6; }
+.ph-typing-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

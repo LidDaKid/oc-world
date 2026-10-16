@@ -3,8 +3,8 @@
 // a person ("ref") = { id: an oc id or null, name: what to call them }.
 // name is kept as a backup so it still reads right if that oc gets deleted.
 
-import { h, openModal, pickFiles, shrinkImage, toast, uid } from '../ui.js';
-import { store } from '../store.js';
+import { h, fill, openModal, pickFiles, shrinkImage, toast, uid } from '../ui.js';
+import { store, MAX_VIDEO } from '../store.js';
 import { portrait, nameOf, allOcs, ocById, worldmates } from './kit.js';
 import { cropAll } from '../crop.js';
 import { ctx as acctCtx, acctOfRef } from './phone-accounts.js';
@@ -98,6 +98,112 @@ export async function addPhotos(multiple = true, maxDim = 1400) {
 
 export const dropImage = id => { if (id) store.deleteImage(id); };
 
+// ---- videos ----
+// a video is saved like a picture (store.putImage) and kept as { imageId, dur, w, h } under a key like `video`
+// (the `imageId` inside is what backups + deleting look for). tests can hand one over as window.__testVideo.
+
+// pick a video; resolves with { imageId, dur, w, h } or null
+export async function addVideo(file = null) {
+  file ||= window.__testVideo || (await pickFiles('video/*', false))[0];
+  if (!file) return null;
+  const probe = document.createElement('video');
+  if (!file.type.startsWith('video/') || !probe.canPlayType(file.type)) { toast("that isn't a video this browser can play", 'bad'); return null; }
+  if (file.size > MAX_VIDEO) { toast(`too big (${MAX_VIDEO / 1e6} mb max)`, 'bad'); return null; }
+  const url = URL.createObjectURL(file);
+  const info = await new Promise(resolve => {
+    probe.preload = 'metadata';
+    probe.onloadedmetadata = () => resolve({ dur: Number.isFinite(probe.duration) ? probe.duration : 0, w: probe.videoWidth, h: probe.videoHeight });
+    probe.onerror = () => resolve(null);
+    probe.src = url;
+  });
+  URL.revokeObjectURL(url);
+  if (!info) { toast("couldn't read that video", 'bad'); return null; }
+  try {
+    return { imageId: await store.putImage(file), dur: Math.round(info.dur * 10) / 10, w: info.w, h: info.h };
+  } catch (err) {
+    console.error(err);
+    toast("couldn't save that video", 'bad');
+    return null;
+  }
+}
+
+// sound is one setting for every video on the phone, like the real apps (tap the speaker to flip it)
+export const videoSound = { on: true };
+const live = new Set(); // every video made here. ones that leave the page get paused so they don't keep playing
+setInterval(() => { for (const v of live) if (!v.isConnected) { v.pause(); live.delete(v); } }, 700);
+
+// a <video> for a saved video.
+//   autoplay: start right away     inView: play only while mostly on screen (feeds)
+//   sound: use the shared sound setting (otherwise always muted)     loop, controls, poster (an imageId)
+export function vid(video, cls = '', { autoplay = false, inView = false, sound = false, loop = true, controls = false, poster = null } = {}) {
+  const v = h('video', { class: 'ph-vid ' + cls, playsInline: true, loop, controls, preload: autoplay || inView ? 'auto' : 'metadata' });
+  v.muted = !(sound && videoSound.on);
+  v.setAttribute('playsinline', '');
+  live.add(v);
+  if (poster) store.imageURL(poster).then(url => { if (url) v.poster = url; });
+  let wantPlay = false; // asked to play before the file was loaded: play once it is
+  const play = () => {
+    if (!v.src) { wantPlay = true; return; }
+    v.muted = !(sound && videoSound.on);
+    const p = v.play();
+    p?.catch(() => { if (!v.muted) { v.muted = true; v.play().catch(() => {}); } });
+  };
+  v.playNow = play;
+  store.imageURL(video?.imageId).then(url => {
+    if (!url) return;
+    // #t=0.1 makes paused videos show their first frame instead of black
+    v.src = url + (autoplay || inView ? '' : '#t=0.1');
+    if (autoplay || wantPlay) play();
+  });
+  if (inView) {
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting && e.intersectionRatio >= 0.6) play(); else { wantPlay = false; v.pause(); } }, { threshold: [0, 0.6, 1] });
+    io.observe(v);
+  }
+  return v;
+}
+
+// tap to pause / play, with the little icon popping up in the middle like tiktok
+export function tapToPause(v, host = v.parentElement) {
+  const mark = h('i', { class: 'ph-vid-mark' });
+  host.append(mark);
+  v.addEventListener('click', e => {
+    e.stopPropagation();
+    if (v.paused) v.playNow(); else v.pause();
+    mark.textContent = v.paused ? '▶' : '❚❚';
+    mark.classList.remove('show'); void mark.offsetWidth; mark.classList.add('show');
+  });
+}
+
+// the speaker button that flips sound for every video on the phone
+export function soundBtn(cls = '') {
+  const b = h('button', { type: 'button', class: 'ph-vid-sound ' + cls, title: 'sound' });
+  const paint = () => { b.textContent = videoSound.on ? '🔊' : '🔇'; };
+  paint();
+  b.onclick = e => {
+    e.stopPropagation();
+    videoSound.on = !videoSound.on;
+    for (const v of live) if (v.isConnected && !v.paused) v.muted = !videoSound.on;
+    document.querySelectorAll('.ph-vid-sound').forEach(x => { x.textContent = videoSound.on ? '🔊' : '🔇'; });
+    paint();
+  };
+  return b;
+}
+
+// the "video" row for a form: preview + add / change / remove. onChange gets the new video or null
+export function videoField(value, onChange) {
+  let cur = value || null;
+  const box = h('div', { class: 'ph-vid-field' });
+  const paint = () => fill(box,
+    cur ? vid(cur, 'ph-vid-prev', { autoplay: true }) : null,
+    h('button', { type: 'button', class: 'btn ghost sm', onclick: async () => { const got = await addVideo(); if (got) { if (cur && cur !== value) dropImage(cur.imageId); cur = got; onChange(cur); paint(); } } }, cur ? 'change' : 'add video'),
+    cur ? h('button', { type: 'button', class: 'btn ghost sm', onclick: () => { if (cur !== value) dropImage(cur.imageId); cur = null; onChange(null); paint(); } }, 'remove') : null);
+  paint();
+  return box;
+}
+
+// "1:05" from seconds
+export const clock = sec => { sec = Math.max(0, Math.round(sec || 0)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
+
 // shorten big numbers like socials do: 12400 -> 12.4k
 export function bigNum(n) {
   n = Number(n) || 0;
@@ -154,7 +260,12 @@ export async function mirrorSend(fromChar, ref, m) {
   o.t.msgs.push(copy);
   o.t.msgs.sort((a, b) => a.at - b.at);
   store.save('char', o.other);
-  if (m.imageId) { copy.imageId = await copyImage(m.imageId); store.save('char', o.other); }
+  await copyMedia(m, copy, o.other);
+}
+async function copyMedia(m, copy, other) {
+  if (m.imageId) copy.imageId = await copyImage(m.imageId);
+  if (m.video?.imageId) copy.video = { ...m.video, imageId: await copyImage(m.video.imageId) };
+  if (m.imageId || m.video) store.save('char', other);
 }
 export function mirrorReact(fromChar, ref, id, react) {
   const o = otherThread(fromChar, ref, false);
@@ -169,6 +280,67 @@ export function mirrorDelete(fromChar, ref, ids) {
   const gone = o.t.msgs.filter(x => ids.includes(x.id));
   if (!gone.length) return;
   o.t.msgs = o.t.msgs.filter(x => !ids.includes(x.id));
-  gone.forEach(m => dropImage(m.imageId));
+  gone.forEach(m => { dropImage(m.imageId); dropImage(m.video?.imageId); });
   store.save('char', o.other);
+}
+
+// ---- group chats land on every member's phone too ----
+// a group thread = { id, group: { gid, name, imageId, members: [ref] }, who: { id: null, name }, msgs }
+// (gid is the same on everyone's copy). a message from someone else carries `by` (a ref).
+// from member X's side: what `fromChar` sent is from 'them' by fromChar, what X sent is from 'me'.
+function groupCopies(fromChar, t, make = true) {
+  if (!store.isMine(fromChar)) return [];
+  const mates = new Set(worldmates(fromChar.id).map(c => c.id));
+  const out = [];
+  for (const ref of t.group.members) {
+    const other = ref.id && mates.has(ref.id) ? store.char(ref.id) : null;
+    if (!other || !store.isMine(other)) continue;
+    other.fun ||= {};
+    const p = other.fun.phone ||= {};
+    p.threads ||= [];
+    const members = [{ id: fromChar.id, name: nameOf(fromChar) }, ...t.group.members.filter(x => x.id !== other.id).map(x => ({ id: x.id || null, name: x.name }))];
+    let ot = p.threads.find(x => x.group?.gid === t.group.gid);
+    if (!ot && !make) continue;
+    if (!ot) {
+      ot = { id: 't_' + uid(), group: { gid: t.group.gid, name: t.group.name, imageId: null, members }, who: { id: null, name: t.group.name }, msgs: [], read: true, typing: false, at: Date.now() };
+      p.threads.push(ot);
+    } else {
+      ot.group.name = t.group.name;
+      ot.who = { id: null, name: t.group.name };
+      ot.group.members = members;
+    }
+    out.push({ other, t: ot });
+  }
+  return out;
+}
+const seenBy = (fromChar, m, other) => (m.from === 'me' ? { from: 'them', by: { id: fromChar.id, name: nameOf(fromChar) } }
+  : m.by?.id === other.id ? { from: 'me' } : { from: 'them', by: m.by });
+export async function mirrorGroupSend(fromChar, t, m) {
+  for (const { other, t: ot } of groupCopies(fromChar, t)) {
+    if (ot.msgs.some(x => x.id === m.id)) continue;
+    const copy = { id: m.id, ...seenBy(fromChar, m, other), text: m.text, imageId: null, at: m.at, react: m.react || null };
+    ot.msgs.push(copy);
+    ot.msgs.sort((a, b) => a.at - b.at);
+    store.save('char', other);
+    copyMedia(m, copy, other);
+  }
+}
+// name / members changed: update everyone's copy
+export function mirrorGroupInfo(fromChar, t) {
+  for (const { other } of groupCopies(fromChar, t, false)) store.save('char', other);
+}
+export function mirrorGroupReact(fromChar, t, id, react) {
+  for (const { other, t: ot } of groupCopies(fromChar, t, false)) {
+    const m = ot.msgs.find(x => x.id === id);
+    if (m) { m.react = react; store.save('char', other); }
+  }
+}
+export function mirrorGroupDelete(fromChar, t, ids) {
+  for (const { other, t: ot } of groupCopies(fromChar, t, false)) {
+    const gone = ot.msgs.filter(x => ids.includes(x.id));
+    if (!gone.length) continue;
+    ot.msgs = ot.msgs.filter(x => !ids.includes(x.id));
+    gone.forEach(m => { dropImage(m.imageId); dropImage(m.video?.imageId); });
+    store.save('char', other);
+  }
 }

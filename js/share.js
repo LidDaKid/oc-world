@@ -54,9 +54,15 @@ async function bundle(char) {
 
   const images = [];
   const bufs = [];
+  const moodIds = new Set(keepVideo.map(m => m.imageId));
   for (const id of imageIdsIn([copy, others])) {
     const rec = await store.imageRecord(id);
     if (!rec) continue;
+    // phone videos share the same budget; past it they just don't come along
+    if (rec.type.startsWith('video/') && !moodIds.has(id)) {
+      if (videoBytes + rec.buf.byteLength > MAX_VIDEOS) continue;
+      videoBytes += rec.buf.byteLength;
+    }
     images.push({ id, type: rec.type, size: rec.buf.byteLength });
     bufs.push(new Uint8Array(rec.buf));
   }

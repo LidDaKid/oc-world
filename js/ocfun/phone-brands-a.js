@@ -2,11 +2,49 @@
 // see the plug-in notes at the top of phone.js. everything people post "as" someone else uses a ref
 // ({ id, name }) like the rest of the phone, so it still reads right if that oc gets renamed.
 
-import { h, s, fill, uid, openModal, confirmDialog, toast, swatches } from '../ui.js';
-import { pic, allOcs } from './kit.js';
+import { h, s, fill, uid, openModal, confirmDialog, toast, swatches, pickFiles, shrinkImage } from '../ui.js';
+import { store } from '../store.js';
+import { cropAll } from '../crop.js';
+import { pic, allOcs, worldmates } from './kit.js';
 // portrait/nameOf here show an oc as their account on the open app (see phone-accounts.js)
 import { portrait, nameOf, acctId, accountBox } from './phone-accounts.js';
-import { who, face, freshRef, pickWho, hm, hmA, dayLabel, ago, addPhotos, dropImage, bigNum, relLabel } from './phone-bits.js';
+import { who, face, freshRef, pickWho, hm, hmA, dayLabel, ago, addPhotos, dropImage, bigNum, relLabel, addVideo, vid, tapToPause, soundBtn, videoField, clock } from './phone-bits.js';
+
+// one picker for pictures + videos, like a real gallery. resolves [{ imageId, width, height } or { video }]
+async function pickMedia(multiple = false, maxDim = 1400) {
+  if (window.__testVideo) { const v = await addVideo(); return v ? [{ video: v }] : []; }
+  const out = [];
+  for (const file of await pickFiles('image/*,video/*', multiple)) {
+    if (file.type.startsWith('video/')) {
+      const v = await addVideo(file); if (v) out.push({ video: v });
+      continue;
+    }
+    const [img] = await cropAll([file]);
+    if (!img) continue;
+    try {
+      const { blob, width, height } = await shrinkImage(img, maxDim);
+      out.push({ imageId: await store.putImage(blob), width, height });
+    } catch (err) {
+      console.error(err);
+      toast("couldn't read that picture", 'bad');
+    }
+  }
+  return out;
+}
+// a feed video (plays while 60%+ on screen). right after the page opens the file can still be loading when vid()
+// first tries to play, so try once more as soon as it can play, if it's on screen
+function liveVid(video, cls, opts = {}) {
+  const v = vid(video, cls, { ...opts, inView: true });
+  v.addEventListener('canplay', () => {
+    const io = new IntersectionObserver(([e]) => { io.disconnect(); if (v.paused && e.intersectionRatio >= 0.6) v.playNow(); });
+    io.observe(v);
+  }, { once: true });
+  return v;
+}
+// drop a post's / message's picture and video
+const dropMedia = x => { dropImage(x?.imageId); dropImage(x?.video?.imageId); };
+// the picture, or the video's first frame (for thumbnails)
+const still = (x, cls = '') => (x.video && !x.imageId ? vid(x.video, 'pa-still ' + cls) : pic(x.imageId, cls));
 
 export const APPS = {
   pinterest: { label: 'pinterest', icon: '1f4cc', bg: 'linear-gradient(160deg,#ff4d5e,#d50c22)', cat: 'social' },
@@ -22,7 +60,7 @@ export const DEF = {
   pinterest: { pins: [], boards: [] },
   discord: { servers: [], dms: [], status: 'online' },
   facebook: { posts: [], coverId: null, bio: '', about: { work: '', school: '', lives: '', from: '', rel: '' } },
-  snapchat: { snaps: [], stories: [], streaks: {} },
+  snapchat: { snaps: [], stories: [], streaks: {}, spotlight: [] },
   whatsapp: { chats: [], status: [], calls: [] },
   bereal: { posts: [] },
   threadsapp: { posts: [], bio: '', followers: 1313 },
@@ -57,6 +95,9 @@ const ico = {
   share: () => I('', P('M14 4.5 21 11l-7 6.5V14c-5 0-8.5 1.5-11 5.5C4 13 7.5 9.5 14 8.8Z')),
   bell: () => I('', P('M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15ZM10 20.5a2 2 0 0 0 4 0')),
   menu: () => I('', P('M4 7h16M4 12h16M4 17h16')),
+  play: () => I('', s('path', { d: 'M7 4.5v15l12.5-7.5z', fill: 'currentColor' })),
+  reels: () => I('', s('rect', { x: 3, y: 3, width: 18, height: 18, rx: 5, fill: 'none', stroke: 'currentColor', 'stroke-width': 2 }), P('M3 8.5h18M9.2 3l3 5.5M15 3l3 5.5'), s('path', { d: 'M10 11.6v5.8l4.9-2.9z', fill: 'currentColor' })),
+  spot: () => I('', P('M12 3.5 14.4 9l5.9.5-4.5 3.9 1.4 5.8L12 16.1l-5.2 3.1 1.4-5.8-4.5-3.9 5.9-.5Z')),
 };
 const discordLogo = () => s('svg', { viewBox: '0 0 24 24', class: 'pa-dc-logo' }, s('path', { fill: 'currentColor', d: 'M19.3 5.4A16.6 16.6 0 0 0 15.2 4l-.5 1a15 15 0 0 0-5.4 0l-.5-1a16.6 16.6 0 0 0-4.1 1.4C2 9.3 1.3 13.1 1.6 16.9a16.8 16.8 0 0 0 5.1 2.6l1.1-1.8a10.8 10.8 0 0 1-1.7-.8l.4-.3a11.9 11.9 0 0 0 11 0l.4.3-1.7.8 1.1 1.8a16.7 16.7 0 0 0 5.1-2.6c.4-4.4-.7-8.2-3.1-11.5ZM8.5 14.6c-1 0-1.9-1-1.9-2.1s.8-2.1 1.9-2.1 1.9 1 1.9 2.1-.8 2.1-1.9 2.1Zm7 0c-1 0-1.9-1-1.9-2.1s.8-2.1 1.9-2.1 1.9 1 1.9 2.1-.8 2.1-1.9 2.1Z' }));
 const threadsLogo = () => s('svg', { viewBox: '0 0 24 24', class: 'pa-th-logo' }, P('M17 8.3C16.2 5.6 14.2 4 11.8 4 8 4 5.5 7.2 5.5 12s2.5 8 6.6 8c3.3 0 5.8-2 5.8-4.8 0-2.6-2-4.1-5-4.1-2.2 0-3.6 1.1-3.6 2.6 0 1.4 1.2 2.3 2.7 2.3 2.4 0 3.6-2 3.4-6', { 'stroke-width': 2.3 }));
@@ -84,6 +125,53 @@ export function install(api) {
   d.whatsapp = { ...structuredClone(DEF.whatsapp), ...d.whatsapp };
   d.bereal = { ...structuredClone(DEF.bereal), ...d.bereal };
   d.threadsapp = { ...structuredClone(DEF.threadsapp), ...d.threadsapp };
+
+  // ---- one feed for the whole world ----
+  // like the real apps, a feed shows what worldmates posted on their own phones too (only what they posted as
+  // themselves). their posts stay theirs: likes + comments write into the post on their phone (only for ocs you can
+  // edit), and only the phone a post lives on can edit or delete it.
+  const owners = new WeakMap(); // a worldmate's post -> the oc whose phone it lives on
+  function shared(key, listOf) {
+    const out = [], seen = new Set();
+    for (const post of listOf(d[key]) || []) if (!seen.has(post.id)) { seen.add(post.id); out.push(post); }
+    for (const m of worldmates(char.id)) {
+      const md = m.fun?.phone?.[key];
+      if (!md) continue;
+      for (const post of listOf(md) || []) {
+        if (!post || post.by?.id !== m.id || seen.has(post.id)) continue;
+        seen.add(post.id);
+        owners.set(post, m);
+        out.push(post);
+      }
+    }
+    return out.sort((a, b) => (b.at || 0) - (a.at || 0));
+  }
+  const ownerOf = post => owners.get(post) || null;
+  const canTouch = post => mine && (!ownerOf(post) || store.isMine(ownerOf(post))); // like, comment, react
+  const canEdit = post => mine && !ownerOf(post); // edit, delete
+  const saveFor = post => { const o = ownerOf(post); if (!o) save(); else if (store.isMine(o)) store.save('char', o); };
+
+  // a video in a feed: plays while on screen, tap to pause, with the sound toggle
+  function feedVid(video, cls = '', { sound = true, loop = true, ratio = true } = {}) {
+    const box = h('div', { class: 'pa-vbox ' + cls, style: ratio && video.w && video.h ? { aspectRatio: `${video.w} / ${Math.min(video.h, video.w * 1.25)}` } : null });
+    const v = liveVid(video, '', { sound, loop });
+    box.append(v);
+    tapToPause(v, box);
+    if (sound) box.append(soundBtn('pa-vsnd'));
+    return box;
+  }
+
+  // a full screen swipe-up video feed (facebook reels, snapchat spotlight). rail(it) + info(it) fill each card
+  function reelFeed(cls, items, { rail, info, empty }) {
+    return h('div', { class: 'pa-reels ' + cls }, items.length ? items.map(it => {
+      const v = liveVid(it.video, 'pa-reel-vid', { sound: true });
+      const card = h('div', { class: 'pa-reel', 'data-id': it.id }, v, h('div', { class: 'pa-reel-shade' }));
+      tapToPause(v, card);
+      card.append(soundBtn('pa-reel-snd'), h('div', { class: 'pa-reel-rail' }, rail(it)), h('div', { class: 'pa-reel-info' }, info(it)));
+      return card;
+    }) : h('div', { class: 'pa-reels-empty' }, empty));
+  }
+  const railBtn = (title, icon, n, onclick, on = false) => h('button', { type: 'button', class: 'pa-reel-act' + (on ? ' on' : ''), title, onclick: e => { e.stopPropagation(); onclick?.(e); } }, icon, n != null ? h('span', {}, n) : null);
 
   // pick who's posting: this oc, anyone in their worlds, or a typed name
   function pickAs(title = 'as who?') {
@@ -115,8 +203,9 @@ export function install(api) {
   }
 
   // the "write a post" box most apps share. resolves via onDone({ by, text, imageId })
-  function compose({ title, placeholder = '', photo = false, needPhoto = false, needText = false, okLabel = 'post', by = me(), extra = null, onDone }) {
-    let as = by, imageId = null;
+  // video: true adds a video row (needPhoto is then happy with a photo or a video)
+  function compose({ title, placeholder = '', photo = false, video = false, needPhoto = false, needText = false, okLabel = 'post', by = me(), extra = null, onDone }) {
+    let as = by, imageId = null, clip = null;
     const ta = h('textarea', { class: 'pa-compose-text', placeholder, maxLength: 1000, rows: 4, 'data-autofocus': '' });
     const prev = h('div', { class: 'pa-compose-pic' });
     const drawPrev = () => fill(prev, imageId ? [pic(imageId), h('button', { type: 'button', class: 'pa-compose-x', title: 'remove', onclick: () => { dropImage(imageId); imageId = null; drawPrev(); } }, '✕')] : null);
@@ -127,19 +216,20 @@ export function install(api) {
         h('div', { class: 'pa-compose-who' }, asChip(() => as, r => { as = r; }), h('span', {}, 'as')),
         ta, prev,
         photo ? h('button', { type: 'button', class: 'btn ghost sm', onclick: async () => { const [p] = await addPhotos(false, 1400); if (p) { if (imageId) dropImage(imageId); imageId = p.imageId; drawPrev(); } } }, 'add photo') : null,
+        video ? videoField(null, v => { clip = v; }) : null,
         extra?.el || null),
       actions: [{
         label: okLabel, kind: 'primary', onClick: close => {
           const text = ta.value.trim();
-          if (needPhoto && !imageId) { toast('pick a photo first'); return; }
-          if ((needText || !photo) && !text && !imageId) { ta.focus(); return; }
-          if (!text && !imageId) { ta.focus(); return; }
+          if (needPhoto && !imageId && !clip) { toast(video ? 'pick a photo or video first' : 'pick a photo first'); return; }
+          if ((needText || !photo) && !text && !imageId && !clip) { ta.focus(); return; }
+          if (!text && !imageId && !clip) { ta.focus(); return; }
           posted = true;
           close();
-          onDone({ by: freshRef(as), text, imageId, ...(extra?.get?.() || {}) });
+          onDone({ by: freshRef(as), text, imageId, video: clip, ...(extra?.get?.() || {}) });
         },
       }],
-      onClose: () => { if (!posted && imageId) dropImage(imageId); },
+      onClose: () => { if (!posted) { if (imageId) dropImage(imageId); if (clip) dropImage(clip.imageId); } },
     });
   }
 
@@ -151,28 +241,37 @@ export function install(api) {
   // pinterest
   // ======================================================================
   const pn = d.pinterest;
-  const pinById = id => pn.pins.find(p => p.id === id);
+  const allPins = () => shared('pinterest', x => x.pins);
+  const pinById = id => allPins().find(p => p.id === id);
   const boardsWith = pin => pn.boards.filter(b => b.pinIds.includes(pin.id));
+  // video pins play muted on a loop right in the grid, like the real app
   const pinCard = (p, from) => h('button', { type: 'button', class: 'pa-pin', 'data-id': p.id, onclick: () => show('pinterest', { view: 'pin', id: p.id, from }, 'push') },
-    h('div', { class: 'pa-pin-img', style: { aspectRatio: p.w && p.h ? `${p.w} / ${p.h}` : '3 / 4' } }, pic(p.imageId)),
+    h('div', { class: 'pa-pin-img', style: { aspectRatio: p.w && p.h ? `${p.w} / ${p.h}` : '3 / 4' } },
+      p.video && !p.imageId ? [liveVid(p.video, '', { loop: true }), h('span', { class: 'pa-pin-dur' }, clock(p.video.dur))] : pic(p.imageId)),
     h('div', { class: 'pa-pin-cap' }, h('span', {}, p.title || ''), h('i', {}, ico.dots())));
   const masonry = (list, from) => (list.length
     ? h('div', { class: 'pa-masonry' }, list.map(p => pinCard(p, from)))
     : h('div', { class: 'ph-empty' }, h('div', { class: 'pa-pn-logo big' }, 'P')));
 
   async function newPins() {
-    const got = await addPhotos(true, 1400);
+    const got = await pickMedia(true, 1400);
     if (!got.length) return;
     const title = h('input', { type: 'text', placeholder: 'title', maxLength: 100, 'data-autofocus': '' });
     const board = h('select', {}, h('option', { value: '' }, 'no board'), pn.boards.map(b => h('option', { value: b.id }, b.name)));
     let done = false;
     openModal({
       title: got.length > 1 ? `${got.length} new pins` : 'new pin',
-      body: h('div', { class: 'pa-form' }, h('div', { class: 'pa-form-pics' }, got.map(g => pic(g.imageId))), title, pn.boards.length ? board : null),
+      body: h('div', { class: 'pa-form' }, h('div', { class: 'pa-form-pics' }, got.map(g => (g.video ? vid(g.video, '', { autoplay: true }) : pic(g.imageId)))), title, pn.boards.length ? board : null),
       actions: [{
         label: 'publish', kind: 'primary', onClick: close => {
           done = true;
-          const ids = got.map(g => { const p = { id: 'pin_' + uid(), imageId: g.imageId, w: g.width, h: g.height, title: title.value.trim(), by: me(), at: Date.now() }; pn.pins.push(p); return p.id; });
+          const ids = got.map(g => {
+            const p = g.video
+              ? { id: 'pin_' + uid(), imageId: null, video: g.video, w: g.video.w, h: g.video.h, title: title.value.trim(), by: me(), at: Date.now() }
+              : { id: 'pin_' + uid(), imageId: g.imageId, w: g.width, h: g.height, title: title.value.trim(), by: me(), at: Date.now() };
+            pn.pins.push(p);
+            return p.id;
+          });
           const b = pn.boards.find(x => x.id === board.value);
           if (b) b.pinIds.push(...ids);
           save();
@@ -180,7 +279,7 @@ export function install(api) {
           show('pinterest', { view: 'home' }, null);
         },
       }],
-      onClose: () => { if (!done) got.forEach(g => dropImage(g.imageId)); },
+      onClose: () => { if (!done) got.forEach(dropMedia); },
     });
   }
   function newBoard(after) {
@@ -198,11 +297,11 @@ export function install(api) {
         if (b.pinIds.includes(p.id)) b.pinIds = b.pinIds.filter(x => x !== p.id); else b.pinIds.push(p.id);
         save(); m.close(); after();
       },
-    }, h('span', { class: 'pa-board-thumb' }, b.pinIds[0] && pinById(b.pinIds[0]) ? pic(pinById(b.pinIds[0]).imageId) : null), h('b', {}, b.name), h('span', {}, b.pinIds.includes(p.id) ? 'saved' : ''))) : null);
+    }, h('span', { class: 'pa-board-thumb' }, b.pinIds[0] && pinById(b.pinIds[0]) ? still(pinById(b.pinIds[0])) : null), h('b', {}, b.name), h('span', {}, b.pinIds.includes(p.id) ? 'saved' : ''))) : null);
   }
   const boardCover = b => {
     const imgs = b.pinIds.map(pinById).filter(Boolean).slice(0, 3);
-    return h('div', { class: 'pa-board-cover' }, [0, 1, 2].map(i => h('div', { class: 'pa-bc' + i }, imgs[i] ? pic(imgs[i].imageId) : null)));
+    return h('div', { class: 'pa-board-cover' }, [0, 1, 2].map(i => h('div', { class: 'pa-bc' + i }, imgs[i] ? still(imgs[i]) : null)));
   };
 
   SCREENS.pinterest = (p = {}) => {
@@ -218,21 +317,27 @@ export function install(api) {
       const pin = pinById(p.id);
       if (!pin) return SCREENS.pinterest({ view: 'home' });
       const saved = boardsWith(pin).length > 0;
-      const others = pn.pins.filter(x => x.id !== pin.id).reverse();
+      const others = allPins().filter(x => x.id !== pin.id);
+      let big = pic(pin.imageId);
+      if (pin.video && !pin.imageId) {
+        const v = vid(pin.video, '', { autoplay: true, sound: true, loop: true });
+        big = h('div', { class: 'pa-pn-bigvid', style: { aspectRatio: pin.w && pin.h ? `${pin.w} / ${pin.h}` : '9 / 16' } }, v, soundBtn('pa-vsnd'));
+        tapToPause(v, big);
+      }
       return wrap('pa-pn-close',
         h('div', { class: 'ph-scroll' },
           h('div', { class: 'pa-pn-big' },
             h('button', { type: 'button', class: 'pa-round-back', title: 'back', onclick: () => show('pinterest', { view: p.from || 'home', id: p.board }, 'pop') }, ico.back()),
-            pic(pin.imageId)),
+            big),
           h('div', { class: 'pa-pn-actions' },
-            h('button', { type: 'button', class: 'pa-ibtn', title: 'like', onclick: e => { if (!mine) return; pin.liked = !pin.liked; save(); fill(e.currentTarget, ico.heart(pin.liked)); } }, ico.heart(pin.liked)),
+            h('button', { type: 'button', class: 'pa-ibtn', title: 'like', onclick: e => { if (!canTouch(pin)) return; pin.liked = !pin.liked; saveFor(pin); fill(e.currentTarget, ico.heart(pin.liked)); } }, ico.heart(pin.liked)),
             h('button', { type: 'button', class: 'pa-ibtn', title: 'share', onclick: () => toast('link copied') }, ico.share()),
-            mine ? h('button', {
+            canEdit(pin) ? h('button', {
               type: 'button', class: 'pa-ibtn', title: 'delete', onclick: async () => {
                 if (!(await confirmDialog('delete this pin?', { danger: true, okLabel: 'delete' }))) return;
                 pn.pins = pn.pins.filter(x => x !== pin);
                 pn.boards.forEach(b => { b.pinIds = b.pinIds.filter(x => x !== pin.id); });
-                dropImage(pin.imageId); save(); show('pinterest', { view: 'home' }, 'pop');
+                dropMedia(pin); save(); show('pinterest', { view: 'home' }, 'pop');
               },
             }, ico.dots()) : null,
             h('span', { class: 'pa-grow' }),
@@ -273,10 +378,10 @@ export function install(api) {
       const input = h('input', { type: 'text', class: 'pa-pn-search-in', placeholder: 'search for ideas', maxLength: 60, oninput: () => draw() });
       const draw = () => {
         const q = input.value.trim().toLowerCase();
-        const hits = [...pn.pins].reverse().filter(x => !q || (x.title || '').toLowerCase().includes(q) || boardsWith(x).some(b => b.name.toLowerCase().includes(q)));
+        const hits = allPins().filter(x => !q || (x.title || '').toLowerCase().includes(q) || boardsWith(x).some(b => b.name.toLowerCase().includes(q)));
         fill(results,
           !q && pn.boards.length ? h('div', { class: 'pa-pn-ideas' }, pn.boards.map(b => h('button', { type: 'button', class: 'pa-pn-idea', onclick: () => { input.value = b.name; draw(); } },
-            b.pinIds[0] && pinById(b.pinIds[0]) ? pic(pinById(b.pinIds[0]).imageId) : null, h('b', {}, b.name)))) : null,
+            b.pinIds[0] && pinById(b.pinIds[0]) ? still(pinById(b.pinIds[0])) : null, h('b', {}, b.name)))) : null,
           masonry(hits, 'search'));
       };
       draw();
@@ -306,7 +411,7 @@ export function install(api) {
     }
 
     // home
-    const list = [...pn.pins].reverse();
+    const list = allPins();
     return wrap('',
       h('div', { class: 'pa-pn-head' },
         h('button', { type: 'button', class: 'pa-ibtn', title: 'home', onclick: home }, ico.back()),
@@ -390,7 +495,7 @@ export function install(api) {
             const last = dm.msgs.at(-1);
             return h('button', { type: 'button', class: 'pa-dc-dm', 'data-id': dm.id, onclick: () => show('discord', { view: 'chat', dm: dm.id }, 'push') },
               dcFace(dm.who, dm.status || 'online'),
-              h('div', { class: 'pa-dc-dm-main' }, h('b', {}, who(dm.who).name), h('span', {}, last ? (isMe(last.by) ? 'you: ' : '') + (last.text || 'sent a picture') : '')),
+              h('div', { class: 'pa-dc-dm-main' }, h('b', {}, who(dm.who).name), h('span', {}, last ? (isMe(last.by) ? 'you: ' : '') + (last.text || (last.video ? 'sent a video' : 'sent a picture')) : '')),
               last ? h('em', {}, ago(last.at)) : null);
           }) : h('div', { class: 'pa-dc-empty' }, discordLogo())));
     }
@@ -410,10 +515,11 @@ export function install(api) {
     let as = me();
     const list = h('div', { class: 'ph-scroll pa-dc-msgs' });
     const input = h('input', { type: 'text', class: 'pa-dc-input', maxLength: 1000, placeholder: ch ? `message #${ch.name}` : `message @${who(dm.who).name}`, onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); send(); } } });
-    function send(imageId = null) {
+    // media = { imageId } or { video } from the + button
+    function send(media = null) {
       const text = input.value.trim();
-      if (!text && !imageId) return;
-      room.msgs.push({ id: 'dmsg_' + uid(), by: freshRef(as), text, imageId, at: Date.now(), reacts: {} });
+      if (!text && !media) return;
+      room.msgs.push({ id: 'dmsg_' + uid(), by: freshRef(as), text, imageId: media?.imageId || null, ...(media?.video ? { video: media.video } : {}), at: Date.now(), reacts: {} });
       if (sv && !isMe(as) && !sv.members.some(m => sameRef(m.ref, as))) sv.members.push({ ref: freshRef(as), status: 'online' });
       input.value = '';
       save();
@@ -424,7 +530,7 @@ export function install(api) {
       if (!mine) return;
       row.append(h('div', { class: 'pa-dc-pick' },
         REACTS_DC.map(r => h('button', { type: 'button', onclick: e => { e.stopPropagation(); m.reacts[r] = (m.reacts[r] || 0) + 1; save(); draw(); } }, r)),
-        h('button', { type: 'button', class: 'pa-dc-del', title: 'delete', onclick: e => { e.stopPropagation(); room.msgs = room.msgs.filter(x => x !== m); dropImage(m.imageId); save(); draw(); } }, '✕')));
+        h('button', { type: 'button', class: 'pa-dc-del', title: 'delete', onclick: e => { e.stopPropagation(); room.msgs = room.msgs.filter(x => x !== m); dropMedia(m); save(); draw(); } }, '✕')));
     }
     function draw() {
       let prev = null;
@@ -442,6 +548,7 @@ export function install(api) {
               head ? h('div', { class: 'pa-dc-meta' }, h('b', { style: { color: dcColor(m.by) } }, who(m.by).name), h('span', {}, `${dayLabel(m.at)} at ${hmA(m.at)}`)) : null,
               m.text ? h('div', { class: 'pa-dc-text' }, m.text) : null,
               m.imageId ? pic(m.imageId, 'pa-dc-pic') : null,
+              m.video ? h('div', { class: 'pa-dc-vid', onclick: e => e.stopPropagation() }, vid(m.video, '', { controls: true, sound: true, loop: false })) : null,
               Object.keys(m.reacts || {}).length ? h('div', { class: 'pa-dc-reacts' }, Object.entries(m.reacts).map(([r, n]) => h('button', {
                 type: 'button', class: 'pa-dc-react', onclick: e => { e.stopPropagation(); if (!mine) return; m.reacts[r] = n - 1; if (m.reacts[r] <= 0) delete m.reacts[r]; save(); draw(); },
               }, r, h('b', {}, n)))) : null));
@@ -458,7 +565,7 @@ export function install(api) {
         sv ? h('button', { type: 'button', class: 'pa-ibtn', title: 'members', onclick: () => show('discord', { view: 'members', sv: sv.id, back: p }, 'push') }, ico.users()) : null),
       list,
       mine ? h('div', { class: 'pa-dc-composer' },
-        h('button', { type: 'button', class: 'pa-dc-plus', title: 'send a picture', onclick: async () => { const [x] = await addPhotos(false, 1200); if (x) send(x.imageId); } }, ico.plus()),
+        h('button', { type: 'button', class: 'pa-dc-plus', title: 'attach', onclick: async () => { const [x] = await pickMedia(false, 1200); if (x) send(x); } }, ico.plus()),
         h('div', { class: 'pa-dc-inwrap' }, input, asChip(() => as, r => { as = r; }, 'pa-dc-as')),
         h('button', { type: 'button', class: 'pa-dc-send', title: 'send', onclick: () => send() }, ico.send())) : null);
   }
@@ -500,6 +607,7 @@ export function install(api) {
   // facebook
   // ======================================================================
   const fb = d.facebook;
+  const allFb = () => shared('facebook', x => x.posts);
   const FB_REACTS = [['like', '👍'], ['love', '❤️'], ['care', '🥰'], ['haha', '😆'], ['wow', '😮'], ['sad', '😢'], ['angry', '😡']];
   const reactEmoji = k => FB_REACTS.find(r => r[0] === k)?.[1] || '👍';
   const fbCount = post => Object.values(post.reacts || {}).reduce((a, b) => a + b, 0) + (post.mine ? 1 : 0);
@@ -510,13 +618,23 @@ export function install(api) {
   };
   function fbPost(p) {
     compose({
-      title: 'create post', placeholder: "what's on your mind?", photo: true, okLabel: 'post', by: p?.by || me(),
-      onDone: ({ by, text, imageId }) => {
-        fb.posts.push({ id: 'fb_' + uid(), by, text, imageId, at: Date.now(), reacts: { like: rnd(2, 40), love: rnd(0, 12), haha: rnd(0, 6) }, mine: null, comments: [] });
+      title: 'create post', placeholder: "what's on your mind?", photo: true, video: true, okLabel: 'post', by: p?.by || me(),
+      onDone: ({ by, text, imageId, video }) => {
+        fb.posts.push({ id: 'fb_' + uid(), by, text, imageId, ...(video ? { video, views: rnd(200, 9000) } : {}), at: Date.now(), reacts: { like: rnd(2, 40), love: rnd(0, 12), haha: rnd(0, 6) }, mine: null, comments: [] });
         save(); api.redraw();
       },
     });
   }
+  const fbDelete = async (post, full) => {
+    if (!(await confirmDialog('delete this post?', { danger: true, okLabel: 'delete' }))) return;
+    fb.posts = fb.posts.filter(x => x !== post); dropMedia(post); save(); show('facebook', {}, full ? 'pop' : null);
+  };
+  // tapping a name opens that person's profile (friends only)
+  const fbWho = ref => {
+    if (ref?.id === char.id) return () => show('facebook', { view: 'profile' }, null);
+    if (ref?.id && allOcs(char.id).some(o => o.id === ref.id)) return () => show('facebook', { view: 'profile', who: ref.id }, 'push');
+    return null;
+  };
   function fbCard(post, full = false) {
     const likeBtn = h('button', { type: 'button', class: 'pa-fb-act' + (post.mine ? ' on ' + post.mine : '') });
     const paintLike = () => fill(likeBtn, post.mine ? h('span', { class: 'pa-fb-re' }, reactEmoji(post.mine)) : ico.thumb(), h('span', {}, post.mine ? post.mine : 'like'));
@@ -524,29 +642,25 @@ export function install(api) {
     const counts = h('div', { class: 'pa-fb-counts' });
     const paintCounts = () => fill(counts,
       fbCount(post) ? h('span', { class: 'pa-fb-emo' }, fbTop(post).map(e => h('i', {}, e)), h('em', {}, fbCount(post))) : h('span'),
-      post.comments.length ? h('span', {}, `${post.comments.length} ${post.comments.length === 1 ? 'comment' : 'comments'}`) : null);
+      h('span', {}, [post.comments.length ? `${post.comments.length} ${post.comments.length === 1 ? 'comment' : 'comments'}` : '', post.video && post.views ? `${bigNum(post.views)} views` : ''].filter(Boolean).join(' · ')));
     paintCounts();
     likeBtn.onclick = e => {
-      if (!mine) return;
+      if (!canTouch(post)) return;
       const card = e.currentTarget.closest('.pa-fb-post');
       card.querySelector('.pa-fb-bar')?.remove();
       const bar = h('div', { class: 'pa-fb-bar' }, FB_REACTS.map(([k, em]) => h('button', {
-        type: 'button', title: k, onclick: ev => { ev.stopPropagation(); post.mine = post.mine === k ? null : k; save(); bar.remove(); paintLike(); likeBtn.className = 'pa-fb-act' + (post.mine ? ' on ' + post.mine : ''); paintCounts(); },
+        type: 'button', title: k, onclick: ev => { ev.stopPropagation(); post.mine = post.mine === k ? null : k; saveFor(post); bar.remove(); paintLike(); likeBtn.className = 'pa-fb-act' + (post.mine ? ' on ' + post.mine : ''); paintCounts(); },
       }, em)));
       likeBtn.parentElement.before(bar);
       setTimeout(() => document.addEventListener('click', () => bar.remove(), { once: true }), 0);
     };
+    const open = fbWho(post.by);
     return h('div', { class: 'pa-fb-post', 'data-id': post.id },
-      h('div', { class: 'pa-fb-phead' }, face(post.by, 'sm'),
-        h('div', {}, h('b', {}, who(post.by).name), h('span', {}, ago(post.at) === 'now' ? 'just now' : ago(post.at), ' · ', ico.globe())),
-        mine ? h('button', {
-          type: 'button', class: 'pa-ibtn', title: 'delete', onclick: async () => {
-            if (!(await confirmDialog('delete this post?', { danger: true, okLabel: 'delete' }))) return;
-            fb.posts = fb.posts.filter(x => x !== post); dropImage(post.imageId); save(); show('facebook', {}, full ? 'pop' : null);
-          },
-        }, ico.dots()) : null),
-      post.text ? h('div', { class: 'pa-fb-text' + (!post.imageId && post.text.length < 90 ? ' big' : '') }, post.text) : null,
-      post.imageId ? pic(post.imageId, 'pa-fb-img') : null,
+      h('div', { class: 'pa-fb-phead' }, h('button', { type: 'button', class: 'pa-fb-whobtn', onclick: () => open?.() }, face(post.by, 'sm')),
+        h('div', {}, h('b', { onclick: () => open?.() }, who(post.by).name), h('span', {}, ago(post.at) === 'now' ? 'just now' : ago(post.at), ' · ', ico.globe())),
+        canEdit(post) ? h('button', { type: 'button', class: 'pa-ibtn', title: 'delete', onclick: () => fbDelete(post, full) }, ico.dots()) : null),
+      post.text ? h('div', { class: 'pa-fb-text' + (!post.imageId && !post.video && post.text.length < 90 ? ' big' : '') }, post.text) : null,
+      post.imageId ? pic(post.imageId, 'pa-fb-img') : post.video ? feedVid(post.video, 'pa-fb-vid') : null,
       counts,
       h('div', { class: 'pa-fb-acts' }, likeBtn,
         h('button', { type: 'button', class: 'pa-fb-act', onclick: () => { if (!full) show('facebook', { view: 'post', id: post.id }, 'push'); } }, ico.bubble(), h('span', {}, 'comment')),
@@ -557,8 +671,8 @@ export function install(api) {
 
   SCREENS.facebook = (p = {}) => {
     const v = p.view || 'home';
-    const tabs = h('div', { class: 'pa-fb-tabs' }, [['home', ico.home], ['friends', ico.users], ['profile', () => portrait(char, 'xs pa-nav-pfp')], ['menu', ico.menu]].map(([id, ic]) =>
-      h('button', { type: 'button', class: v === id ? 'on' : '', 'data-tab': id, title: id, onclick: () => show('facebook', { view: id }, null) }, ic())));
+    const tabs = h('div', { class: 'pa-fb-tabs' }, [['home', ico.home], ['video', ico.video], ['friends', ico.users], ['profile', () => portrait(char, 'xs pa-nav-pfp')], ['menu', ico.menu]].map(([id, ic]) =>
+      h('button', { type: 'button', class: v === id && !p.who ? 'on' : '', 'data-tab': id, title: id, onclick: () => show('facebook', { view: id }, null) }, ic())));
     const top = h('div', { class: 'pa-fb-top' },
       h('button', { type: 'button', class: 'pa-ibtn', title: 'home', onclick: home }, ico.back()),
       h('b', { class: 'pa-fb-word' }, 'facebook'),
@@ -568,23 +682,55 @@ export function install(api) {
     const wrap = (...kids) => h('div', { class: 'ph-app-screen pa-fb' }, ...kids);
 
     if (v === 'post') {
-      const post = fb.posts.find(x => x.id === p.id);
+      const post = allFb().find(x => x.id === p.id);
       if (!post) return SCREENS.facebook({});
       let as = me();
       const input = h('input', { type: 'text', class: 'pa-fb-cin', maxLength: 500, placeholder: 'write a comment...', onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); add(); } } });
       function add() {
         const text = input.value.trim(); if (!text) return;
         post.comments.push({ id: 'c_' + uid(), by: freshRef(as), text, at: Date.now(), likes: 0 });
-        save(); api.redraw();
+        saveFor(post); api.redraw();
       }
       return wrap(
         h('div', { class: 'pa-fb-top' }, h('button', { type: 'button', class: 'pa-ibtn', title: 'back', onclick: () => show('facebook', { view: p.from || 'home' }, 'pop') }, ico.back()), h('b', {}, who(post.by).name + "'s post")),
         h('div', { class: 'ph-scroll pa-fb-feed' }, fbCard(post, true),
           h('div', { class: 'pa-fb-comments' }, post.comments.map(c => h('div', { class: 'pa-fb-comment' }, face(c.by, 'sm'),
             h('div', {}, h('div', { class: 'pa-fb-cbub' }, h('b', {}, who(c.by).name), h('span', {}, c.text)),
-              h('div', { class: 'pa-fb-cmeta' }, h('span', {}, ago(c.at)), h('button', { type: 'button', onclick: e => { if (!mine) return; c.liked = !c.liked; save(); e.currentTarget.classList.toggle('on', c.liked); } , class: c.liked ? 'on' : '' }, 'like'),
-                mine ? h('button', { type: 'button', onclick: () => { post.comments = post.comments.filter(x => x !== c); save(); api.redraw(); } }, 'delete') : null)))))),
-        mine ? h('div', { class: 'pa-fb-cbar' }, asChip(() => as, r => { as = r; }), input, h('button', { type: 'button', class: 'pa-fb-csend', title: 'send', onclick: add }, ico.send())) : null);
+              h('div', { class: 'pa-fb-cmeta' }, h('span', {}, ago(c.at)), h('button', { type: 'button', onclick: e => { if (!canTouch(post)) return; c.liked = !c.liked; saveFor(post); e.currentTarget.classList.toggle('on', c.liked); }, class: c.liked ? 'on' : '' }, 'like'),
+                canEdit(post) ? h('button', { type: 'button', onclick: () => { post.comments = post.comments.filter(x => x !== c); save(); api.redraw(); } }, 'delete') : null)))))),
+        canTouch(post) ? h('div', { class: 'pa-fb-cbar' }, asChip(() => as, r => { as = r; }), input, h('button', { type: 'button', class: 'pa-fb-csend', title: 'send', onclick: add }, ico.send())) : null);
+    }
+
+    if (v === 'video') {
+      // reels: every video post, full screen, swipe up for the next one
+      const items = allFb().filter(x => x.video && !x.imageId);
+      return h('div', { class: 'ph-app-screen pa-fb pa-dark-reels' },
+        h('div', { class: 'pa-reels-top' },
+          h('button', { type: 'button', class: 'pa-ibtn', title: 'back', onclick: () => show('facebook', {}, null) }, ico.back()),
+          h('b', {}, 'reels'),
+          mine ? h('button', { type: 'button', class: 'pa-ibtn', title: 'create reel', onclick: () => fbPost() }, ico.cam()) : h('span')),
+        reelFeed('pa-fb-reels', items, {
+          empty: [ico.reels(), mine ? h('button', { type: 'button', class: 'pa-fb-btn', onclick: () => fbPost() }, 'create reel') : null],
+          rail: post => {
+            const likeIco = () => h('span', { class: 'pa-reel-emo' }, post.mine ? reactEmoji(post.mine) : ico.thumb());
+            const like = railBtn('like', likeIco(), bigNum(fbCount(post)), e => {
+              if (!canTouch(post)) return;
+              post.mine = post.mine ? null : 'like';
+              saveFor(post);
+              const b = e.currentTarget;
+              fill(b, likeIco(), h('span', {}, bigNum(fbCount(post))));
+              b.classList.toggle('on', !!post.mine);
+            }, !!post.mine);
+            return [like,
+              railBtn('comment', ico.bubble(), bigNum(post.comments.length), () => show('facebook', { view: 'post', id: post.id, from: 'video' }, 'push')),
+              railBtn('share', ico.share(), null, () => toast('shared')),
+              canEdit(post) ? railBtn('delete', ico.dots(), null, () => fbDelete(post, false)) : null];
+          },
+          info: post => [
+            h('div', { class: 'pa-reel-who' }, face(post.by, 'sm'), h('b', {}, who(post.by).name), !isMe(post.by) ? h('span', { class: 'pa-reel-follow' }, 'follow') : null),
+            post.text ? h('p', { class: 'pa-reel-cap' }, post.text) : null,
+            post.views ? h('span', { class: 'pa-reel-sub' }, `${bigNum(post.views)} views`) : null],
+        }));
     }
 
     if (v === 'friends') {
@@ -593,12 +739,26 @@ export function install(api) {
         h('div', { class: 'ph-scroll pa-fb-feed' },
           h('h3', { class: 'pa-fb-h' }, 'friends'),
           h('div', { class: 'pa-fb-sub' }, `${ocs.length} ${ocs.length === 1 ? 'friend' : 'friends'}`),
-          ocs.length ? ocs.map(o => h('div', { class: 'pa-fb-friend' }, portrait(o, 'md'), h('div', {}, h('b', {}, nameOf(o)), h('span', {}, relLabel(char, o.id) || `${rnd(1, 30)} mutual friends`)),
+          ocs.length ? ocs.map(o => h('div', { class: 'pa-fb-friend', 'data-id': o.id, onclick: () => show('facebook', { view: 'profile', who: o.id }, 'push') }, portrait(o, 'md'), h('div', {}, h('b', {}, nameOf(o)), h('span', {}, relLabel(char, o.id) || `${rnd(1, 30)} mutual friends`)),
             h('button', { type: 'button', class: 'pa-fb-btn grey' }, 'message'))) : h('div', { class: 'ph-empty' }, ico.users())));
     }
 
+    if (v === 'profile' && p.who) {
+      // a friend's profile: what they posted on their own phone
+      const o = allOcs(char.id).find(x => x.id === p.who);
+      if (!o) return SCREENS.facebook({ view: 'friends' });
+      const ofb = o.fun?.phone?.facebook || {};
+      const theirs = allFb().filter(x => x.by?.id === o.id);
+      return wrap(h('div', { class: 'pa-fb-top' }, h('button', { type: 'button', class: 'pa-ibtn', title: 'back', onclick: () => show('facebook', { view: 'friends' }, 'pop') }, ico.back()), h('b', {}, nameOf(o))),
+        h('div', { class: 'ph-scroll pa-fb-feed' },
+          h('div', { class: 'pa-fb-cover', style: { '--c': o.color || '#0866ff' } }, ofb.coverId ? pic(ofb.coverId) : null),
+          h('div', { class: 'pa-fb-me' }, portrait(o, 'lg'), h('h2', {}, nameOf(o)), h('span', {}, relLabel(char, o.id) || 'friends'), ofb.bio ? h('p', {}, ofb.bio) : null),
+          h('h3', { class: 'pa-fb-h' }, 'posts'),
+          theirs.length ? theirs.map(x => fbCard(x)) : h('div', { class: 'ph-empty' }, ico.user())));
+    }
+
     if (v === 'profile') {
-      const myPosts = fb.posts.filter(x => isMe(x.by)).reverse();
+      const myPosts = allFb().filter(x => isMe(x.by));
       const a = fb.about;
       const rows = [['work', 'works at'], ['school', 'went to'], ['lives', 'lives in'], ['from', 'from'], ['rel', '']].filter(([k]) => a[k]);
       return wrap(top, tabs,
@@ -628,13 +788,13 @@ export function install(api) {
     }
 
     if (v === 'memories') {
-      const old = fb.posts.filter(x => dayLabel(x.at) !== 'today').reverse();
+      const old = allFb().filter(x => isMe(x.by) && dayLabel(x.at) !== 'today');
       return wrap(h('div', { class: 'pa-fb-top' }, h('button', { type: 'button', class: 'pa-ibtn', title: 'back', onclick: () => show('facebook', { view: 'menu' }, 'pop') }, ico.back()), h('b', {}, 'memories')),
         h('div', { class: 'ph-scroll pa-fb-feed' }, old.length ? old.map(x => fbCard(x)) : h('div', { class: 'ph-empty' }, '🕰️')));
     }
 
     // home feed
-    const posts = [...fb.posts].reverse();
+    const posts = allFb();
     return wrap(top, tabs,
       h('div', { class: 'ph-scroll pa-fb-feed' },
         mine ? h('div', { class: 'pa-fb-mind' }, portrait(char, 'sm'), h('button', { type: 'button', class: 'pa-fb-mindbtn', onclick: () => fbPost() }, "what's on your mind?"), h('button', { type: 'button', class: 'pa-ibtn pa-fb-green', title: 'photo', onclick: () => fbPost() }, ico.photo())) : null,
@@ -657,6 +817,8 @@ export function install(api) {
   // snapchat
   // ======================================================================
   const sc = d.snapchat;
+  const allStories = () => shared('snapchat', x => x.stories);
+  const allSpot = () => shared('snapchat', x => x.spotlight);
   const streakOf = ref => sc.streaks[refKey(ref)]?.n || 0;
   function bumpStreak(ref) {
     const k = refKey(ref), today = dayKey(), y = dayKey(Date.now() - 864e5);
@@ -676,50 +838,66 @@ export function install(api) {
     return [...map.values()].sort((a, b) => (b.last?.at || 0) - (a.last?.at || 0));
   };
   const unopenedFrom = ref => sc.snaps.filter(sn => sn.dir === 'in' && !sn.opened && sameRef(sn.with, ref)).sort((a, b) => a.at - b.at);
+  // the picture or video a snap / story holds
+  const mediaOf = m => (m.video ? { imageId: null, video: m.video } : { imageId: m.imageId });
+  // a picture or video still used by another snap, story or spotlight on this phone
+  const fileId = m => m?.video?.imageId || m?.imageId || null;
+  const stillUsed = (id, not) => [...sc.snaps, ...sc.stories, ...sc.spotlight].some(x => x !== not && fileId(x) === id);
 
   async function sendSnap() {
-    const [ph] = await addPhotos(false, 1400);
+    const [ph] = await pickMedia(false, 1400);
     if (!ph) return;
     const cap = h('input', { type: 'text', maxLength: 80, placeholder: 'caption', class: 'pa-sc-capin' });
     const picked = new Set();
-    let story = false;
+    let story = false, spot = false;
     const people = scPeople();
     const list = h('div', { class: 'pa-sc-sendlist' });
     const drawList = () => fill(list,
       h('button', { type: 'button', class: 'pa-sc-sendrow' + (story ? ' on' : ''), onclick: () => { story = !story; drawList(); } }, portrait(char, 'sm'), h('b', {}, 'my story'), h('i', { class: 'pa-check' })),
+      ph.video ? h('button', { type: 'button', class: 'pa-sc-sendrow' + (spot ? ' on' : ''), 'data-row': 'spotlight', onclick: () => { spot = !spot; drawList(); } }, h('span', { class: 'pa-sc-spotico' }, ico.spot()), h('b', {}, 'spotlight'), h('i', { class: 'pa-check' })) : null,
       people.map(pp => h('button', { type: 'button', class: 'pa-sc-sendrow' + (picked.has(refKey(pp.ref)) ? ' on' : ''), onclick: () => { const k = refKey(pp.ref); picked.has(k) ? picked.delete(k) : picked.add(k); drawList(); } },
         face(pp.ref, 'sm'), h('b', {}, who(pp.ref).name), streakOf(pp.ref) ? h('span', {}, streakOf(pp.ref) + '🔥') : null, h('i', { class: 'pa-check' }))));
     drawList();
     let sent = false;
     openModal({
-      title: 'send to', body: h('div', { class: 'pa-sc-send' }, h('div', { class: 'pa-sc-sendprev' }, pic(ph.imageId), cap), list),
+      title: 'send to', body: h('div', { class: 'pa-sc-send' }, h('div', { class: 'pa-sc-sendprev' }, ph.video ? vid(ph.video, '', { autoplay: true }) : pic(ph.imageId), cap), list),
       actions: [{
         label: 'send', kind: 'primary', onClick: close => {
-          if (!picked.size && !story) { toast('pick someone'); return; }
+          if (!picked.size && !story && !spot) { toast('pick someone'); return; }
           sent = true;
-          for (const pp of people) if (picked.has(refKey(pp.ref))) { sc.snaps.push({ id: 'sn_' + uid(), dir: 'out', with: freshRef(pp.ref), imageId: ph.imageId, caption: cap.value.trim(), at: Date.now(), opened: false }); bumpStreak(pp.ref); }
-          if (story) sc.stories.push({ id: 'st_' + uid(), by: me(), imageId: ph.imageId, caption: cap.value.trim(), at: Date.now() });
-          save(); close(); show('snapchat', { view: 'chat' }, 'push');
+          const m = mediaOf(ph);
+          for (const pp of people) if (picked.has(refKey(pp.ref))) { sc.snaps.push({ id: 'sn_' + uid(), dir: 'out', with: freshRef(pp.ref), ...m, caption: cap.value.trim(), at: Date.now(), opened: false }); bumpStreak(pp.ref); }
+          if (story) sc.stories.push({ id: 'st_' + uid(), by: me(), ...m, caption: cap.value.trim(), at: Date.now() });
+          if (spot) sc.spotlight.push({ id: 'sp_' + uid(), by: me(), video: ph.video, caption: cap.value.trim(), at: Date.now(), likes: rnd(40, 4000), liked: false, views: rnd(900, 90000) });
+          save(); close(); show('snapchat', { view: picked.size ? 'chat' : spot ? 'spotlight' : 'stories' }, 'push');
         },
       }],
-      onClose: () => { if (!sent) dropImage(ph.imageId); },
+      onClose: () => { if (!sent) dropMedia(ph); },
     });
   }
   async function incomingSnap() {
     const ref = await pickWho({ title: 'snap from', not: char.id, okLabel: 'next' });
     if (!ref) return;
-    const [ph] = await addPhotos(false, 1400);
+    const [ph] = await pickMedia(false, 1400);
     if (!ph) return;
     const cap = h('input', { type: 'text', maxLength: 80, placeholder: 'caption', 'data-autofocus': '' });
+    let ok = false;
     openModal({
-      title: `snap from ${who(ref).name}`, body: h('div', { class: 'pa-form' }, h('div', { class: 'pa-form-pics' }, pic(ph.imageId)), cap),
-      actions: [{ label: 'send', kind: 'primary', onClick: close => { sc.snaps.push({ id: 'sn_' + uid(), dir: 'in', with: ref, imageId: ph.imageId, caption: cap.value.trim(), at: Date.now(), opened: false }); bumpStreak(ref); save(); close(); api.redraw(); } }],
+      title: `snap from ${who(ref).name}`, body: h('div', { class: 'pa-form' }, h('div', { class: 'pa-form-pics' }, ph.video ? vid(ph.video, '', { autoplay: true }) : pic(ph.imageId)), cap),
+      actions: [{ label: 'send', kind: 'primary', onClick: close => { ok = true; sc.snaps.push({ id: 'sn_' + uid(), dir: 'in', with: ref, ...mediaOf(ph), caption: cap.value.trim(), at: Date.now(), opened: false }); bumpStreak(ref); save(); close(); api.redraw(); } }],
+      onClose: () => { if (!ok) dropMedia(ph); },
     });
   }
   async function addStory() {
     compose({
-      title: 'add to story', placeholder: 'caption', photo: true, needPhoto: true, okLabel: 'post',
-      onDone: ({ by, text, imageId }) => { sc.stories.push({ id: 'st_' + uid(), by, imageId, caption: text, at: Date.now() }); save(); api.redraw(); },
+      title: 'add to story', placeholder: 'caption', photo: true, video: true, needPhoto: true, okLabel: 'post',
+      onDone: ({ by, text, imageId, video }) => { sc.stories.push({ id: 'st_' + uid(), by, ...(video && !imageId ? { imageId: null, video } : { imageId }), caption: text, at: Date.now() }); if (video && imageId) dropImage(video.imageId); save(); api.redraw(); },
+    });
+  }
+  function addSpotlight() {
+    compose({
+      title: 'spotlight', placeholder: 'caption', video: true, needPhoto: true, okLabel: 'post',
+      onDone: ({ by, text, video }) => { sc.spotlight.push({ id: 'sp_' + uid(), by, video, caption: text, at: Date.now(), likes: rnd(40, 4000), liked: false, views: rnd(900, 90000) }); save(); show('snapchat', { view: 'spotlight' }, null); },
     });
   }
   function personInfo(pp) {
@@ -734,12 +912,13 @@ export function install(api) {
       ].filter(Boolean),
     });
   }
-  const scNav = cur => tabBar('pa-sc-nav', [['chat', ico.chat, 'chat'], ['cam', ico.cam, 'camera'], ['stories', ico.users, 'stories']], cur, id => show('snapchat', { view: id }, null));
+  const scNav = cur => tabBar('pa-sc-nav', [['chat', ico.chat, 'chat'], ['cam', ico.cam, 'camera'], ['stories', ico.users, 'stories'], ['spotlight', ico.play, 'spotlight']], cur, id => show('snapchat', { view: id }, null));
 
   SCREENS.snapchat = (p = {}) => {
     const v = p.view || 'cam';
     if (v === 'snap') return scViewer(p);
     if (v === 'story') return scStory(p);
+    if (v === 'spotlight') return scSpotlight();
     if (v === 'chat') {
       const people = scPeople();
       return h('div', { class: 'ph-app-screen pa-sc pa-sc-list' },
@@ -751,6 +930,7 @@ export function install(api) {
           if (!sn) { status = 'tap to snap'; cls = 'none'; }
           else if (sn.dir === 'in') { status = unopened ? 'new snap' : 'received'; cls = unopened ? 'new' : 'got'; }
           else { status = sn.opened ? 'opened' : 'delivered'; cls = sn.opened ? 'opened' : 'sent'; }
+          if (sn?.video) cls += ' vid';
           return h('div', { class: 'pa-sc-row', 'data-key': refKey(pp.ref), onclick: () => { if (unopened) show('snapchat', { view: 'snap', key: refKey(pp.ref) }, 'zoom'); else if (mine) personInfo(pp); } },
             h('span', { class: 'pa-sc-av' }, face(pp.ref, 'md')),
             h('div', { class: 'pa-sc-main' }, h('b', {}, who(pp.ref).name),
@@ -761,16 +941,17 @@ export function install(api) {
         scNav('chat'));
     }
     if (v === 'stories') {
+      const stories = allStories();
       const byPerson = new Map();
-      for (const st of [...sc.stories].sort((a, b) => b.at - a.at)) { const k = refKey(st.by); if (!byPerson.has(k)) byPerson.set(k, st); }
+      for (const st of stories) { const k = refKey(st.by); if (!byPerson.has(k)) byPerson.set(k, st); }
       return h('div', { class: 'ph-app-screen pa-sc pa-sc-list' },
         h('div', { class: 'pa-sc-top' }, h('button', { type: 'button', class: 'pa-sc-bit', title: 'home', onclick: home }, portrait(char, 'sm')), h('b', {}, 'stories'), h('span', { class: 'pa-grow' }),
           mine ? h('button', { type: 'button', class: 'pa-sc-circ', title: 'add to story', onclick: addStory }, ico.plus()) : null),
         h('div', { class: 'ph-scroll' },
           h('div', { class: 'pa-sc-friends' }, [...byPerson.values()].map(st => h('button', { type: 'button', class: 'pa-sc-ring', onclick: () => show('snapchat', { view: 'story', key: refKey(st.by) }, 'zoom') }, face(st.by, 'md'), h('span', {}, isMe(st.by) ? 'my story' : who(st.by).name)))),
-          h('div', { class: 'pa-sc-disc' }, [...sc.stories].sort((a, b) => b.at - a.at).map(st => h('button', { type: 'button', class: 'pa-sc-tile', onclick: () => show('snapchat', { view: 'story', key: refKey(st.by) }, 'zoom') },
-            pic(st.imageId), h('div', {}, h('b', {}, who(st.by).name), st.caption ? h('span', {}, st.caption) : null)))),
-          !sc.stories.length ? h('div', { class: 'ph-empty' }, ico.users()) : null),
+          h('div', { class: 'pa-sc-disc' }, stories.map(st => h('button', { type: 'button', class: 'pa-sc-tile', 'data-id': st.id, onclick: () => show('snapchat', { view: 'story', key: refKey(st.by) }, 'zoom') },
+            still(st), st.video ? h('span', { class: 'pa-sc-tdur' }, ico.play(), clock(st.video.dur)) : null, h('div', {}, h('b', {}, who(st.by).name), st.caption ? h('span', {}, st.caption) : null)))),
+          !stories.length ? h('div', { class: 'ph-empty' }, ico.users()) : null),
         scNav('stories'));
     }
     // camera
@@ -785,6 +966,14 @@ export function install(api) {
       h('button', { type: 'button', class: 'pa-sc-shutter', title: 'take a snap', disabled: !mine, onclick: sendSnap }),
       scNav('cam'));
   };
+  // full screen picture or video. a video plays once with sound and moves on when it ends
+  // (ms = how long this one lasts, so the timer / progress bar can match it)
+  function scMedia(m, onEnd) {
+    if (!m.video) return { el: pic(m.imageId, 'pa-sc-full'), ms: null };
+    const v = vid(m.video, 'pa-sc-full', { autoplay: true, sound: true, loop: false });
+    v.addEventListener('ended', onEnd);
+    return { el: v, ms: Math.max(1, Math.min(60, m.video.dur || 5)) * 1000 };
+  }
   function scViewer(p) {
     const list = sc.snaps.filter(sn => sn.dir === 'in' && !sn.opened && refKey(sn.with) === p.key).sort((a, b) => a.at - b.at);
     const sn = list[0];
@@ -796,43 +985,79 @@ export function install(api) {
       if (list.length > 1 && mine) show('snapchat', { view: 'snap', key: p.key }, null);
       else show('snapchat', { view: 'chat' }, 'pop');
     };
-    const t = setTimeout(next, 10000);
+    const media = scMedia(sn, next);
+    const t = setTimeout(next, media.ms ? media.ms + 1500 : 10000);
     api.onLeave(() => clearTimeout(t));
-    return h('div', { class: 'ph-app-screen pa-sc-view', onclick: next },
-      pic(sn.imageId, 'pa-sc-full'),
+    return h('div', { class: 'ph-app-screen pa-sc-view', onclick: next, style: { '--dur': (media.ms || 10000) + 'ms' } },
+      media.el,
       sn.caption ? h('div', { class: 'pa-sc-cap' }, sn.caption) : null,
       h('div', { class: 'pa-sc-vtop' }, face(sn.with, 'sm'), h('div', {}, h('b', {}, who(sn.with).name), h('span', {}, ago(sn.at))), h('span', { class: 'pa-grow' }),
+        sn.video ? soundBtn('pa-sc-snd') : null,
         s('svg', { viewBox: '0 0 36 36', class: 'pa-sc-timer' }, s('circle', { cx: 18, cy: 18, r: 15, class: 'bg' }), s('circle', { cx: 18, cy: 18, r: 15, class: 'fg' }))));
   }
   function scStory(p) {
-    const list = sc.stories.filter(st => refKey(st.by) === p.key).sort((a, b) => a.at - b.at);
+    const list = allStories().filter(st => refKey(st.by) === p.key).sort((a, b) => a.at - b.at);
     let i = p.i || 0;
     const st = list[i];
     if (!st) return SCREENS.snapchat({ view: 'stories' });
-    const go = () => { if (i + 1 < list.length) show('snapchat', { view: 'story', key: p.key, i: i + 1 }, null); else show('snapchat', { view: 'stories' }, 'pop'); };
-    const t = setTimeout(go, 5000);
+    let gone = false;
+    const go = () => { if (gone) return; gone = true; if (i + 1 < list.length) show('snapchat', { view: 'story', key: p.key, i: i + 1 }, null); else show('snapchat', { view: 'stories' }, 'pop'); };
+    const media = scMedia(st, go);
+    const t = setTimeout(go, media.ms ? media.ms + 1500 : 5000);
     api.onLeave(() => clearTimeout(t));
-    return h('div', { class: 'ph-app-screen pa-sc-view', onclick: go },
-      pic(st.imageId, 'pa-sc-full'),
+    return h('div', { class: 'ph-app-screen pa-sc-view', onclick: go, style: { '--dur': (media.ms || 5000) + 'ms' } },
+      media.el,
       st.caption ? h('div', { class: 'pa-sc-cap' }, st.caption) : null,
       h('div', { class: 'pa-sc-bars' }, list.map((_, k) => h('i', { class: k < i ? 'done' : k === i ? 'now' : '' }))),
       h('div', { class: 'pa-sc-vtop story' }, face(st.by, 'sm'), h('div', {}, h('b', {}, isMe(st.by) ? 'my story' : who(st.by).name), h('span', {}, ago(st.at))), h('span', { class: 'pa-grow' }),
-        mine ? h('button', {
+        st.video ? soundBtn('pa-sc-snd') : null,
+        canEdit(st) ? h('button', {
           type: 'button', class: 'pa-sc-glass', title: 'delete', onclick: async e => {
             e.stopPropagation();
             clearTimeout(t);
             if (!(await confirmDialog('delete this story?', { danger: true, okLabel: 'delete' }))) return;
             sc.stories = sc.stories.filter(x => x !== st);
-            if (!sc.snaps.some(x => x.imageId === st.imageId)) dropImage(st.imageId);
+            if (!stillUsed(fileId(st), st)) dropMedia(st);
             save(); show('snapchat', { view: 'stories' }, 'pop');
           },
         }, ico.dots()) : null));
+  }
+  // spotlight: everyone's public videos, full screen, swipe up
+  function scSpotlight() {
+    return h('div', { class: 'ph-app-screen pa-sc pa-dark-reels pa-sc-spot' },
+      h('div', { class: 'pa-reels-top' },
+        h('button', { type: 'button', class: 'pa-sc-bit', title: 'home', onclick: home }, portrait(char, 'sm')),
+        h('b', {}, 'spotlight'),
+        mine ? h('button', { type: 'button', class: 'pa-ibtn', title: 'post to spotlight', onclick: addSpotlight }, ico.plus()) : h('span')),
+      reelFeed('pa-sc-reels', allSpot(), {
+        empty: [ico.play(), mine ? h('button', { type: 'button', class: 'pa-sc-spotbtn', onclick: addSpotlight }, 'post to spotlight') : null],
+        rail: sp => [
+          railBtn('like', ico.heart(sp.liked), bigNum((sp.likes || 0) + (sp.liked ? 1 : 0)), e => {
+            if (!canTouch(sp)) return;
+            sp.liked = !sp.liked; saveFor(sp);
+            fill(e.currentTarget, ico.heart(sp.liked), h('span', {}, bigNum((sp.likes || 0) + (sp.liked ? 1 : 0))));
+            e.currentTarget.classList.toggle('on', sp.liked);
+          }, sp.liked),
+          railBtn('share', ico.share(), null, () => toast('link copied')),
+          canEdit(sp) ? railBtn('delete', ico.dots(), null, async () => {
+            if (!(await confirmDialog('delete this from spotlight?', { danger: true, okLabel: 'delete' }))) return;
+            sc.spotlight = sc.spotlight.filter(x => x !== sp);
+            if (!stillUsed(fileId(sp), sp)) dropMedia(sp);
+            save(); api.redraw();
+          }) : null],
+        info: sp => [
+          h('div', { class: 'pa-reel-who' }, face(sp.by, 'sm'), h('b', {}, who(sp.by).name), !isMe(sp.by) ? h('span', { class: 'pa-reel-follow' }, 'subscribe') : null),
+          sp.caption ? h('p', { class: 'pa-reel-cap' }, sp.caption) : null,
+          sp.views ? h('span', { class: 'pa-reel-sub' }, `${bigNum(sp.views)} views`) : null],
+      }),
+      scNav('spotlight'));
   }
 
   // ======================================================================
   // whatsapp
   // ======================================================================
   const wa = d.whatsapp;
+  const allStatus = () => shared('whatsapp', x => x.status);
   const chatName = c => (c.group ? c.name : who(c.members[0]).name);
   const chatFace = (c, cls = 'md') => (c.group
     ? h('span', { class: 'pa-wa-gface ' + cls }, c.members.slice(0, 2).map(r => face(r, 'xs')))
@@ -875,7 +1100,7 @@ export function install(api) {
       h('h3', { class: 'pa-wa-big' }, title), ...kids, waTabs(v));
     if (v === 'updates') {
       const byPerson = new Map();
-      for (const st of [...wa.status].sort((a, b) => b.at - a.at)) { const k = refKey(st.by); if (!byPerson.has(k)) byPerson.set(k, st); }
+      for (const st of allStatus()) { const k = refKey(st.by); if (!byPerson.has(k)) byPerson.set(k, st); }
       return wrap('updates', mine ? h('button', { type: 'button', class: 'pa-wa-circ', title: 'add status', onclick: waAddStatus }, ico.plus()) : null,
         h('div', { class: 'ph-scroll' },
           h('div', { class: 'pa-wa-sub' }, 'status'),
@@ -907,20 +1132,29 @@ export function install(api) {
             h('div', { class: 'pa-wa-rmain' },
               h('div', { class: 'pa-wa-rtop' }, h('b', {}, chatName(c)), h('span', {}, last ? shortDay(last.at) : '')),
               h('div', { class: 'pa-wa-rsub' }, last && isMe(last.by) ? ico.ticks() : null,
-                h('span', {}, last ? (c.group && !isMe(last.by) ? who(last.by).name.split(' ')[0] + ': ' : '') + (last.text || '📷 photo') : ''))));
+                h('span', {}, last ? [c.group && !isMe(last.by) ? who(last.by).name.split(' ')[0] + ': ' : '', last.text || (last.video ? [ico.video(), ' video'] : '📷 photo')] : ''))));
         }) : h('div', { class: 'ph-empty' }, ico.chat())));
   };
   const shortDay = ts => (dayLabel(ts) === 'today' ? hm(ts) : dayLabel(ts));
+  // a video message: first frame + play button + length, tap to play it right there
+  function waVideo(video) {
+    const v = vid(video, '', { sound: true, loop: false });
+    const box = h('div', { class: 'pa-wa-vid', onclick: e => { e.stopPropagation(); if (v.paused) { v.playNow(); box.classList.add('playing'); } else { v.pause(); box.classList.remove('playing'); } } },
+      v, h('span', { class: 'pa-wa-vplay' }, ico.play()), h('span', { class: 'pa-wa-vdur' }, ico.video(), clock(video.dur)));
+    v.addEventListener('ended', () => box.classList.remove('playing'));
+    return box;
+  }
   function waChat(p) {
     const c = wa.chats.find(x => x.id === p.id);
     if (!c) return SCREENS.whatsapp({});
     let as = me();
     const list = h('div', { class: 'ph-scroll pa-wa-msgs' });
     const input = h('input', { type: 'text', class: 'pa-wa-input', maxLength: 1000, placeholder: '', onkeydown: e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); send(); } } });
-    function send(imageId = null) {
+    // media = { imageId } or { video } from the + button
+    function send(media = null) {
       const text = input.value.trim();
-      if (!text && !imageId) return;
-      c.msgs.push({ id: 'wm_' + uid(), by: freshRef(as), text, imageId, at: Date.now() });
+      if (!text && !media) return;
+      c.msgs.push({ id: 'wm_' + uid(), by: freshRef(as), text, imageId: media?.imageId || null, ...(media?.video ? { video: media.video } : {}), at: Date.now() });
       input.value = ''; save(); draw();
     }
     const asBtn = h('button', { type: 'button', class: 'pa-as pa-wa-as', title: 'who is texting' });
@@ -941,11 +1175,12 @@ export function install(api) {
           day !== prevDay ? h('div', { class: 'pa-wa-day' }, h('span', {}, day)) : null,
           h('div', { class: 'pa-wa-mrow ' + (out ? 'out' : 'in') },
             h('div', {
-              class: 'pa-wa-bub' + (tail ? ' tail' : '') + (m.imageId ? ' pic' : ''),
-              onclick: async () => { if (!mine) return; if (await confirmDialog('delete this message?', { danger: true, okLabel: 'delete' })) { c.msgs = c.msgs.filter(x => x !== m); dropImage(m.imageId); save(); draw(); } },
+              class: 'pa-wa-bub' + (tail ? ' tail' : '') + (m.imageId || m.video ? ' pic' : ''),
+              onclick: async () => { if (!mine) return; if (await confirmDialog('delete this message?', { danger: true, okLabel: 'delete' })) { c.msgs = c.msgs.filter(x => x !== m); dropMedia(m); save(); draw(); } },
             },
               c.group && !out && tail ? h('b', { class: 'pa-wa-from', style: { color: who(m.by).color } }, who(m.by).name) : null,
               m.imageId ? pic(m.imageId, 'pa-wa-pic') : null,
+              m.video ? waVideo(m.video) : null,
               m.text ? h('span', { class: 'pa-wa-text' }, m.text) : null,
               h('span', { class: 'pa-wa-meta' }, hm(m.at), out ? ico.ticks() : null))),
         ];
@@ -965,12 +1200,12 @@ export function install(api) {
         mine ? h('button', {
           type: 'button', class: 'pa-wa-link', title: 'delete chat', onclick: async () => {
             if (!(await confirmDialog(`delete the chat with ${chatName(c)}?`, { danger: true, okLabel: 'delete' }))) return;
-            wa.chats = wa.chats.filter(x => x !== c); c.msgs.forEach(m => dropImage(m.imageId)); save(); show('whatsapp', {}, 'pop');
+            wa.chats = wa.chats.filter(x => x !== c); c.msgs.forEach(dropMedia); save(); show('whatsapp', {}, 'pop');
           },
         }, ico.dots()) : null),
       list,
       mine ? h('div', { class: 'pa-wa-composer' },
-        h('button', { type: 'button', class: 'pa-wa-link', title: 'photo', onclick: async () => { const [x] = await addPhotos(false, 1200); if (x) send(x.imageId); } }, ico.plus()),
+        h('button', { type: 'button', class: 'pa-wa-link', title: 'photo or video', onclick: async () => { const [x] = await pickMedia(false, 1200); if (x) send(x); } }, ico.plus()),
         h('div', { class: 'pa-wa-inwrap' }, input, asBtn),
         h('button', { type: 'button', class: 'pa-wa-send', title: 'send', onclick: () => send() }, ico.send())) : null);
   }
@@ -978,9 +1213,13 @@ export function install(api) {
     let color = '#25d366';
     const sw = swatches(color, c => { color = c; }, ['#25d366', '#7e57c2', '#ec407a', '#ff7043', '#26a69a', '#5c6bc0', '#111111', '#ff4fa3']);
     compose({
-      title: 'add status', placeholder: 'type a status', photo: true, okLabel: 'post',
+      title: 'add status', placeholder: 'type a status', photo: true, video: true, okLabel: 'post',
       extra: { el: sw, get: () => ({ color }) },
-      onDone: ({ by, text, imageId, color: col }) => { wa.status.push({ id: 'ws_' + uid(), by, text, imageId, color: col, at: Date.now() }); save(); api.redraw(); },
+      onDone: ({ by, text, imageId, video, color: col }) => {
+        if (video && imageId) { dropImage(video.imageId); video = null; }
+        wa.status.push({ id: 'ws_' + uid(), by, text, imageId, ...(video ? { video } : {}), color: col, at: Date.now() });
+        save(); api.redraw();
+      },
     });
   }
   async function waAddCall() {
@@ -996,19 +1235,23 @@ export function install(api) {
     });
   }
   function waStatusView(p) {
-    const list = wa.status.filter(st => refKey(st.by) === p.key).sort((a, b) => a.at - b.at);
+    const list = allStatus().filter(st => refKey(st.by) === p.key).sort((a, b) => a.at - b.at);
     const i = p.i || 0;
     const st = list[i];
     if (!st) return SCREENS.whatsapp({ view: 'updates' });
-    const go = () => { if (i + 1 < list.length) show('whatsapp', { view: 'status', key: p.key, i: i + 1 }, null); else show('whatsapp', { view: 'updates' }, 'pop'); };
-    const t = setTimeout(go, 5000);
+    let gone = false;
+    const go = () => { if (gone) return; gone = true; if (i + 1 < list.length) show('whatsapp', { view: 'status', key: p.key, i: i + 1 }, null); else show('whatsapp', { view: 'updates' }, 'pop'); };
+    const media = st.video || st.imageId ? scMedia(st, go) : { el: null, ms: null };
+    const t = setTimeout(go, media.ms ? media.ms + 1500 : 5000);
     api.onLeave(() => clearTimeout(t));
-    return h('div', { class: 'ph-app-screen pa-wa-sview', style: { background: st.imageId ? '#000' : st.color || '#25d366' }, onclick: go },
-      st.imageId ? pic(st.imageId, 'pa-sc-full') : null,
-      st.text ? h('div', { class: 'pa-wa-stext' + (st.imageId ? ' cap' : '') }, st.text) : null,
+    const hasPic = st.imageId || st.video;
+    return h('div', { class: 'ph-app-screen pa-wa-sview', style: { background: hasPic ? '#000' : st.color || '#25d366', '--dur': (media.ms || 5000) + 'ms' }, onclick: go },
+      media.el,
+      st.text ? h('div', { class: 'pa-wa-stext' + (hasPic ? ' cap' : '') }, st.text) : null,
       h('div', { class: 'pa-sc-bars' }, list.map((_, k) => h('i', { class: k < i ? 'done' : k === i ? 'now' : '' }))),
       h('div', { class: 'pa-sc-vtop story' }, face(st.by, 'sm'), h('div', {}, h('b', {}, isMe(st.by) ? 'my status' : who(st.by).name), h('span', {}, agoLong(st.at))), h('span', { class: 'pa-grow' }),
-        mine ? h('button', { type: 'button', class: 'pa-sc-glass', title: 'delete', onclick: e => { e.stopPropagation(); clearTimeout(t); wa.status = wa.status.filter(x => x !== st); dropImage(st.imageId); save(); show('whatsapp', { view: 'updates' }, 'pop'); } }, ico.dots()) : null));
+        st.video ? soundBtn('pa-sc-snd') : null,
+        canEdit(st) ? h('button', { type: 'button', class: 'pa-sc-glass', title: 'delete', onclick: e => { e.stopPropagation(); clearTimeout(t); wa.status = wa.status.filter(x => x !== st); dropMedia(st); save(); show('whatsapp', { view: 'updates' }, 'pop'); } }, ico.dots()) : null));
   }
 
   // ======================================================================
@@ -1050,12 +1293,12 @@ export function install(api) {
     pickAs('who reacted?').then(ref => {
       if (!ref) return;
       const m = openModal({
-        title: 'realmoji', body: h('div', { class: 'pa-br-emojis' }, BR_EMOJI.map(e => h('button', { type: 'button', onclick: () => { post.reacts = post.reacts.filter(r => !sameRef(r.by, ref)); post.reacts.push({ by: ref, emoji: e }); save(); m.close(); api.redraw(); } }, e))),
+        title: 'realmoji', body: h('div', { class: 'pa-br-emojis' }, BR_EMOJI.map(e => h('button', { type: 'button', onclick: () => { post.reacts ||= []; post.reacts = post.reacts.filter(r => !sameRef(r.by, ref)); post.reacts.push({ by: ref, emoji: e }); saveFor(post); m.close(); api.redraw(); } }, e))),
       });
     });
   }
   SCREENS.bereal = () => {
-    const posts = [...br.posts].sort((a, b) => b.at - a.at);
+    const posts = shared('bereal', x => x.posts);
     const blurOthers = mine && !postedToday();
     return h('div', { class: 'ph-app-screen pa-br' },
       h('div', { class: 'pa-br-top' },
@@ -1073,13 +1316,13 @@ export function install(api) {
             pic(swapped && post.front ? post.front : post.back, 'pa-br-main'),
             post.front ? h('button', { type: 'button', class: 'pa-br-small', title: 'swap', onclick: e => { e.stopPropagation(); swapped = !swapped; paint(); } }, pic(swapped ? post.back : post.front)) : null,
             blur ? h('div', { class: 'pa-br-blurmsg' }, h('b', {}, 'post to view')) : null,
-            !blur ? h('button', { type: 'button', class: 'pa-br-rmbtn', title: 'realmoji', onclick: e => { e.stopPropagation(); if (mine) realmoji(post); } }, ico.smile()) : null,
-            post.reacts.length && !blur ? h('div', { class: 'pa-br-reacts' }, post.reacts.slice(-4).map(r => h('span', { class: 'pa-br-rm' }, face(r.by, 'sm'), h('i', {}, r.emoji)))) : null);
+            !blur ? h('button', { type: 'button', class: 'pa-br-rmbtn', title: 'realmoji', onclick: e => { e.stopPropagation(); if (canTouch(post)) realmoji(post); } }, ico.smile()) : null,
+            post.reacts?.length && !blur ? h('div', { class: 'pa-br-reacts' }, post.reacts.slice(-4).map(r => h('span', { class: 'pa-br-rm' }, face(r.by, 'sm'), h('i', {}, r.emoji)))) : null);
           paint();
           return h('div', { class: 'pa-br-post', 'data-id': post.id },
             h('div', { class: 'pa-br-phead' }, face(post.by, 'sm'),
               h('div', {}, h('b', {}, isMe(post.by) ? nameOf(char) : who(post.by).name), h('span', {}, `${dayLabel(post.at)} · ${hmA(post.at)}`, post.late ? h('em', { class: 'pa-br-late' }, ' · ' + lateLabel(post.late)) : null)),
-              mine ? h('button', {
+              canEdit(post) ? h('button', {
                 type: 'button', class: 'pa-ibtn', title: 'delete', onclick: async () => {
                   if (!(await confirmDialog('delete this bereal?', { danger: true, okLabel: 'delete' }))) return;
                   br.posts = br.posts.filter(x => x !== post); dropImage(post.back); dropImage(post.front); save(); api.redraw();
@@ -1094,29 +1337,36 @@ export function install(api) {
   // threads
   // ======================================================================
   const th = d.threadsapp;
+  const allTh = () => shared('threadsapp', x => x.posts);
   function thNew(replyTo = null) {
     compose({
       title: replyTo ? 'reply' : 'new thread', placeholder: replyTo ? `reply to ${who(replyTo.by).name}...` : "what's new?", photo: !replyTo, okLabel: 'post',
       onDone: ({ by, text, imageId }) => {
-        if (replyTo) replyTo.replies.push({ id: 'tr_' + uid(), by, text, at: Date.now() });
-        else th.posts.push({ id: 'th_' + uid(), by, text, imageId, at: Date.now(), likes: rnd(0, 60), liked: false, reposts: rnd(0, 8), reposted: false, replies: [] });
-        save(); api.redraw();
+        if (replyTo) { replyTo.replies.push({ id: 'tr_' + uid(), by, text, at: Date.now() }); saveFor(replyTo); }
+        else { th.posts.push({ id: 'th_' + uid(), by, text, imageId, at: Date.now(), likes: rnd(0, 60), liked: false, reposts: rnd(0, 8), reposted: false, replies: [] }); save(); }
+        api.redraw();
       },
     });
+  }
+  // tap a worldmate's face / name: their threads profile
+  function thProfile(e, ref) {
+    if (!ref?.id || !allOcs(char.id).some(o => o.id === ref.id)) return;
+    e.stopPropagation();
+    show('threads', { view: 'profile', who: ref.id }, 'push');
   }
   function thPost(post, full = false) {
     const acts = h('div', { class: 'pa-th-acts' });
     const paint = () => fill(acts,
-      h('button', { type: 'button', class: 'pa-th-act' + (post.liked ? ' liked' : ''), title: 'like', onclick: e => { e.stopPropagation(); if (!mine) return; post.liked = !post.liked; save(); paint(); } }, ico.heart(post.liked), h('span', {}, post.likes + (post.liked ? 1 : 0) || '')),
-      h('button', { type: 'button', class: 'pa-th-act', title: 'reply', onclick: e => { e.stopPropagation(); if (mine) thNew(post); } }, ico.bubble(), h('span', {}, post.replies.length || '')),
-      h('button', { type: 'button', class: 'pa-th-act' + (post.reposted ? ' reposted' : ''), title: 'repost', onclick: e => { e.stopPropagation(); if (!mine) return; post.reposted = !post.reposted; save(); paint(); } }, ico.repost(), h('span', {}, post.reposts + (post.reposted ? 1 : 0) || '')),
+      h('button', { type: 'button', class: 'pa-th-act' + (post.liked ? ' liked' : ''), title: 'like', onclick: e => { e.stopPropagation(); if (!canTouch(post)) return; post.liked = !post.liked; saveFor(post); paint(); } }, ico.heart(post.liked), h('span', {}, post.likes + (post.liked ? 1 : 0) || '')),
+      h('button', { type: 'button', class: 'pa-th-act', title: 'reply', onclick: e => { e.stopPropagation(); if (canTouch(post)) thNew(post); } }, ico.bubble(), h('span', {}, post.replies.length || '')),
+      h('button', { type: 'button', class: 'pa-th-act' + (post.reposted ? ' reposted' : ''), title: 'repost', onclick: e => { e.stopPropagation(); if (!canTouch(post)) return; post.reposted = !post.reposted; saveFor(post); paint(); } }, ico.repost(), h('span', {}, post.reposts + (post.reposted ? 1 : 0) || '')),
       h('button', { type: 'button', class: 'pa-th-act', title: 'share', onclick: e => { e.stopPropagation(); toast('link copied'); } }, ico.send()));
     paint();
     return h('div', { class: 'pa-th-post' + (full ? ' full' : ''), 'data-id': post.id, onclick: () => { if (!full) show('threads', { view: 'post', id: post.id }, 'push'); } },
-      h('div', { class: 'pa-th-left' }, face(post.by, 'sm'), post.replies.length && full ? h('i', { class: 'pa-th-line' }) : null),
+      h('div', { class: 'pa-th-left', onclick: e => thProfile(e, post.by) }, face(post.by, 'sm'), post.replies.length && full ? h('i', { class: 'pa-th-line' }) : null),
       h('div', { class: 'pa-th-body' },
-        h('div', { class: 'pa-th-meta' }, h('b', {}, handleOf(post.by)), h('span', {}, ago(post.at)), h('span', { class: 'pa-grow' }),
-          mine ? h('button', {
+        h('div', { class: 'pa-th-meta' }, h('b', { onclick: e => thProfile(e, post.by) }, handleOf(post.by)), h('span', {}, ago(post.at)), h('span', { class: 'pa-grow' }),
+          canEdit(post) ? h('button', {
             type: 'button', class: 'pa-ibtn sm', title: 'delete', onclick: async e => {
               e.stopPropagation();
               if (!(await confirmDialog('delete this thread?', { danger: true, okLabel: 'delete' }))) return;
@@ -1135,7 +1385,7 @@ export function install(api) {
     });
     const wrap = (...kids) => h('div', { class: 'ph-app-screen pa-th' }, ...kids, nav);
     if (v === 'post') {
-      const post = th.posts.find(x => x.id === p.id);
+      const post = allTh().find(x => x.id === p.id);
       if (!post) return SCREENS.threads({});
       return wrap(
         h('div', { class: 'pa-th-top' }, h('button', { type: 'button', class: 'pa-ibtn', title: 'back', onclick: () => show('threads', { view: p.from || 'home' }, 'pop') }, ico.back()), h('b', {}, 'thread'), h('span')),
@@ -1143,9 +1393,9 @@ export function install(api) {
           h('div', { class: 'pa-th-replies' }, post.replies.map(r => h('div', { class: 'pa-th-post reply' },
             h('div', { class: 'pa-th-left' }, face(r.by, 'sm')),
             h('div', { class: 'pa-th-body' }, h('div', { class: 'pa-th-meta' }, h('b', {}, handleOf(r.by)), h('span', {}, ago(r.at)), h('span', { class: 'pa-grow' }),
-              mine ? h('button', { type: 'button', class: 'pa-ibtn sm', title: 'delete', onclick: () => { post.replies = post.replies.filter(x => x !== r); save(); api.redraw(); } }, '✕') : null),
+              canEdit(post) ? h('button', { type: 'button', class: 'pa-ibtn sm', title: 'delete', onclick: () => { post.replies = post.replies.filter(x => x !== r); save(); api.redraw(); } }, '✕') : null),
             h('div', { class: 'pa-th-text' }, r.text))))),
-          mine ? h('button', { type: 'button', class: 'pa-th-replybar', onclick: () => thNew(post) }, portrait(char, 'xs'), h('span', {}, `reply to ${handleOf(post.by)}...`)) : null));
+          canTouch(post) ? h('button', { type: 'button', class: 'pa-th-replybar', onclick: () => thNew(post) }, portrait(char, 'xs'), h('span', {}, `reply to ${handleOf(post.by)}...`)) : null));
     }
     if (v === 'search') {
       const out = h('div', {});
@@ -1153,24 +1403,42 @@ export function install(api) {
       const draw = () => {
         const q = input.value.trim().toLowerCase();
         const people = [char, ...allOcs(char.id)].filter(o => !q || nameOf(o).toLowerCase().includes(q));
-        const posts = q ? th.posts.filter(x => x.text.toLowerCase().includes(q)).reverse() : [];
+        const posts = q ? allTh().filter(x => (x.text || '').toLowerCase().includes(q)) : [];
         fill(out,
-          people.map(o => h('div', { class: 'pa-th-person' }, portrait(o, 'md'), h('div', {}, h('b', {}, handleOf({ id: o.id })), h('span', {}, nameOf(o))), h('button', { type: 'button', class: 'pa-th-follow' }, o === char ? 'you' : 'follow'))),
+          people.map(o => h('div', { class: 'pa-th-person', onclick: () => { if (o !== char) show('threads', { view: 'profile', who: o.id }, 'push'); } }, portrait(o, 'md'), h('div', {}, h('b', {}, handleOf({ id: o.id })), h('span', {}, nameOf(o))), h('button', { type: 'button', class: 'pa-th-follow' }, o === char ? 'you' : 'follow'))),
           posts.map(x => thPost(x)));
       };
       draw();
       return wrap(h('h3', { class: 'pa-th-big' }, 'search'), h('div', { class: 'pa-th-searchbar' }, ico.search(), input), h('div', { class: 'ph-scroll' }, out));
     }
     if (v === 'activity') {
-      const acts = th.posts.filter(x => isMe(x.by)).flatMap(x => x.replies.filter(r => !isMe(r.by)).map(r => ({ r, x }))).sort((a, b) => b.r.at - a.r.at);
+      const acts = allTh().filter(x => isMe(x.by)).flatMap(x => x.replies.filter(r => !isMe(r.by)).map(r => ({ r, x }))).sort((a, b) => b.r.at - a.r.at);
       return wrap(h('h3', { class: 'pa-th-big' }, 'activity'),
         h('div', { class: 'ph-scroll' }, acts.length ? acts.map(({ r, x }) => h('button', { type: 'button', class: 'pa-th-person', onclick: () => show('threads', { view: 'post', id: x.id, from: 'activity' }, 'push') },
           face(r.by, 'md'), h('div', {}, h('b', {}, handleOf(r.by), h('em', {}, ' ' + ago(r.at))), h('span', {}, r.text)))) : h('div', { class: 'ph-empty' }, ico.heart(false))));
     }
+    if (v === 'profile' && p.who) {
+      // a worldmate's profile: the threads they posted on their own phone
+      const o = allOcs(char.id).find(x => x.id === p.who);
+      if (!o) return SCREENS.threads({});
+      const oth = o.fun?.phone?.threadsapp || {};
+      const theirs = allTh().filter(x => x.by?.id === o.id);
+      return wrap(
+        h('div', { class: 'pa-th-top' }, h('button', { type: 'button', class: 'pa-ibtn', title: 'back', onclick: () => show('threads', {}, 'pop') }, ico.back()), h('span'), h('span', { class: 'pa-ibtn' }, ico.menu())),
+        h('div', { class: 'ph-scroll' },
+          h('div', { class: 'pa-th-prof' },
+            h('div', {}, h('h2', {}, nameOf(o)), h('div', { class: 'pa-th-handle' }, handleOf({ id: o.id }), h('span', {}, 'threads.net'))),
+            portrait(o, 'md')),
+          oth.bio ? h('p', { class: 'pa-th-bio' }, oth.bio) : null,
+          h('div', { class: 'pa-th-fol' }, `${bigNum(oth.followers ?? 1313)} followers`),
+          h('div', { class: 'pa-th-pbtns' }, h('button', { type: 'button', class: 'pa-th-pbtn dark' }, 'follow'), h('button', { type: 'button', class: 'pa-th-pbtn' }, 'mention')),
+          h('div', { class: 'pa-th-ptabs' }, h('button', { type: 'button', class: 'on' }, 'threads'), h('button', { type: 'button' }, 'replies')),
+          theirs.map(x => thPost(x))));
+    }
     if (v === 'profile') {
       let tab = p.tab || 'threads';
-      const myPosts = th.posts.filter(x => isMe(x.by)).reverse();
-      const myReplies = th.posts.filter(x => x.replies.some(r => isMe(r.by))).reverse();
+      const myPosts = allTh().filter(x => isMe(x.by));
+      const myReplies = allTh().filter(x => x.replies.some(r => isMe(r.by)));
       const followers = allOcs(char.id).slice(0, 3);
       return wrap(
         h('div', { class: 'pa-th-top' }, h('button', { type: 'button', class: 'pa-ibtn', title: 'home', onclick: home }, ico.back()), h('span'), h('span', { class: 'pa-ibtn' }, ico.menu())),
@@ -1185,7 +1453,7 @@ export function install(api) {
           (tab === 'threads' ? myPosts : myReplies).map(x => thPost(x))));
     }
     // home feed
-    const posts = [...th.posts].reverse();
+    const posts = allTh();
     return wrap(
       h('div', { class: 'pa-th-top' }, h('button', { type: 'button', class: 'pa-ibtn', title: 'home', onclick: home }, ico.back()), threadsLogo(), h('span')),
       h('div', { class: 'ph-scroll' },

@@ -4,7 +4,10 @@
 import { h, fill, uid, openModal, confirmDialog, swatches, segmented, toast, autosize } from '../ui.js';
 import { store } from '../store.js';
 import { dataFor, pic, sticker, appBar, portrait, nameOf, allOcs, ocById } from './kit.js';
-import { who, face, freshRef, pickWho, refOf, ago, bigNum, addPhotos, dropImage, relLabel, hmA, dayLabel } from './phone-bits.js';
+import { who, face, freshRef, pickWho, refOf, ago, bigNum, addPhotos, dropImage, relLabel, hmA, dayLabel, vid } from './phone-bits.js';
+
+// a post made in the phone's snapshot app can be a video with no picture
+const postVid = p => vid(p.video, 'so-vid', { inView: true, loop: true });
 
 export const meta = { id: 'social', label: 'socials', icon: '1f4f2' };
 
@@ -65,7 +68,7 @@ export function render(el, ctx) {
     let following = false;
     const followBtn = h('button', { type: 'button', class: 'so-btn blue', onclick: e => { following = !following; e.currentTarget.textContent = following ? 'following' : 'follow'; e.currentTarget.classList.toggle('blue', !following); } }, 'follow');
     const grid = h('div', { class: 'so-grid' }, posts.map(p => h('button', { type: 'button', class: 'so-tile', onclick: () => openPost(p) },
-      p.imageId ? pic(p.imageId) : h('div', { class: 'so-text-tile' }, h('span', {}, p.caption)),
+      p.imageId ? pic(p.imageId) : p.video ? postVid(p) : h('div', { class: 'so-text-tile' }, h('span', {}, p.caption)),
       p.id === d.pinned ? h('span', { class: 'so-pin' }, '📌') : null,
       h('div', { class: 'so-tile-hover' }, h('span', {}, '♥ ', bigNum(p.likes)), h('span', {}, '💬 ', p.comments.length)))));
     const list = h('div', { class: 'so-list' }, posts.map(p => feedPost(p)));
@@ -143,14 +146,14 @@ export function render(el, ctx) {
     likes.redraw = drawLikes;
     drawLikes();
     const media = h('div', { class: 'so-media', ondblclick: () => { if (!p.liked) like(p, heart, likes); burst(media); } },
-      p.imageId ? pic(p.imageId) : h('div', { class: 'so-text-tile big' }, h('span', {}, p.caption)));
+      p.imageId ? pic(p.imageId) : p.video ? postVid(p) : h('div', { class: 'so-text-tile big' }, h('span', {}, p.caption)));
     return h('article', { class: 'so-post' },
       h('div', { class: 'so-post-head' }, portrait(char, 'xs'), h('b', {}, handleOf(char, d)), d.verified ? verified() : null, p.id === d.pinned ? h('span', { class: 'so-pinned' }, '📌') : null,
         h('button', { type: 'button', class: 'so-more', onclick: () => openPost(p) }, '•••')),
       media,
       h('div', { class: 'so-act-row' }, heart, h('button', { type: 'button', class: 'so-act', title: 'comments', onclick: () => openPost(p) }, '💬'), h('span', { class: 'so-act' }, '➤'), h('span', { class: 'so-act save' }, '🔖')),
       likes,
-      p.caption && p.imageId ? h('p', { class: 'so-cap' }, h('b', {}, handleOf(char, d)), ' ', p.caption) : null,
+      p.caption && (p.imageId || p.video) ? h('p', { class: 'so-cap' }, h('b', {}, handleOf(char, d)), ' ', p.caption) : null,
       p.comments.length ? h('button', { type: 'button', class: 'so-view-c', onclick: () => openPost(p) }, p.comments.length === 1 ? 'view 1 comment' : `view all ${p.comments.length} comments`) : null,
       p.comments.slice(-2).map(c => h('p', { class: 'so-cap' }, h('b', {}, handleFor(c.who)), ' ', c.text)),
       h('span', { class: 'so-ago' }, timeAgo(p.at)));
@@ -176,7 +179,7 @@ export function render(el, ctx) {
     const heart = h('button', { type: 'button', class: 'so-act' + (p.liked ? ' liked' : ''), onclick: () => { like(p, heart, likesEl); likesEl.textContent = `${bigNum(p.likes)} likes`; } }, p.liked ? '♥' : '♡');
     const likesEl = h('b', { class: 'so-likes' }, `${bigNum(p.likes)} likes`);
     const media = h('div', { class: 'so-pm-media', ondblclick: () => { if (!p.liked) { like(p, heart, likesEl); likesEl.textContent = `${bigNum(p.likes)} likes`; } burst(media); } },
-      p.imageId ? pic(p.imageId) : h('div', { class: 'so-text-tile big' }, h('span', {}, p.caption)));
+      p.imageId ? pic(p.imageId) : p.video ? postVid(p) : h('div', { class: 'so-text-tile big' }, h('span', {}, p.caption)));
     function addComment() {
       const text = input.value.trim();
       if (!text) return;
@@ -188,7 +191,7 @@ export function render(el, ctx) {
     }
     function drawComments(anim) {
       fill(commentsEl,
-        p.caption && p.imageId ? h('div', { class: 'so-c cap' }, portrait(char, 'sm'), h('div', {}, h('p', {}, h('b', {}, handleOf(char, d)), ' ', p.caption), h('span', { class: 'so-ago' }, timeAgo(p.at)))) : null,
+        p.caption && (p.imageId || p.video) ? h('div', { class: 'so-c cap' }, portrait(char, 'sm'), h('div', {}, h('p', {}, h('b', {}, handleOf(char, d)), ' ', p.caption), h('span', { class: 'so-ago' }, timeAgo(p.at)))) : null,
         p.comments.map((c, i) => {
           const w = who(c.who);
           return h('div', { class: 'so-c' + (anim && i === p.comments.length - 1 ? ' new' : '') },
@@ -211,7 +214,7 @@ export function render(el, ctx) {
           h('span', { class: 'so-ago' }, new Date(p.at).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }).toLowerCase()),
           mine ? h('div', { class: 'so-c-add' }, asBtn, input, h('button', { type: 'button', class: 'so-c-post', onclick: addComment }, 'post')) : null)),
       actions: mine ? [
-        { label: 'delete', kind: 'danger', onClick: async close => { if (!(await confirmDialog('delete this post?', { danger: true, okLabel: 'delete' }))) return; d.posts = d.posts.filter(x => x !== p); if (d.pinned === p.id) d.pinned = null; dropImage(p.imageId); save(); close(); draw(); } },
+        { label: 'delete', kind: 'danger', onClick: async close => { if (!(await confirmDialog('delete this post?', { danger: true, okLabel: 'delete' }))) return; d.posts = d.posts.filter(x => x !== p); if (d.pinned === p.id) d.pinned = null; dropImage(p.imageId); dropImage(p.video?.imageId); save(); close(); draw(); } },
         { label: d.pinned === p.id ? 'unpin' : 'pin', kind: 'ghost', onClick: close => { d.pinned = d.pinned === p.id ? null : p.id; save(); close(); draw(); } },
         { label: 'edit', kind: 'ghost', onClick: close => { close(); postBox(p); } },
       ] : [],
@@ -244,7 +247,7 @@ export function render(el, ctx) {
         h('div', { class: 'so-pb-row' }, h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'likes'), likes), h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'day'), day))),
       actions: [{
         label: post ? 'save' : 'post', kind: 'primary', onClick: close => {
-          if (!draft.imageId && !draft.caption.trim()) { cap.focus(); return; }
+          if (!draft.imageId && !draft.video && !draft.caption.trim()) { cap.focus(); return; }
           saved = true;
           if (post) {
             if (post.imageId && post.imageId !== draft.imageId) dropImage(post.imageId);

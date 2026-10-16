@@ -98,6 +98,13 @@ export async function addPhotos(multiple = true, maxDim = 1400) {
 
 export const dropImage = id => { if (id) store.deleteImage(id); };
 
+// texts from them since the chat was last opened (t.seenAt = the newest text that's been seen)
+export function unreadCount(t) {
+  let k = 0;
+  for (let i = (t.msgs?.length || 0) - 1; i >= 0 && t.msgs[i].from === 'them' && t.msgs[i].at > (t.seenAt || 0); i--) k++;
+  return k;
+}
+
 // ---- videos ----
 // a video is saved like a picture (store.putImage) and kept as { imageId, dur, w, h } under a key like `video`
 // (the `imageId` inside is what backups + deleting look for). tests can hand one over as window.__testVideo.

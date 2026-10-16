@@ -15,7 +15,7 @@ import { cropAll } from '../crop.js';
 import { store } from '../store.js';
 import { dataFor, pic, sticker, appBar, portrait, nameOf, allOcs, ocById } from './kit.js';
 import { who, face, freshRef, pickWho, hm, hmA, stamp, dayLabel, shortDate, addPhotos, dropImage, relLabel, inkOn, mirrorSend, mirrorReact, mirrorDelete, refOf, addVideo, vid,
-  mirrorGroupSend, mirrorGroupReact, mirrorGroupDelete, mirrorGroupInfo, catchUp } from './phone-bits.js';
+  mirrorGroupSend, mirrorGroupReact, mirrorGroupDelete, mirrorGroupInfo, catchUp, unreadCount } from './phone-bits.js';
 import * as callsApps from './phone-calls.js';
 import * as lifeApps from './phone-life.js';
 import * as webApps from './phone-web.js';
@@ -218,7 +218,7 @@ export function render(el, ctx) {
   // every notification, newest first (lock screen + notification center). perThread = how many texts per chat
   function allNotifs(perThread = 1) {
     return [
-      ...d.threads.flatMap(t => t.msgs.filter(m => m.from === 'them').slice(-perThread).map(m => ({
+      ...d.threads.flatMap(t => t.msgs.filter(m => m.from === 'them' && m.at > (t.seenAt || 0)).slice(-perThread).map(m => ({
         app: 'messages', title: threadName(t), text: msgPreview(t, m), at: m.at, faceOf: t.group ? m.by : t.who, open: () => show('thread', { id: t.id }, 'unlock'),
       }))),
       ...EXTRA.flatMap(m => { try { return m.lockNotifs?.(api) || []; } catch (err) { console.error(err); return []; } }),
@@ -271,11 +271,7 @@ export function render(el, ctx) {
   };
 
   // home screen
-  const unread = () => d.threads.reduce((n, t) => {
-    let k = 0;
-    for (let i = t.msgs.length - 1; i >= 0 && t.msgs[i].from === 'them'; i--) k++;
-    return n + k;
-  }, 0);
+  const unread = () => d.threads.reduce((n, t) => n + unreadCount(t), 0);
   // apps you made in the app store look + open like the built in ones
   const appOf = id => {
     if (APPS[id]) return APPS[id];
@@ -398,7 +394,7 @@ export function render(el, ctx) {
         list.length ? list.map(t => {
           const last = t.msgs.at(-1);
           return h('button', { type: 'button', class: 'ph-row ph-thread-row', onclick: () => show('thread', { id: t.id }) },
-            last?.from === 'them' ? h('i', { class: 'ph-unread' }) : h('i', { class: 'ph-unread off' }),
+            unreadCount(t) ? h('i', { class: 'ph-unread' }) : h('i', { class: 'ph-unread off' }),
             threadFace(t, 'md'),
             h('div', { class: 'ph-row-main' },
               h('div', { class: 'ph-row-top' }, h('b', {}, threadName(t)), h('span', {}, last ? shortDate(last.at) : '')),
@@ -517,7 +513,15 @@ export function render(el, ctx) {
       if (got) send(got);
     }
     const dropMsg = m => { dropImage(m.imageId); dropImage(m.video?.imageId); };
+    // opening a chat (or a text landing while it's open) reads it
+    const markSeen = () => {
+      const at = t.msgs.at(-1)?.at || 0;
+      if ((t.seenAt || 0) >= at) return;
+      t.seenAt = at;
+      if (mine) save();
+    };
     function drawMsgs(animateLast = false) {
+      markSeen();
       let prev = null;
       const lastMine = t.msgs.map(m => m.from).lastIndexOf('me');
       const sender = m => (m.from === 'me' ? 'me' : g ? 'by:' + (m.by?.id || m.by?.name) : 'them');

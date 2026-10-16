@@ -8,7 +8,7 @@ import { cropAll } from '../crop.js';
 import { pic, ocById, allOcs } from './kit.js';
 // portrait/nameOf here show an oc as their account on the open app (see phone-accounts.js)
 import { portrait, nameOf, acctId, instaSd, activeOf, updateAccount } from './phone-accounts.js';
-import { who, face, freshRef, pickWho, refOf, ago, bigNum, addPhotos, dropImage, relLabel, addVideo, vid, tapToPause, soundBtn } from './phone-bits.js';
+import { who, face, freshRef, pickWho, refOf, ago, bigNum, addPhotos, dropImage, relLabel, addVideo, vid, tapToPause, soundBtn, unreadCount } from './phone-bits.js';
 
 // one picker for pictures + videos, like the app's own gallery. resolves { imageId, width, height } or { video } or null
 async function pickMedia(maxDim = 1400) {
@@ -217,7 +217,7 @@ export function install(api) {
     const backBtn = () => h('button', { type: 'button', class: 'ps-ibtn', title: 'back', onclick: pop }, ico.back());
     const homeBtn = () => h('button', { type: 'button', class: 'ps-ibtn ps-exit', title: 'home', onclick: () => api.goHome() }, ico.back());
 
-    const unreadDms = () => d.threads.filter(t => t.msgs.at(-1)?.from === 'them').length;
+    const unreadDms = () => d.threads.filter(t => unreadCount(t)).length;
 
     // ================= home feed =================
     function homePage() {
@@ -850,7 +850,7 @@ export function install(api) {
           h('b', { class: 'ps-act-group' }, 'messages'),
           list.length ? list.map(t => {
             const last = t.msgs.at(-1);
-            const unread = last?.from === 'them';
+            const unread = !!unreadCount(t);
             return h('button', { type: 'button', class: 'ps-dm' + (unread ? ' unread' : ''), onclick: () => api.show('thread', { id: t.id }) },
               face(t.who, 'ps-av md'),
               h('span', { class: 'ps-dm-text' }, h('b', {}, who(t.who).name),

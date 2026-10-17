@@ -4,6 +4,7 @@
 // and its own stylesheet in css/ocfun/<id>.css. whatever it saves lives in char.fun[<id>].
 
 import * as phone from './phone.js';
+import * as computer from './computer.js';
 import * as social from './social.js';
 import * as magazine from './magazine.js';
 import * as letters from './letters.js';
@@ -20,4 +21,4 @@ import * as mixtape from './mixtape.js';
 import * as ships from './ships.js';
 import * as diaries from './diaries.js';
 
-export const FEATURES = [phone, social, magazine, letters, room, dressup, locker, polaroids, card, ids, yearbook, timeline, mood, mixtape, ships, diaries];
+export const FEATURES = [phone, computer, social, magazine, letters, room, dressup, locker, polaroids, card, ids, yearbook, timeline, mood, mixtape, ships, diaries];

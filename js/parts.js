@@ -73,6 +73,19 @@ export function picOr(imageId, fallback) {
 
 // the emoji choices + "upload your own". works on a draft: draft.emoji, draft.iconId (a picture beats the emoji).
 // call done(saved) when the box closes so pictures that didn't get used are cleaned up.
+// any sticker from the diaries (3d emoji, gems, flowers...) in a box. onPick(id)
+export function pickStickerIcon(onPick) {
+  let tab = STICKER_TABS[0][0];
+  const tabs = h('div', { class: 'stk-tabs' });
+  const grid = h('div', { class: 'stk-grid icon-stk-grid' });
+  const m = openModal({ title: '3d sticker', body: h('div', { class: 'icon-stk-pick' }, tabs, grid) });
+  const draw = () => {
+    fill(tabs, STICKER_TABS.filter(t => !['doodles', 'words', 'tape', 'spills'].includes(t[0])).map(([name, icon]) => h('button', { type: 'button', class: 'stk-tab' + (name === tab ? ' on' : ''), title: name, onclick: () => { tab = name; draw(); } }, h('span', { class: 'stk-tab-icon' }, stickerNode(icon)))));
+    fill(grid, STICKER_TABS.find(t => t[0] === tab)[2].map(id => h('button', { type: 'button', class: 'stk-cell', onclick: () => { onPick(id); m.close(); } }, stickerNode(id))));
+  };
+  draw();
+}
+
 export function iconPicker(draft, oldId) {
   const uploads = [];
   const pic = h('div', { class: 'icon-pick' });
@@ -82,17 +95,7 @@ export function iconPicker(draft, oldId) {
     h('button', { type: 'button', class: 'btn ghost sm', onclick: pickSticker }, draft.sticker ? 'change sticker' : '+ 3d sticker'),
     draft.iconId || draft.sticker ? h('button', { type: 'button', class: 'link-btn', onclick: () => { draft.iconId = null; draft.sticker = null; drawPic(); } }, 'use the emoji') : null);
   // any sticker from the diaries (3d emoji, gems, flowers...)
-  function pickSticker() {
-    let tab = STICKER_TABS[0][0];
-    const tabs = h('div', { class: 'stk-tabs' });
-    const grid = h('div', { class: 'stk-grid icon-stk-grid' });
-    const m = openModal({ title: '3d sticker', body: h('div', { class: 'icon-stk-pick' }, tabs, grid) });
-    const draw = () => {
-      fill(tabs, STICKER_TABS.filter(t => !['doodles', 'words', 'tape', 'spills'].includes(t[0])).map(([name, icon]) => h('button', { type: 'button', class: 'stk-tab' + (name === tab ? ' on' : ''), title: name, onclick: () => { tab = name; draw(); } }, h('span', { class: 'stk-tab-icon' }, stickerNode(icon)))));
-      fill(grid, STICKER_TABS.find(t => t[0] === tab)[2].map(id => h('button', { type: 'button', class: 'stk-cell', onclick: () => { draft.sticker = id; draft.iconId = null; drawPic(); m.close(); } }, stickerNode(id))));
-    };
-    draw();
-  }
+  const pickSticker = () => pickStickerIcon(id => { draft.sticker = id; draft.iconId = null; drawPic(); });
   async function upload() {
     const file = await pickAndCrop({ aspect: 1 });
     if (!file) return;

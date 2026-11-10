@@ -1,6 +1,9 @@
 // what the saved things look like, and how to make new ones.
 //
-//   world = { id, name, blurb, emoji, icon, color, charIds, boards, maps, lore }
+//   world = { id, name, blurb, emoji, icon, color, charIds, boards, maps, lore, calendar, holidays, events }
+//   calendar = { kind: 'real' | 'custom', months: [{ name, days }], weekdays: [name], era, now: { y, m, d } }   (m starts at 0)
+//   holiday  = { id, name, emoji, sticker, color, m, d, len, about, imageId }               every year
+//   event    = { id, name, emoji, sticker, color, y, m, d, len, about, imageId, ocs, place }  once. place = a lore page id
 //   char  = { id, name, tagline, color, imageId, tags, basics, sections, gallery, moodboard, playlist, page }
 //   home  = the home page's layout (blankHome below)
 //
@@ -98,10 +101,29 @@ export function fixWorld(w) {
   w.boards ||= [];
   w.maps ||= [];
   w.lore ||= [];
+  w.calendar = fixCalendar(w.calendar);
+  w.holidays ||= [];
+  w.events ||= [];
   for (const b of w.boards) { b.nodes ||= []; b.edges ||= []; b.hiddenRels ||= []; }
   for (const m of w.maps) { m.pins ||= []; m.strokes ||= []; }
   w.createdAt ||= Date.now();
   return w;
+}
+
+export const REAL_MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+export const REAL_WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const REAL_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+export const realMonths = () => REAL_MONTHS.map((name, i) => ({ name, days: REAL_DAYS[i] }));
+
+export function fixCalendar(c) {
+  c = { kind: 'real', era: '', ...c };
+  if (!Array.isArray(c.months) || !c.months.length) c.months = realMonths();
+  if (!Array.isArray(c.weekdays) || !c.weekdays.length) c.weekdays = [...REAL_WEEKDAYS];
+  if (!c.now) {
+    const t = new Date();
+    c.now = c.kind === 'real' ? { y: t.getFullYear(), m: t.getMonth(), d: t.getDate() } : { y: 1, m: 0, d: 1 };
+  }
+  return c;
 }
 
 export function newWorld(fields = {}) {

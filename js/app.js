@@ -5,6 +5,7 @@
 //   #/w/<world>/web[/<board>]           connections boards
 //   #/w/<world>/maps[/<map>]            maps
 //   #/w/<world>/lore[/<entry>]          lore pages
+//   #/w/<world>/calendar                calendar: holidays, events, birthdays
 //   #/join/<code>                       an invite link to someone's collab world
 //   #/diary/<id>[/cover|/write[/<page>]] a diary: the 3d book, its cover designer, the pages
 //   #/view/<token>[/<tab>]              a one-time share link: someone's oc, read-only, kept in memory (share.js)
@@ -21,6 +22,7 @@ import * as profile from './views/profile.js';
 import * as web from './views/graph.js';
 import * as maps from './views/maps.js';
 import * as lore from './views/lore.js';
+import * as calendar from './views/calendar.js';
 import { renderBook, renderWrite } from './views/diary.js';
 import { renderCover } from './views/diary-cover.js';
 import { openLink } from './share.js';
@@ -30,6 +32,7 @@ const TABS = [
   { id: 'web', label: 'connections', icon: '🧶', view: web },
   { id: 'maps', label: 'maps', icon: '🗺️', view: maps },
   { id: 'lore', label: 'lore', icon: '📖', view: lore },
+  { id: 'calendar', label: 'calendar', icon: '📅', view: calendar },
 ];
 
 const app = document.getElementById('app');

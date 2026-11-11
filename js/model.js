@@ -26,7 +26,10 @@ const SECTIONS = ['personality', 'backstory', 'appearance', 'likes + dislikes'];
 
 // colors, fonts, corners + background picture. both the home page and an oc's page have these (see look.js).
 // null = "just use the site theme"
-export const blankLook = () => ({ bg: null, text: null, border: null, accent: null, wallpaper: { imageId: null, tile: false }, fontHead: null, fontBody: null, corners: 'round' });
+export const blankLook = () => ({ bg: null, text: null, border: null, accent: null, wallpaper: { imageId: null, tile: false }, fontHead: null, fontBody: null, corners: 'round',
+  // the boxes + extras (see look.js BOX_*): null / 0 / 'normal' = untouched
+  boxAlpha: null, boxColor: null, boxBlur: 0, edgeSize: 'normal', edgeStyle: 'solid', shadow: 'normal', spacing: 'normal',
+  textSize: 'normal', titleFx: 'none', buttons: 'filled', bgFade: 0, texture: 'none' });
 
 // how an oc's own page looks: a look, plus the top part (banner, pfp) and which tabs show in what order
 export const blankPage = () => ({

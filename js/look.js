@@ -1,7 +1,8 @@
 // how a page looks: colors, fonts, corners, a background picture. the home page and every oc's page
 // each carry one of these, paint() puts it on the page's outer box, and lookCards() are the controls.
 //
-//   look = { bg, text, border, accent, wallpaper: { imageId, tile }, fontHead, fontBody, corners }
+//   look = { bg, text, border, accent, wallpaper: { imageId, tile }, fontHead, fontBody, corners,
+//            boxAlpha, boxColor, boxBlur, edgeSize, edgeStyle, shadow, spacing, textSize, titleFx, buttons, bgFade, texture }
 //   (null anywhere = "just use the site theme")
 
 import { h, clear, swatches, segmented, pickFile, shrinkImage, toast } from './ui.js';
@@ -25,6 +26,20 @@ export const FONTS = [
   { id: 'graffiti', css: "'Sedgwick Ave Display', cursive", scale: 1.1 },
 ];
 export const CORNERS = ['round', 'soft', 'square'];
+
+// the "boxes + extras" choices. the first one in each list is the normal look (no class on the page)
+export const LOOK_CHOICES = {
+  edgeSize: ['normal', 'none', 'thin', 'thick'],
+  edgeStyle: ['solid', 'dashed', 'dotted', 'double'],
+  shadow: ['normal', 'none', 'big', 'glow'],
+  spacing: ['normal', 'tight', 'roomy'],
+  textSize: ['normal', 'small', 'big', 'huge'],
+  titleFx: ['none', 'glow', 'outline', 'shadow', 'gradient'],
+  buttons: ['filled', 'outline', 'soft'],
+  texture: ['none', 'grain', 'scanlines', 'glitter', 'stars', 'hearts'],
+};
+const TEXT_SIZES = { small: .9, normal: 1, big: 1.12, huge: 1.25 };
+const num = (v, min, max) => (typeof v === 'number' && isFinite(v) ? Math.min(max, Math.max(min, v)) : null);
 
 const HEX = /^#[0-9a-f]{6}$/i;
 const hex = v => (typeof v === 'string' && HEX.test(v) ? v : null);
@@ -63,7 +78,23 @@ export async function paint(el, look, accent) {
   if (body) {
     st.setProperty('--font-body', body.css);
     st.fontFamily = body.css;
-    if (body.scale) st.fontSize = body.scale + 'em';
+  }
+  const size = (body?.scale || 1) * (TEXT_SIZES[look.textSize] || 1);
+  if (size !== 1) st.fontSize = size + 'em';
+
+  // the boxes: see-through, tint, frosted glass
+  const boxAlpha = num(look.boxAlpha, 0, 100), boxColor = hex(look.boxColor), blur = num(look.boxBlur, 0, 30) || 0;
+  el.classList.toggle('box-fill', boxAlpha !== null || !!boxColor);
+  st.setProperty('--box-a', boxAlpha ?? 100);
+  if (boxColor) st.setProperty('--box-color', boxColor);
+  el.classList.toggle('box-blur', blur > 0);
+  if (blur) st.setProperty('--box-blur', blur + 'px');
+  // fades the background picture / video / color toward the page color
+  const fade = num(look.bgFade, 0, 95) || 0;
+  el.classList.toggle('bg-fade', fade > 0);
+  if (fade) st.setProperty('--bg-fade', fade);
+  for (const [key, values] of Object.entries(LOOK_CHOICES)) {
+    for (const v of values.slice(1)) el.classList.toggle(`${key}-${v}`, look[key] === v);
   }
   el.classList.add('look');
   el.classList.toggle('styled', !!ink);
@@ -86,6 +117,18 @@ export function colorCard(label, get, set, changed, colors) {
   const reset = h('button', { class: 'link-btn', hidden: !get(), onclick: () => { set(null); picker.set(null); reset.hidden = true; changed(); } }, 'reset');
   const picker = swatches(get(), c => { set(c); reset.hidden = false; changed(); }, colors);
   return card(label, reset, picker);
+}
+
+// a 0..max slider that can also be "nothing" (the reset link). off = the value that counts as untouched
+export function sliderCard(label, get, set, changed, { max = 100, off = null, start = max, unit = '%' } = {}) {
+  const shown = () => get() ?? start;
+  const out = h('span', { class: 'slider-num' });
+  const input = h('input', { type: 'range', class: 'look-slider', min: 0, max, step: 1, value: shown() });
+  const reset = h('button', { class: 'link-btn', onclick: () => { set(off); input.value = shown(); sync(); changed(); } }, 'reset');
+  const sync = () => { out.textContent = Math.round(shown()) + unit; reset.hidden = get() === off; };
+  input.oninput = () => { set(+input.value); sync(); changed(); };
+  sync();
+  return card(label, reset, h('div', { class: 'slider-row' }, input, out));
 }
 
 export function choiceCard(label, options, value, onPick) {
@@ -151,6 +194,31 @@ export function lookCards(look, changed, { accent = false } = {}) {
     fontCard('writing font', look.fontBody, v => { look.fontBody = v; changed(); }),
     choiceCard('corners', CORNERS, look.corners, v => { look.corners = v; changed(); }),
   ];
+}
+
+// the boxes (panels, cards, tabs) + the text, buttons, and what sits over the background
+export function boxCards(look, changed) {
+  const pick = (label, key) => choiceCard(label, LOOK_CHOICES[key], look[key] || LOOK_CHOICES[key][0], v => { look[key] = v; changed(); });
+  return {
+    boxes: [
+      sliderCard('see-through', () => (look.boxAlpha == null ? null : 100 - look.boxAlpha), v => look.boxAlpha = v == null ? null : 100 - v, changed, { start: 0 }),
+      colorCard('box color', () => look.boxColor, v => look.boxColor = v, changed, [...PAGE_BGS, ...PAGE_INKS.slice(4)]),
+      sliderCard('frosted glass', () => look.boxBlur || 0, v => look.boxBlur = v || 0, changed, { max: 30, off: 0, start: 0, unit: '' }),
+      pick('border thickness', 'edgeSize'),
+      pick('border style', 'edgeStyle'),
+      pick('shadow', 'shadow'),
+      pick('spacing', 'spacing'),
+    ],
+    text: [
+      pick('text size', 'textSize'),
+      pick('title effect', 'titleFx'),
+      pick('buttons', 'buttons'),
+    ],
+    background: [
+      sliderCard('background fade', () => look.bgFade || 0, v => look.bgFade = v || 0, changed, { max: 95, off: 0, start: 0 }),
+      pick('texture', 'texture'),
+    ],
+  };
 }
 
 // a list of things you can move up/down and show/hide. items: [{ id, label }], hidden: array of ids

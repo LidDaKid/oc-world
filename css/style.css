@@ -453,7 +453,7 @@ details.more summary { cursor: pointer; font-weight: 800; font-size: .85rem; col
 .look:is(.has-wallpaper, .has-video) .profile-top { padding: .35rem 1rem; border-radius: 999px; }
 .look:is(.has-wallpaper, .has-video) .profile-tabs { padding: .3rem; border-radius: 999px; width: fit-content; max-width: 100%; }
 .look:is(.has-wallpaper, .has-video) :is(.home-section, .home-foot) { padding: 1.1rem 1.2rem; border-radius: var(--radius); border: 0; }
-.bleed-video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -1; pointer-events: none; }
+.bleed-video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; pointer-events: none; }
 
 /* corners */
 .look.corners-soft { --radius: 10px; }
@@ -461,6 +461,93 @@ details.more summary { cursor: pointer; font-weight: 800; font-size: .85rem; col
 .look.corners-soft :is(.profile-hero, .profile-panel, .style-card, .fact, .rel-card, .gallery-item, .mood-item, .rel-web, .home-header, .section-text) { border-radius: 10px; }
 .look.corners-square :is(.profile-hero, .profile-panel, .style-card, .fact, .rel-card, .gallery-item, .mood-item, .rel-web, .home-header, .section-text, .card-pic, .btn, .chip, .tag, .profile-tab, .profile-tabs, .profile-top, input, textarea, .segmented, .seg) { border-radius: 0 !important; }
 .look.corners-soft :is(.btn, .profile-tab, .profile-tabs, .profile-top, .chip, .segmented, .seg) { border-radius: 8px !important; }
+
+/* ---- boxes + extras (look.js boxCards). every box on a page = the list in these :is() ---- */
+.look { --box-auto: var(--panel); --sp: 1; }
+.look.styled { --box-auto: color-mix(in srgb, var(--ink) 9%, var(--page-bg-color, var(--bg))); }
+/* see-through + box color */
+.look.box-fill :is(.profile-hero, .profile-panel, .card, .style-card, .fact, .rel-card, .rel-web, .section-text),
+.look.box-fill:is(.has-wallpaper, .has-video) :is(.profile-top, .profile-tabs, .home-section, .home-foot) {
+  background: color-mix(in srgb, var(--box-color, var(--box-auto)) calc(var(--box-a) * 1%), transparent) !important;
+}
+.look.box-fill .fact input { background: none !important; }
+/* frosted glass */
+.look.box-blur :is(.profile-hero, .profile-panel, .card, .style-card, .fact, .rel-card, .rel-web, .section-text),
+.look.box-blur:is(.has-wallpaper, .has-video) :is(.profile-top, .profile-tabs, .home-section, .home-foot) {
+  backdrop-filter: blur(var(--box-blur)); -webkit-backdrop-filter: blur(var(--box-blur));
+}
+/* borders */
+.look.edgeSize-none :is(.profile-hero, .profile-panel, .card, .style-card, .fact, .rel-card, .rel-web, .section-text, .gallery-item, .mood-item) { border-color: transparent !important; }
+.look.edgeSize-thin :is(.profile-hero, .profile-panel, .card, .style-card, .fact, .rel-card, .rel-web, .section-text, .gallery-item, .mood-item) { border-width: 1px !important; }
+.look.edgeSize-thick :is(.profile-hero, .profile-panel, .card, .style-card, .fact, .rel-card, .rel-web, .section-text, .gallery-item, .mood-item) { border-width: 3px !important; }
+.look.edgeStyle-dashed :is(.profile-hero, .profile-panel, .card, .style-card, .fact, .rel-card, .rel-web, .section-text, .gallery-item, .mood-item) { border-style: dashed !important; }
+.look.edgeStyle-dotted :is(.profile-hero, .profile-panel, .card, .style-card, .fact, .rel-card, .rel-web, .section-text, .gallery-item, .mood-item) { border-style: dotted !important; }
+.look.edgeStyle-double :is(.profile-hero, .profile-panel, .card, .style-card, .fact, .rel-card, .rel-web, .section-text, .gallery-item, .mood-item) { border-style: double !important; border-width: 4px !important; }
+.look.edgeStyle-double.edgeSize-thick :is(.profile-hero, .profile-panel, .card, .style-card, .fact, .rel-card, .rel-web, .section-text, .gallery-item, .mood-item) { border-width: 6px !important; }
+/* shadows */
+.look.shadow-none :is(.profile-hero, .profile-panel, .card, .style-card, .fact, .rel-card, .rel-web, .gallery-item, .mood-item) { box-shadow: none !important; }
+.look.shadow-big :is(.profile-hero, .profile-panel, .card, .style-card, .fact, .rel-card, .rel-web, .gallery-item, .mood-item) { box-shadow: 0 18px 44px -14px rgba(0, 0, 0, .6) !important; }
+.look.shadow-glow :is(.profile-hero, .profile-panel, .card, .style-card, .fact, .rel-card, .rel-web, .gallery-item, .mood-item) { box-shadow: 0 0 22px -3px color-mix(in srgb, var(--c, var(--accent)) 75%, transparent) !important; }
+/* spacing */
+.look.spacing-tight { --sp: .55; }
+.look.spacing-roomy { --sp: 1.6; }
+.look:is(.spacing-tight, .spacing-roomy) .card-grid { gap: calc(1.1rem * var(--sp)); }
+.look:is(.spacing-tight, .spacing-roomy) .facts { gap: calc(.6rem * var(--sp)); margin-bottom: calc(1.4rem * var(--sp)); }
+.look:is(.spacing-tight, .spacing-roomy) .sections { gap: calc(1.4rem * var(--sp)); }
+.look:is(.spacing-tight, .spacing-roomy) .style-grid { gap: calc(.8rem * var(--sp)); }
+.look:is(.spacing-tight, .spacing-roomy) .profile-panel { padding: calc(clamp(1rem, 3vw, 1.8rem) * var(--sp)); margin-bottom: calc(2rem * var(--sp)); }
+.look:is(.spacing-tight, .spacing-roomy) .home-section { margin-bottom: calc(2.8rem * var(--sp)); }
+/* text size: look.js scales the page's font-size; the big titles use rem so they get scaled here too */
+.look.textSize-small { --ts: .9; }
+.look.textSize-big { --ts: 1.12; }
+.look.textSize-huge { --ts: 1.25; }
+.look[class*="textSize-"] h1 { font-size: calc(2rem * var(--ts)); }
+.look[class*="textSize-"] h2 { font-size: calc(1.5rem * var(--ts)); }
+.look[class*="textSize-"] .profile-name { font-size: calc(clamp(1.8rem, 5vw, 2.6rem) * var(--ts)); }
+/* title effects */
+.look.titleFx-glow :is(h1, h2, .profile-name, .world-card h3) { text-shadow: 0 0 10px var(--c, var(--accent)), 0 0 22px color-mix(in srgb, var(--c, var(--accent)) 60%, transparent); }
+.look.titleFx-outline :is(h1, h2, .profile-name, .world-card h3) { -webkit-text-stroke: .045em var(--c, var(--accent)); paint-order: stroke fill; }
+.look.titleFx-shadow :is(h1, h2, .profile-name, .world-card h3) { text-shadow: .07em .07em 0 var(--c, var(--accent)); }
+.look.titleFx-gradient :is(h1, h2, .profile-name, .world-card h3) {
+  background: linear-gradient(90deg, var(--c, var(--accent)), color-mix(in srgb, var(--c, var(--accent)) 35%, var(--ink)) 55%, var(--edge, var(--accent)));
+  -webkit-background-clip: text; background-clip: text; color: transparent !important; -webkit-text-fill-color: transparent;
+}
+.look.titleFx-gradient .profile-name::placeholder { -webkit-text-fill-color: var(--ink2); }
+/* buttons */
+.look.buttons-outline :is(.btn.primary, .profile-tab.on) { background: transparent !important; color: var(--accent) !important; box-shadow: inset 0 0 0 2px var(--accent) !important; }
+.look.buttons-soft :is(.btn.primary, .profile-tab.on) { background: color-mix(in srgb, var(--accent) 24%, transparent) !important; color: var(--ink) !important; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent) !important; }
+/* picking text highlights in the page's color */
+.look ::selection { background: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--ink); }
+/* over the background: fade (::before) + texture (::after). both sit above the bg picture/video, under everything else */
+.look.bg-fade::before, .look[class*="texture-"]::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.look.bg-fade::before { background: color-mix(in srgb, var(--page-bg-color, var(--bg)) calc(var(--bg-fade) * 1%), transparent); }
+.look.texture-grain::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1.6 -.45'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: .32; mix-blend-mode: overlay;
+}
+.look.texture-scanlines::after { background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .22) 0 1px, transparent 1px 3px); }
+.look:is(.texture-glitter, .texture-stars, .texture-hearts)::after { -webkit-mask-repeat: repeat; mask-repeat: repeat; }
+.look.texture-glitter::after {
+  background: var(--accent); opacity: .55;
+  --g: radial-gradient(circle, #000 0 1px, transparent 1.6px);
+  -webkit-mask-image: var(--g), var(--g), var(--g); mask-image: var(--g), var(--g), var(--g);
+  -webkit-mask-size: 23px 29px, 37px 31px, 53px 47px; mask-size: 23px 29px, 37px 31px, 53px 47px;
+  -webkit-mask-position: 0 0, 11px 17px, 29px 5px; mask-position: 0 0, 11px 17px, 29px 5px;
+}
+.look.texture-stars::after {
+  background: var(--ink); opacity: .3;
+  --s: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cg fill='%23000'%3E%3Cpath d='M20 12l2 6 6 2-6 2-2 6-2-6-6-2 6-2z'/%3E%3Cpath d='M80 48l1.4 4.2 4.2 1.4-4.2 1.4L80 59.2l-1.4-4.2-4.2-1.4 4.2-1.4z'/%3E%3Cpath d='M45 88l2.4 7 7 2.4-7 2.4-2.4 7-2.4-7-7-2.4 7-2.4z'/%3E%3Ccircle cx='100' cy='100' r='1.4'/%3E%3Ccircle cx='60' cy='18' r='1'/%3E%3Ccircle cx='12' cy='70' r='1.2'/%3E%3C/g%3E%3C/svg%3E");
+  -webkit-mask-image: var(--s); mask-image: var(--s);
+}
+.look.texture-hearts::after {
+  background: var(--accent); opacity: .3;
+  --h: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cg fill='%23000'%3E%3Cpath d='M24 34s-10-6.2-10-12.4A5.6 5.6 0 0 1 24 18.4a5.6 5.6 0 0 1 10 3.2C34 27.8 24 34 24 34z'/%3E%3Cpath transform='translate(48 46) scale(.7)' d='M24 34s-10-6.2-10-12.4A5.6 5.6 0 0 1 24 18.4a5.6 5.6 0 0 1 10 3.2C34 27.8 24 34 24 34z'/%3E%3C/g%3E%3C/svg%3E");
+  -webkit-mask-image: var(--h); mask-image: var(--h);
+}
+/* the style controls */
+.slider-row { display: flex; align-items: center; gap: .7rem; }
+.look-slider { flex: 1; accent-color: var(--accent); }
+.slider-num { min-width: 2.8rem; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink2); }
 
 .profile { max-width: 60rem; }
 .profile-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: .8rem; }

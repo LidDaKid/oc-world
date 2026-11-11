@@ -6,7 +6,7 @@ import { store, imageIdsIn } from '../store.js';
 import { newChar, newWorld, newDiary } from '../model.js';
 import { h, fill, toast, openModal, confirmDialog, swatches, field, pickFile } from '../ui.js';
 import { iconPicker, worldIcon, picOr, emojiPicker, downloadBackup, ocCard, emptyState } from '../parts.js';
-import { paint, readableInk, lookCards, card, colorCard, choiceCard, pictureCard, orderList } from '../look.js';
+import { paint, readableInk, lookCards, boxCards, card, colorCard, choiceCard, pictureCard, orderList } from '../look.js';
 import { collab } from '../collab.js';
 import { openJoinModal } from '../collab-ui.js';
 import { book3d } from '../diary/covers.js';
@@ -158,6 +158,11 @@ export function render(el, { go }) {
 
       group('colors + fonts'),
       lookCards(home.look, changed, { accent: true }),
+      ...((b = boxCards(home.look, changed)) => [
+        group('boxes'), b.boxes,
+        group('text + buttons'), b.text,
+        group('over the background'), b.background,
+      ])(),
 
       group('cards'),
       pick('oc cards', 'ocLayout', ['grid', 'list']),

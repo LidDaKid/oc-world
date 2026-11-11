@@ -8,7 +8,7 @@ import { h, s, fill, uid, toast, openModal, confirmDialog, swatches, segmented, 
 import { portrait, nameOf, emptyState, worldIcon } from '../parts.js';
 import { seenFrom, openRelEditor } from '../rels.js';
 import { blankPage } from '../model.js';
-import { paint, lookCards, card, colorCard, choiceCard, pictureCard, orderList } from '../look.js';
+import { paint, lookCards, boxCards, card, colorCard, choiceCard, pictureCard, orderList } from '../look.js';
 import { FEATURES } from '../ocfun/index.js';
 import { dataFor, sticker } from '../ocfun/kit.js';
 import * as mood from '../ocfun/mood.js';
@@ -486,6 +486,11 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
       group('colors + fonts'),
       card('their color', null, swatches(char.color, c => { char.color = c; changed(); drawPfp(); })),
       lookCards(page, changed),
+      ...((b = boxCards(page, changed)) => [
+        group('boxes'), b.boxes,
+        group('text + buttons'), b.text,
+        group('over the background'), b.background,
+      ])(),
 
       group('top of the page'),
       bannerCard,

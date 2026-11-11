@@ -14,13 +14,17 @@ import { dataFor, sticker } from '../ocfun/kit.js';
 import * as mood from '../ocfun/mood.js';
 import { pickAndCrop, cropAll } from '../crop.js';
 import { openShareModal } from '../share.js';
+import { moreCards, toolsFor, organize, PICTURE_KEYS } from '../look-more.js';
+import { setFavicon, blinkieNode } from '../look-fx.js';
+import { pickStickerIcon } from '../parts.js';
+import { stickerNode } from '../diary/stickers.js';
 
 // the tabs you can move around / hide. page style is always last (and only for whoever made the oc).
 const TAB_NAMES = { about: 'about', relationships: 'relationships', gallery: 'gallery', moodboard: 'moodboard', fun: 'more' };
 const tabOrder = page => [...new Set([...(page.tabs || []).filter(id => id in TAB_NAMES), ...Object.keys(TAB_NAMES)])];
 
 const LAYOUT_CLASSES = {
-  bannerSize: ['none', 'short', 'tall'], heroAlign: ['center'], pfpShape: ['circle', 'square', 'heart', 'star', 'flower', 'hexagon', 'blob'], pfpSize: ['small', 'big'], width: ['wide', 'full'],
+  bannerSize: ['none', 'short', 'tall'], heroAlign: ['center', 'right'], pfpShape: ['circle', 'square', 'heart', 'star', 'flower', 'hexagon', 'blob'], pfpSize: ['small', 'big'], width: ['wide', 'full'],
   pfpFrame: ['double', 'glow', 'polaroid', 'lace', 'sparkle', 'dashed'], bannerEdge: ['wavy', 'zigzag', 'scalloped', 'torn'], tabStyle: ['underline', 'folder', 'buttons'],
 };
 
@@ -61,6 +65,9 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
     bleed.classList.toggle('has-mood', !!tint);
     if (tint) bleed.style.setProperty('--mood', tint);
     bleed.classList.toggle('banner-fade', !!page.bannerFade);
+    // the browser tab can wear their pfp
+    setFavicon(page.tabIcon === 'their pfp' && char.imageId ? await store.imageURL(char.imageId) : null);
+    drawPageStickers();
     for (const [key, values] of Object.entries(LAYOUT_CLASSES)) {
       for (const v of values) bleed.classList.toggle(`${key}-${v}`, page[key] === v);
     }
@@ -154,7 +161,7 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
 
     const sections = h('div', { class: 'sections' });
     const drawSections = () => fill(sections,
-      char.sections.map((sec, i) => h('section', { class: 'profile-section' },
+      char.sections.map((sec, i) => h('section', { class: 'profile-section', style: sec.color ? { '--sec-color': sec.color } : null },
         h('div', { class: 'section-head' },
           h('input', { type: 'text', class: 'section-title', value: sec.title, placeholder: 'section title', maxLength: 60, ...ro, oninput: e => { sec.title = e.target.value; save(); } }),
           mine && char.sections.length > 1 && [[-1, '↑', 'move up'], [1, '↓', 'move down']].map(([d, icon, title]) => h('button', {
@@ -431,8 +438,9 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
   // ---- tab: page style ----
   function styleTab() {
     const wrap = h('div', { class: 'style-grid' });
-    const changed = () => { save(); applyPageStyle(); };
     const rebuild = () => { save(); render(fill(el), { char, tab: 'style', base, world, go }); }; // for changes to the tabs themselves
+    const tools = toolsFor(page, () => { save(); applyPageStyle(); }, { scope: 'oc', reload: rebuild, ownerId: char.id });
+    const changed = tools.changed;
     const group = title => h('h3', { class: 'style-group' }, title);
     const pick = (label, key, options) => choiceCard(label, options, page[key], v => { page[key] = v; changed(); });
 
@@ -487,7 +495,9 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
     }
     drawSongs();
 
+    const more = moreCards(page, changed, 'oc');
     fill(wrap,
+      group('tools'), tools.cards,
       group('colors + fonts'),
       card('their color', null, swatches(char.color, c => { char.color = c; changed(); drawPfp(); })),
       lookCards(page, changed),
@@ -505,7 +515,7 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
       pick('banner size', 'bannerSize', ['none', 'short', 'normal', 'tall']),
       sliderCard('banner height', () => page.bannerPx ?? null, v => page.bannerPx = v, changed, { max: 400, start: 120, unit: 'px' }),
       pick('banner edge', 'bannerEdge', ['straight', 'wavy', 'zigzag', 'scalloped', 'torn']),
-      pick('name + pfp', 'heroAlign', ['left', 'center']),
+      pick('name + pfp', 'heroAlign', ['left', 'center', 'right']),
       pick('pfp shape', 'pfpShape', ['rounded', 'circle', 'square', 'heart', 'star', 'flower', 'hexagon', 'blob']),
       pick('pfp frame', 'pfpFrame', ['none', 'double', 'glow', 'polaroid', 'lace', 'sparkle', 'dashed']),
       pick('pfp size', 'pfpSize', ['small', 'normal', 'big']),
@@ -521,17 +531,73 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
       pick('tab style', 'tabStyle', ['pills', 'underline', 'folder', 'buttons']),
       pick('page width', 'width', ['normal', 'wide', 'full']),
 
+      Object.entries(more).map(([name, cards]) => [group(name), cards]),
+
+      group('stickers + blinkies'),
+      stickersCard(),
+      blinkiesCard(),
+      sectionColorsCard(),
+
       h('div', { class: 'style-card plain' },
         h('button', {
           class: 'btn ghost sm', onclick: async () => {
             if (!await confirmDialog('put the whole look back to normal?', { okLabel: 'reset' })) return;
-            [page.wallpaper.imageId, page.bannerPic.imageId].forEach(id => id && store.deleteImage(id));
+            [page.wallpaper.imageId, page.bannerPic.imageId, page.fallPic?.imageId, page.pfpHover?.imageId, page.cursorPic?.imageId,
+              ...(page.slides || []).map(p => p.imageId), ...(page.bannerSlides || []).map(p => p.imageId)].forEach(id => id && store.deleteImage(id));
             char.page = blankPage();
             rebuild(); // start over with the fresh page object
           },
         }, 'reset the whole look')));
 
+    organize(wrap);
     return wrap;
+
+    function stickersCard() {
+      const list = h('div', { class: 'order-list' });
+      const draw = () => {
+        page.stickers = Array.isArray(page.stickers) ? page.stickers : [];
+        fill(list, page.stickers.map(st => h('div', { class: 'order-row sticker-row' },
+          h('span', { class: 'sticker-pick-prev' }, stickerNode(st.sid)),
+          h('input', { type: 'range', class: 'look-slider', min: 24, max: 260, value: st.size, title: 'size', oninput: e => { st.size = +e.target.value; changed(); } }),
+          h('input', { type: 'range', class: 'look-slider', min: -45, max: 45, value: st.rot || 0, title: 'turn', oninput: e => { st.rot = +e.target.value; changed(); } }),
+          h('button', { type: 'button', class: 'icon-btn sm', title: 'remove', onclick: () => { page.stickers = page.stickers.filter(x => x !== st); changed(); draw(); } }, '✕'))));
+      };
+      draw();
+      return card('stickers on the page', null, list,
+        h('button', { class: 'btn ghost sm', onclick: () => pickStickerIcon(sid => {
+          page.stickers = [...(page.stickers || []), { id: 'ps_' + uid(), sid, x: 10 + Math.random() * 75, y: 40 + Math.random() * 300, size: 90, rot: Math.round(Math.random() * 30 - 15) }];
+          changed(); draw();
+        }) }, '+ add sticker'));
+    }
+
+    function blinkiesCard() {
+      const list = h('div', { class: 'blinkie-edit-list' });
+      const draw = () => {
+        page.blinkies = Array.isArray(page.blinkies) ? page.blinkies : [];
+        fill(list, page.blinkies.map(b => {
+          const prev = h('div', { class: 'blinkie-prev' }, blinkieNode(b));
+          const redo = () => { fill(prev, blinkieNode(b)); changed(); };
+          return h('div', { class: 'blinkie-edit' },
+            prev,
+            h('input', { type: 'text', value: b.text, maxLength: 40, placeholder: 'words', oninput: e => { b.text = e.target.value; redo(); } }),
+            segmented(['blinkie', 'stamp'].map(v => ({ value: v, label: v })), b.style || 'blinkie', v => { b.style = v; redo(); }),
+            segmented(['blink', 'scroll', 'glitter', 'still'].map(v => ({ value: v, label: v })), b.anim || 'blink', v => { b.anim = v; redo(); }),
+            swatches(b.bg, c => { b.bg = c; redo(); }),
+            swatches(b.ink, c => { b.ink = c; redo(); }, ['#ffffff', '#000000', '#ff4fa3', '#ffd84d', '#7df9d0', '#6ec6ff', '#b18cff']),
+            h('button', { type: 'button', class: 'link-btn', onclick: () => { page.blinkies = page.blinkies.filter(x => x !== b); changed(); draw(); } }, 'remove'));
+        }));
+      };
+      draw();
+      return card('blinkies + stamps', null, list,
+        h('button', { class: 'btn ghost sm', onclick: () => { page.blinkies = [...(page.blinkies || []), { id: 'bl_' + uid(), text: char.name || 'hi', style: 'blinkie', bg: char.color, ink: '#ffffff', anim: 'blink' }]; changed(); draw(); } }, '+ add blinkie'));
+    }
+
+    function sectionColorsCard() {
+      return card('section colors', null, h('div', { class: 'sec-color-list' }, char.sections.map(sec => h('div', { class: 'sec-color-row' },
+        h('span', { class: 'sec-color-name' }, sec.title || 'untitled'),
+        swatches(sec.color || null, c => { sec.color = c; save(); }),
+        h('button', { type: 'button', class: 'link-btn', onclick: e => { sec.color = null; save(); e.target.previousSibling.set?.(null); } }, 'reset')))));
+    }
   }
 
   // ---- tab: more (a grid of little apps, each one in ocfun/) ----
@@ -548,12 +614,37 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
     return box;
   }
 
+  // ---- 3d stickers stuck anywhere on the page (page.stickers = [{ id, sid, x: % across, y: px down, size, rot }]) ----
+  const stickerLayer = h('div', { class: 'page-stickers' });
+  function drawPageStickers() {
+    const list = Array.isArray(page.stickers) ? page.stickers : [];
+    fill(stickerLayer, list.map(st => {
+      const node = h('div', { class: 'page-sticker' + (mine ? ' movable' : ''), style: { left: st.x + '%', top: st.y + 'px', width: st.size + 'px', '--rot': (st.rot || 0) + 'deg' } }, stickerNode(st.sid));
+      if (mine) node.onpointerdown = e => {
+        e.preventDefault();
+        const box = stickerLayer.getBoundingClientRect();
+        const sx = e.clientX, sy = e.clientY, x0 = st.x, y0 = st.y;
+        node.setPointerCapture(e.pointerId);
+        node.classList.add('dragging');
+        node.onpointermove = ev => {
+          st.x = Math.max(0, Math.min(100, x0 + (ev.clientX - sx) / box.width * 100));
+          st.y = Math.max(0, y0 + ev.clientY - sy);
+          node.style.left = st.x + '%';
+          node.style.top = st.y + 'px';
+        };
+        node.onpointerup = () => { node.onpointermove = null; node.classList.remove('dragging'); save(); };
+      };
+      return node;
+    }));
+  }
+
   // ---- put it together ----
   const TAB_VIEWS = { about: aboutTab, relationships: relsTab, gallery: galleryTab, moodboard: moodTab, fun: funTab, style: styleTab };
   const panel = h('div', { class: 'profile-panel' }, TAB_VIEWS[active]());
 
   el.append(bleed);
   bleed.append(videoBack, h('div', { class: 'page profile' },
+    stickerLayer,
     view ? null : h('div', { class: 'profile-top' },
       h('a', { class: 'back-link', href: backHref }, world ? `← ${world.name}` : '← home'),
       mine && h('div', { class: 'profile-top-right' },

@@ -10,6 +10,7 @@ import { paint, readableInk, lookCards, boxCards, card, colorCard, choiceCard, p
 import { collab } from '../collab.js';
 import { openJoinModal } from '../collab-ui.js';
 import { book3d } from '../diary/covers.js';
+import { moreCards, toolsFor, organize } from '../look-more.js';
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const SECTION_NAMES = { header: 'header', worlds: 'worlds', ocs: 'ocs', diaries: 'diaries' };
@@ -134,7 +135,9 @@ export function render(el, { go }) {
   }
 
   function controls() {
-    const changed = () => { store.saveHome(); drawLayout(); };
+    const tools = toolsFor(home.look, () => { store.saveHome(); drawLayout(); }, { scope: 'home', reload: () => { drawer?.close(); openDrawer(); } });
+    const changed = tools.changed;
+    const more = moreCards(home.look, changed, 'home');
     const logoChanged = () => { store.saveHome(); drawLogo(); };
     const group = title => h('h3', { class: 'style-group' }, title);
     const pick = (label, key, options) => choiceCard(label, options, home[key], v => { home[key] = v; changed(); });
@@ -144,7 +147,8 @@ export function render(el, { go }) {
       h('input', { type: 'checkbox', checked: home[key], onchange: e => { home[key] = e.target.checked; changed(); } }), ' ' + label);
     const order = home.order.map(id => ({ id, label: SECTION_NAMES[id] }));
 
-    return h('div', { class: 'style-grid' },
+    const grid = h('div', { class: 'style-grid' },
+      group('tools'), tools.cards,
       group('sections'),
       card('order', null, orderList(order, home.hidden, () => { home.order = order.map(o => o.id); changed(); })),
 
@@ -173,6 +177,8 @@ export function render(el, { go }) {
       pick('world card size', 'worldSize', ['small', 'normal', 'big']),
       pick('page width', 'width', ['normal', 'wide', 'full']),
 
+      Object.entries(more).map(([name, cards]) => [group(name), cards]),
+
       group('site'),
       h('div', { class: 'style-card text-card' }, h('div', { class: 'style-card-head' }, h('h3', {}, 'site name')),
         text('siteName', 'oc world', 40, logoChanged)),
@@ -181,12 +187,16 @@ export function render(el, { go }) {
 
       h('div', { class: 'style-card plain' },
         h('button', { class: 'btn ghost sm', onclick: resetAll }, 'reset the whole look')));
+    organize(grid);
+    return grid;
   }
 
   async function resetAll() {
     if (!await confirmDialog('put the home page back to normal?', { okLabel: 'reset' })) return;
     imageIdsIn(home).forEach(id => store.deleteImage(id));
+    const presets = home.presets; // saved presets aren't part of the look
     store.resetHome();
+    if (presets) { store.home.presets = presets; store.saveHome(); }
     drawer?.close();
     render(fill(el), { go });
     drawLogo();

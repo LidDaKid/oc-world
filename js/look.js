@@ -9,6 +9,8 @@ import { h, clear, swatches, segmented, pickFile, shrinkImage, toast } from './u
 import { store } from './store.js';
 import { pickAndCrop } from './crop.js';
 import { setFall, cursorCss, setTrail } from './look-fx.js';
+import { paintMore } from './look-more.js';
+import { stickerNode } from './diary/stickers.js';
 
 export const PAGE_BGS = ['#15101d', '#000000', '#2a0a1b', '#1b1838', '#0f2a2a', '#3b1d4a', '#ffffff', '#fff0f6', '#ffd9e8', '#e3c6ff', '#bfe1ee', '#fff3b8'];
 export const PAGE_INKS = ['#f7effc', '#ffffff', '#1a1320', '#000000', '#ff4fa3', '#ff8ac4', '#ff5d6c', '#ffd84d', '#9be564', '#7df9d0', '#6ec6ff', '#b18cff'];
@@ -32,15 +34,15 @@ export const CORNERS = ['round', 'soft', 'square'];
 export const LOOK_CHOICES = {
   edgeSize: ['normal', 'none', 'thin', 'thick'],
   edgeStyle: ['solid', 'dashed', 'dotted', 'double'],
-  shadow: ['normal', 'none', 'big', 'glow'],
+  shadow: ['normal', 'none', 'big', 'glow', 'hard', 'paper stack', 'long', 'inner'],
   spacing: ['normal', 'tight', 'roomy'],
   textSize: ['normal', 'small', 'big', 'huge'],
   titleFx: ['none', 'glow', 'outline', 'shadow', 'gradient'],
   buttons: ['filled', 'outline', 'soft'],
-  texture: ['none', 'grain', 'scanlines', 'glitter', 'stars', 'hearts'],
+  texture: ['none', 'grain', 'scanlines', 'glitter', 'stars', 'hearts', 'paper', 'dots', 'crosshatch', 'lace', 'film', 'vhs'],
   bgFilter: ['none', 'b&w', 'sepia', 'faded', 'vintage', 'warm', 'cool', 'pink', 'dreamy', 'dark', 'bright', 'invert'],
-  bgMotion: ['none', 'shift', 'pan'],
-  fall: ['none', 'hearts', 'bats', 'stars', 'sparkles', 'petals', 'rain', 'snow'],
+  bgMotion: ['none', 'shift', 'pan', 'zoom', 'pulse', 'hue spin'],
+  fall: ['none', 'hearts', 'bats', 'stars', 'sparkles', 'petals', 'rain', 'snow', 'bubbles', 'confetti', 'leaves', 'music notes', 'moons', 'crosses', 'skulls', 'butterflies', 'my picture', 'sticker'],
   bgPos: ['center', 'top', 'bottom'],
   bgFit: ['fill', 'fit'],
   bgScroll: ['scrolls', 'stays'],
@@ -50,8 +52,8 @@ export const LOOK_CHOICES = {
   textShadow: ['none', 'soft', 'strong'],
   titleCase: ['as typed', 'upper', 'lower'],
   titleSpacing: ['normal', 'wide', 'wider'],
-  cursor: ['normal', 'heart', 'bat', 'star', 'cross'],
-  cursorTrail: ['none', 'sparkles'],
+  cursor: ['normal', 'heart', 'bat', 'star', 'cross', 'bow', 'moon', 'skull', 'sparkle', 'cherry'],
+  cursorTrail: ['none', 'sparkles', 'hearts', 'stars', 'bubbles'],
   pageIn: ['none', 'fade', 'slide', 'pop'],
 };
 // the filter presets (background, pfp, banner all use these)
@@ -135,11 +137,16 @@ export async function paint(el, look, accent) {
   // falling stuff + cursor use the page's own colors
   const accentNow = accent || '#ff4fa3', inkNow = ink || '#f7effc';
   const FALL_COLORS = { bats: [bg && readableInk(bg) === '#1a1320' ? '#1a1320' : inkNow], rain: [inkNow], snow: ['#ffffff', inkNow], petals: ['#ffb7d5', '#ff8ac4', '#ffd9e8'] };
-  setFall(el, look.fall, FALL_COLORS[look.fall] || [accentNow, inkNow]);
+  const fallKind = look.fall === 'my picture' ? 'picture' : look.fall;
+  let fallSrc = null;
+  if (fallKind === 'picture' && look.fallPic?.imageId) fallSrc = await store.imageURL(look.fallPic.imageId);
+  if (fallKind === 'sticker' && look.fallSticker) fallSrc = stickerNode(look.fallSticker)?.querySelector?.('img')?.src || stickerNode(look.fallSticker)?.src || null;
+  setFall(el, fallKind, hex(look.fallColor) ? [look.fallColor] : FALL_COLORS[look.fall] || [accentNow, inkNow],
+    { amount: look.fallAmount, speed: look.fallSpeed, size: look.fallSize, way: look.fallWay, src: fallSrc });
   const cur = cursorCss(look.cursor, look.cursor === 'bat' ? '#0b0710' : accentNow, look.cursor === 'bat' ? accentNow : '#ffffff');
   el.classList.toggle('cursor-on', !!cur);
   if (cur) st.setProperty('--look-cursor', cur);
-  setTrail(el, look.cursorTrail === 'sparkles');
+  setTrail(el, look.cursorTrail);
   document.documentElement.style.setProperty('--look-thumb', accent || inkNow);
   for (const [key, values] of Object.entries(LOOK_CHOICES)) {
     for (const v of values.slice(1)) el.classList.toggle(`${key}-${v.replace(/\W/g, '')}`, look[key] === v);
@@ -152,11 +159,16 @@ export async function paint(el, look, accent) {
   el.classList.toggle('has-wallpaper', !!wallpaperId);
   // a gradient sits under the picture (or is the whole background when there's no picture)
   const grads = [look.grad1, look.grad2, look.grad3].map(hex).filter(Boolean);
-  const gradient = grads.length >= 2 ? `linear-gradient(${num(look.gradAngle, 0, 360) ?? 160}deg, ${grads.join(', ')})` : null;
+  const ang = num(look.gradAngle, 0, 360) ?? 160;
+  const gradient = grads.length < 2 ? null
+    : look.gradType === 'radial' ? `radial-gradient(circle at 50% 30%, ${grads.join(', ')})`
+    : look.gradType === 'conic' ? `conic-gradient(from ${ang}deg, ${grads.join(', ')}, ${grads[0]})`
+    : `linear-gradient(${ang}deg, ${grads.join(', ')})`;
   el.classList.toggle('has-gradient', !!gradient);
   if (gradient) st.backgroundImage = gradient;
   const url = await store.imageURL(wallpaperId);
   if (url && look.wallpaper.imageId === wallpaperId) st.backgroundImage = [`url("${url}")`, gradient].filter(Boolean).join(', ');
+  await paintMore(el, look, { accent, ink, bg });
 }
 
 // ---- the controls ----
@@ -173,10 +185,10 @@ export function colorCard(label, get, set, changed, colors) {
 }
 
 // a 0..max slider that can also be "nothing" (the reset link). off = the value that counts as untouched
-export function sliderCard(label, get, set, changed, { max = 100, off = null, start = max, unit = '%' } = {}) {
+export function sliderCard(label, get, set, changed, { min = 0, max = 100, off = null, start = max, unit = '%' } = {}) {
   const shown = () => get() ?? start;
   const out = h('span', { class: 'slider-num' });
-  const input = h('input', { type: 'range', class: 'look-slider', min: 0, max, step: 1, value: shown() });
+  const input = h('input', { type: 'range', class: 'look-slider', min, max, step: 1, value: shown() });
   const reset = h('button', { class: 'link-btn', onclick: () => { set(off); input.value = shown(); sync(); changed(); } }, 'reset');
   const sync = () => { out.textContent = Math.round(shown()) + unit; reset.hidden = get() === off; };
   input.oninput = () => { set(+input.value); sync(); changed(); };

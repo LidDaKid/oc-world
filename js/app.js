@@ -26,6 +26,7 @@ import * as calendar from './views/calendar.js';
 import { renderBook, renderWrite } from './views/diary.js';
 import { renderCover } from './views/diary-cover.js';
 import { openLink } from './share.js';
+import { setFavicon } from './look-fx.js';
 
 const TABS = [
   { id: 'ocs', label: 'ocs', icon: '⭐', view: ocs },
@@ -151,6 +152,8 @@ async function route() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
   try { view.cleanup?.(); } catch (err) { console.error(err); }
   view = {};
+  setFavicon(null); // an oc page may have put their pfp on the browser tab
+  document.querySelectorAll('.look-intro').forEach(n => n.remove());
   // a share link is its own little site. going anywhere else (or to another link) starts fresh
   if (bootedView || parts[0] === 'view') {
     if (!bootedView || parts[0] !== 'view' || (viewing && parts[1] !== viewing.token)) { await store.flush(); location.reload(); return; }

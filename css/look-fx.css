@@ -140,12 +140,12 @@
 .look.pfpFrame-polaroid .pfp-btn { transform: rotate(-3deg); border-radius: 3px; }
 .look.pfpFrame-lace .portrait.pfp { border: 4px solid #fff !important; outline: 5px dotted #fff; outline-offset: 2px; box-shadow: 0 0 0 12px color-mix(in srgb, #fff 22%, transparent), 0 14px 30px -12px var(--c) !important; }
 .look.pfpFrame-sparkle .portrait.pfp { box-shadow: 0 0 0 3px var(--c), 0 0 18px 2px color-mix(in srgb, var(--c) 70%, transparent) !important; }
-.look.pfpFrame-sparkle .pfp-btn::before, .look.pfpFrame-sparkle .pfp-btn::after {
+.look.pfpFrame-sparkle .pfp-btn::before, .look.pfpFrame-sparkle:not([class*="pfpBadge-"]) .pfp-btn::after {
   position: absolute; z-index: 2; color: #fff; pointer-events: none;
   text-shadow: 0 0 8px var(--c), 0 0 2px var(--c); animation: look-twinkle 1.8s ease-in-out infinite;
 }
 .look.pfpFrame-sparkle .pfp-btn::before { content: '✦'; top: -.7rem; left: -.6rem; font-size: 1.7rem; }
-.look.pfpFrame-sparkle .pfp-btn::after { content: '✧'; top: .2rem; right: -.9rem; font-size: 1.15rem; animation-delay: .9s; }
+.look.pfpFrame-sparkle:not([class*="pfpBadge-"]) .pfp-btn::after { content: '✧'; top: .2rem; right: -.9rem; font-size: 1.15rem; animation-delay: .9s; }
 @keyframes look-twinkle { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7) rotate(20deg); } }
 .look.pfpFrame-dashed .portrait.pfp { border: 4px dashed var(--c) !important; box-shadow: none !important; }
 

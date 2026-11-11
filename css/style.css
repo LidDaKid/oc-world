@@ -464,7 +464,7 @@ details.more summary { cursor: pointer; font-weight: 800; font-size: .85rem; col
 
 /* ---- boxes + extras (look.js boxCards). every box on a page = the list in these :is() ---- */
 .look { --box-auto: var(--panel); --sp: 1; }
-.look.styled { --box-auto: color-mix(in srgb, var(--ink) 9%, var(--page-bg-color, var(--bg))); }
+.look.styled { --box-auto: var(--page-bg-color, var(--bg)); }
 /* see-through + box color */
 .look.box-fill :is(.profile-hero, .profile-panel, .card, .style-card, .fact, .rel-card, .rel-web, .section-text),
 .look.box-fill:is(.has-wallpaper, .has-video) :is(.profile-top, .profile-tabs, .home-section, .home-foot) {

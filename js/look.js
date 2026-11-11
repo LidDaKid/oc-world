@@ -202,7 +202,7 @@ export function boxCards(look, changed) {
   return {
     boxes: [
       sliderCard('see-through', () => (look.boxAlpha == null ? null : 100 - look.boxAlpha), v => look.boxAlpha = v == null ? null : 100 - v, changed, { start: 0 }),
-      colorCard('box color', () => look.boxColor, v => look.boxColor = v, changed, [...PAGE_BGS, ...PAGE_INKS.slice(4)]),
+      colorCard('box color', () => look.boxColor, v => look.boxColor = v, changed, ['#000000', '#ffffff', ...PAGE_BGS.filter(c => c !== '#000000' && c !== '#ffffff'), ...PAGE_INKS.slice(4)]),
       sliderCard('frosted glass', () => look.boxBlur || 0, v => look.boxBlur = v || 0, changed, { max: 30, off: 0, start: 0, unit: '' }),
       pick('border thickness', 'edgeSize'),
       pick('border style', 'edgeStyle'),

@@ -162,6 +162,7 @@ export function render(el, { go }) {
         group('boxes'), b.boxes,
         group('text + buttons'), b.text,
         group('over the background'), b.background,
+        group('extras'), b.extras,
       ])(),
 
       group('cards'),

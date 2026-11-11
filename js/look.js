@@ -8,6 +8,7 @@
 import { h, clear, swatches, segmented, pickFile, shrinkImage, toast } from './ui.js';
 import { store } from './store.js';
 import { pickAndCrop } from './crop.js';
+import { setFall, cursorCss, setTrail } from './look-fx.js';
 
 export const PAGE_BGS = ['#15101d', '#000000', '#2a0a1b', '#1b1838', '#0f2a2a', '#3b1d4a', '#ffffff', '#fff0f6', '#ffd9e8', '#e3c6ff', '#bfe1ee', '#fff3b8'];
 export const PAGE_INKS = ['#f7effc', '#ffffff', '#1a1320', '#000000', '#ff4fa3', '#ff8ac4', '#ff5d6c', '#ffd84d', '#9be564', '#7df9d0', '#6ec6ff', '#b18cff'];
@@ -38,6 +39,20 @@ export const LOOK_CHOICES = {
   buttons: ['filled', 'outline', 'soft'],
   texture: ['none', 'grain', 'scanlines', 'glitter', 'stars', 'hearts'],
   bgFilter: ['none', 'b&w', 'sepia', 'faded', 'vintage', 'warm', 'cool', 'pink', 'dreamy', 'dark', 'bright', 'invert'],
+  bgMotion: ['none', 'shift', 'pan'],
+  fall: ['none', 'hearts', 'bats', 'stars', 'sparkles', 'petals', 'rain', 'snow'],
+  bgPos: ['center', 'top', 'bottom'],
+  bgFit: ['fill', 'fit'],
+  bgScroll: ['scrolls', 'stays'],
+  boxSkin: ['none', 'glass', 'notebook', 'sticky note', 'torn paper', 'window', 'chrome', 'pixel'],
+  hover: ['none', 'lift', 'glow', 'wiggle', 'tilt'],
+  divider: ['none', 'line', 'lace', 'chain', 'hearts', 'stars', 'barbed wire'],
+  textShadow: ['none', 'soft', 'strong'],
+  titleCase: ['as typed', 'upper', 'lower'],
+  titleSpacing: ['normal', 'wide', 'wider'],
+  cursor: ['normal', 'heart', 'bat', 'star', 'cross'],
+  cursorTrail: ['none', 'sparkles'],
+  pageIn: ['none', 'fade', 'slide', 'pop'],
 };
 // the filter presets (background, pfp, banner all use these)
 export const FILTERS = {
@@ -114,6 +129,18 @@ export async function paint(el, look, accent) {
   el.classList.toggle('bg-fx', bgBlur > 0 || (!!look.bgFilter && look.bgFilter !== 'none'));
   if (bgBlur) st.setProperty('--bg-blur', bgBlur + 'px');
   if (filterCss(look.bgFilter)) st.setProperty('--bgf', filterCss(look.bgFilter));
+  const label = hex(look.labelColor);
+  el.classList.toggle('has-label', !!label);
+  if (label) st.setProperty('--label', label);
+  // falling stuff + cursor use the page's own colors
+  const accentNow = accent || '#ff4fa3', inkNow = ink || '#f7effc';
+  const FALL_COLORS = { bats: [bg && readableInk(bg) === '#1a1320' ? '#1a1320' : inkNow], rain: [inkNow], snow: ['#ffffff', inkNow], petals: ['#ffb7d5', '#ff8ac4', '#ffd9e8'] };
+  setFall(el, look.fall, FALL_COLORS[look.fall] || [accentNow, inkNow]);
+  const cur = cursorCss(look.cursor, look.cursor === 'bat' ? '#0b0710' : accentNow, look.cursor === 'bat' ? accentNow : '#ffffff');
+  el.classList.toggle('cursor-on', !!cur);
+  if (cur) st.setProperty('--look-cursor', cur);
+  setTrail(el, look.cursorTrail === 'sparkles');
+  document.documentElement.style.setProperty('--look-thumb', accent || inkNow);
   for (const [key, values] of Object.entries(LOOK_CHOICES)) {
     for (const v of values.slice(1)) el.classList.toggle(`${key}-${v.replace(/\W/g, '')}`, look[key] === v);
   }
@@ -123,8 +150,13 @@ export async function paint(el, look, accent) {
   for (const c of CORNERS) el.classList.toggle('corners-' + c, look.corners === c && c !== 'round');
   const wallpaperId = look.wallpaper.imageId;
   el.classList.toggle('has-wallpaper', !!wallpaperId);
+  // a gradient sits under the picture (or is the whole background when there's no picture)
+  const grads = [look.grad1, look.grad2, look.grad3].map(hex).filter(Boolean);
+  const gradient = grads.length >= 2 ? `linear-gradient(${num(look.gradAngle, 0, 360) ?? 160}deg, ${grads.join(', ')})` : null;
+  el.classList.toggle('has-gradient', !!gradient);
+  if (gradient) st.backgroundImage = gradient;
   const url = await store.imageURL(wallpaperId);
-  if (url && look.wallpaper.imageId === wallpaperId) st.backgroundImage = `url("${url}")`;
+  if (url && look.wallpaper.imageId === wallpaperId) st.backgroundImage = [`url("${url}")`, gradient].filter(Boolean).join(', ');
 }
 
 // ---- the controls ----
@@ -229,10 +261,17 @@ export function boxCards(look, changed) {
       pick('border style', 'edgeStyle'),
       pick('shadow', 'shadow'),
       pick('spacing', 'spacing'),
+      pick('box skin', 'boxSkin'),
+      pick('hover', 'hover'),
+      pick('dividers', 'divider'),
     ],
     text: [
       pick('text size', 'textSize'),
       pick('title effect', 'titleFx'),
+      pick('title case', 'titleCase'),
+      pick('title spacing', 'titleSpacing'),
+      pick('writing shadow', 'textShadow'),
+      colorCard('label color', () => look.labelColor, v => look.labelColor = v, changed),
       pick('buttons', 'buttons'),
     ],
     background: [
@@ -240,8 +279,34 @@ export function boxCards(look, changed) {
       pick('filter', 'bgFilter'),
       sliderCard('background blur', () => look.bgBlur || 0, v => look.bgBlur = v || 0, changed, { max: 30, off: 0, start: 0, unit: '' }),
       pick('texture', 'texture'),
+      gradientCard(look, changed),
+      pick('moving', 'bgMotion'),
+      pick('falling', 'fall'),
+      pick('picture spot', 'bgPos'),
+      pick('picture size', 'bgFit'),
+      pick('when you scroll', 'bgScroll'),
+    ],
+    extras: [
+      pick('cursor', 'cursor'),
+      pick('cursor trail', 'cursorTrail'),
+      pick('page opens', 'pageIn'),
     ],
   };
+}
+
+// 2 or 3 colors + which way they go
+function gradientCard(look, changed) {
+  const keys = ['grad1', 'grad2', 'grad3'];
+  const pickers = keys.map(k => swatches(look[k], c => { look[k] = c; sync(); changed(); }, [...PAGE_BGS, ...PAGE_INKS.slice(4)]));
+  const angle = h('input', { type: 'range', class: 'look-slider', min: 0, max: 360, step: 5, value: look.gradAngle ?? 160 });
+  const deg = h('span', { class: 'slider-num' });
+  const reset = h('button', { class: 'link-btn', onclick: () => { keys.forEach((k, i) => { look[k] = null; pickers[i].set(null); }); sync(); changed(); } }, 'reset');
+  const sync = () => { deg.textContent = (look.gradAngle ?? 160) + '°'; reset.hidden = !keys.some(k => look[k]); };
+  angle.oninput = () => { look.gradAngle = +angle.value; sync(); changed(); };
+  sync();
+  return card('gradient', reset,
+    ...pickers.map((p, i) => h('div', { class: 'grad-row' }, h('span', { class: 'grad-num' }, String(i + 1)), p)),
+    h('div', { class: 'slider-row' }, angle, deg));
 }
 
 // a list of things you can move up/down and show/hide. items: [{ id, label }], hidden: array of ids

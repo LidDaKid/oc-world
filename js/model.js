@@ -29,13 +29,17 @@ const SECTIONS = ['personality', 'backstory', 'appearance', 'likes + dislikes'];
 export const blankLook = () => ({ bg: null, text: null, border: null, accent: null, wallpaper: { imageId: null, tile: false }, fontHead: null, fontBody: null, corners: 'round',
   // the boxes + extras (see look.js BOX_*): null / 0 / 'normal' = untouched
   boxAlpha: null, boxColor: null, boxBlur: 0, edgeSize: 'normal', edgeStyle: 'solid', shadow: 'normal', spacing: 'normal',
-  textSize: 'normal', titleFx: 'none', buttons: 'filled', bgFade: 0, texture: 'none', bgFilter: 'none', bgBlur: 0 });
+  textSize: 'normal', titleFx: 'none', buttons: 'filled', bgFade: 0, texture: 'none', bgFilter: 'none', bgBlur: 0,
+  grad1: null, grad2: null, grad3: null, gradAngle: 160, bgMotion: 'none', fall: 'none', bgPos: 'center', bgFit: 'fill', bgScroll: 'scrolls',
+  boxSkin: 'none', hover: 'none', divider: 'none', labelColor: null, textShadow: 'none', titleCase: 'as typed', titleSpacing: 'normal',
+  cursor: 'normal', cursorTrail: 'none', pageIn: 'none' });
 
 // how an oc's own page looks: a look, plus the top part (banner, pfp) and which tabs show in what order
 export const blankPage = () => ({
   ...blankLook(),
   banner: null, bannerFade: false, bannerPic: { imageId: null }, bannerSize: 'normal',
   heroAlign: 'left', pfpShape: 'rounded', pfpSize: 'normal', width: 'normal', pfpFilter: 'none', bannerFilter: 'none',
+  pfpFrame: 'none', bannerEdge: 'straight', bannerPx: null, tabStyle: 'pills',
   tabs: null, hiddenTabs: [], moodLayout: 'grid', videoBg: null,
   musicAutoplay: true, musicShuffle: false,
 });

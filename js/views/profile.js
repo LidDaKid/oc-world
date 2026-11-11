@@ -8,7 +8,7 @@ import { h, s, fill, uid, toast, openModal, confirmDialog, swatches, segmented, 
 import { portrait, nameOf, emptyState, worldIcon } from '../parts.js';
 import { seenFrom, openRelEditor } from '../rels.js';
 import { blankPage } from '../model.js';
-import { paint, lookCards, boxCards, LOOK_CHOICES, filterCss, card, colorCard, choiceCard, pictureCard, orderList } from '../look.js';
+import { paint, lookCards, boxCards, LOOK_CHOICES, filterCss, sliderCard, card, colorCard, choiceCard, pictureCard, orderList } from '../look.js';
 import { FEATURES } from '../ocfun/index.js';
 import { dataFor, sticker } from '../ocfun/kit.js';
 import * as mood from '../ocfun/mood.js';
@@ -20,7 +20,8 @@ const TAB_NAMES = { about: 'about', relationships: 'relationships', gallery: 'ga
 const tabOrder = page => [...new Set([...(page.tabs || []).filter(id => id in TAB_NAMES), ...Object.keys(TAB_NAMES)])];
 
 const LAYOUT_CLASSES = {
-  bannerSize: ['none', 'short', 'tall'], heroAlign: ['center'], pfpShape: ['circle', 'square'], pfpSize: ['small', 'big'], width: ['wide', 'full'],
+  bannerSize: ['none', 'short', 'tall'], heroAlign: ['center'], pfpShape: ['circle', 'square', 'heart', 'star', 'flower', 'hexagon', 'blob'], pfpSize: ['small', 'big'], width: ['wide', 'full'],
+  pfpFrame: ['double', 'glow', 'polaroid', 'lace', 'sparkle', 'dashed'], bannerEdge: ['wavy', 'zigzag', 'scalloped', 'torn'], tabStyle: ['underline', 'folder', 'buttons'],
 };
 
 export function render(el, { char, tab, sub, base, world, go, view = false }) {
@@ -53,6 +54,8 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
     if (page.banner) bleed.style.setProperty('--banner', page.banner);
     if (filterCss(page.pfpFilter)) bleed.style.setProperty('--pfp-filter', filterCss(page.pfpFilter));
     if (filterCss(page.bannerFilter)) bleed.style.setProperty('--banner-filter', filterCss(page.bannerFilter));
+    bleed.classList.toggle('banner-custom', typeof page.bannerPx === 'number');
+    if (typeof page.bannerPx === 'number') bleed.style.setProperty('--banner-h', page.bannerPx + 'px');
     // their mood ring's color glows softly behind the page
     const tint = mood.moodTint?.(char);
     bleed.classList.toggle('has-mood', !!tint);
@@ -492,6 +495,7 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
         group('boxes'), b.boxes,
         group('text + buttons'), b.text,
         group('over the background'), b.background,
+        group('extras'), b.extras,
       ])(),
 
       group('top of the page'),
@@ -499,8 +503,11 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
       pictureCard('banner picture', page.bannerPic, changed, { maxDim: 2400 }),
       pick('banner filter', 'bannerFilter', LOOK_CHOICES.bgFilter),
       pick('banner size', 'bannerSize', ['none', 'short', 'normal', 'tall']),
+      sliderCard('banner height', () => page.bannerPx ?? null, v => page.bannerPx = v, changed, { max: 400, start: 120, unit: 'px' }),
+      pick('banner edge', 'bannerEdge', ['straight', 'wavy', 'zigzag', 'scalloped', 'torn']),
       pick('name + pfp', 'heroAlign', ['left', 'center']),
-      pick('pfp shape', 'pfpShape', ['rounded', 'circle', 'square']),
+      pick('pfp shape', 'pfpShape', ['rounded', 'circle', 'square', 'heart', 'star', 'flower', 'hexagon', 'blob']),
+      pick('pfp frame', 'pfpFrame', ['none', 'double', 'glow', 'polaroid', 'lace', 'sparkle', 'dashed']),
       pick('pfp size', 'pfpSize', ['small', 'normal', 'big']),
       pick('pfp filter', 'pfpFilter', LOOK_CHOICES.bgFilter),
 
@@ -511,6 +518,7 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
 
       group('layout'),
       card('tabs', null, orderList(tabs, page.hiddenTabs, () => { page.tabs = tabs.map(t => t.id); rebuild(); })),
+      pick('tab style', 'tabStyle', ['pills', 'underline', 'folder', 'buttons']),
       pick('page width', 'width', ['normal', 'wide', 'full']),
 
       h('div', { class: 'style-card plain' },

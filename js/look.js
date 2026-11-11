@@ -37,6 +37,7 @@ export const LOOK_CHOICES = {
   titleFx: ['none', 'glow', 'outline', 'shadow', 'gradient'],
   buttons: ['filled', 'outline', 'soft'],
   texture: ['none', 'grain', 'scanlines', 'glitter', 'stars', 'hearts'],
+  bgFilter: ['none', 'b&w', 'sepia', 'faded', 'vintage', 'warm', 'cool', 'pink', 'dreamy', 'dark', 'bright', 'invert'],
 };
 const TEXT_SIZES = { small: .9, normal: 1, big: 1.12, huge: 1.25 };
 const num = (v, min, max) => (typeof v === 'number' && isFinite(v) ? Math.min(max, Math.max(min, v)) : null);
@@ -93,8 +94,12 @@ export async function paint(el, look, accent) {
   const fade = num(look.bgFade, 0, 95) || 0;
   el.classList.toggle('bg-fade', fade > 0);
   if (fade) st.setProperty('--bg-fade', fade);
+  // a filter on the background only (the fade layer filters whatever is behind it)
+  const bgBlur = num(look.bgBlur, 0, 30) || 0;
+  el.classList.toggle('bg-fx', bgBlur > 0 || (!!look.bgFilter && look.bgFilter !== 'none'));
+  if (bgBlur) st.setProperty('--bg-blur', bgBlur + 'px');
   for (const [key, values] of Object.entries(LOOK_CHOICES)) {
-    for (const v of values.slice(1)) el.classList.toggle(`${key}-${v}`, look[key] === v);
+    for (const v of values.slice(1)) el.classList.toggle(`${key}-${v.replace(/\W/g, '')}`, look[key] === v);
   }
   el.classList.add('look');
   el.classList.toggle('styled', !!ink);
@@ -216,6 +221,8 @@ export function boxCards(look, changed) {
     ],
     background: [
       sliderCard('background fade', () => look.bgFade || 0, v => look.bgFade = v || 0, changed, { max: 95, off: 0, start: 0 }),
+      pick('filter', 'bgFilter'),
+      sliderCard('background blur', () => look.bgBlur || 0, v => look.bgBlur = v || 0, changed, { max: 30, off: 0, start: 0, unit: '' }),
       pick('texture', 'texture'),
     ],
   };

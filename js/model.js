@@ -29,7 +29,7 @@ const SECTIONS = ['personality', 'backstory', 'appearance', 'likes + dislikes'];
 export const blankLook = () => ({ bg: null, text: null, border: null, accent: null, wallpaper: { imageId: null, tile: false }, fontHead: null, fontBody: null, corners: 'round',
   // the boxes + extras (see look.js BOX_*): null / 0 / 'normal' = untouched
   boxAlpha: null, boxColor: null, boxBlur: 0, edgeSize: 'normal', edgeStyle: 'solid', shadow: 'normal', spacing: 'normal',
-  textSize: 'normal', titleFx: 'none', buttons: 'filled', bgFade: 0, texture: 'none' });
+  textSize: 'normal', titleFx: 'none', buttons: 'filled', bgFade: 0, texture: 'none', bgFilter: 'none', bgBlur: 0 });
 
 // how an oc's own page looks: a look, plus the top part (banner, pfp) and which tabs show in what order
 export const blankPage = () => ({

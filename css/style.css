@@ -521,6 +521,19 @@ details.more summary { cursor: pointer; font-weight: 800; font-size: .85rem; col
 /* over the background: fade (::before) + texture (::after). both sit above the bg picture/video, under everything else */
 .look.bg-fade::before, .look[class*="texture-"]::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; }
 .look.bg-fade::before { background: color-mix(in srgb, var(--page-bg-color, var(--bg)) calc(var(--bg-fade) * 1%), transparent); }
+.look.bg-fx::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.look.bg-fx::before { --bgf: opacity(1); backdrop-filter: var(--bgf) blur(var(--bg-blur, 0px)); -webkit-backdrop-filter: var(--bgf) blur(var(--bg-blur, 0px)); }
+.look.bgFilter-bw::before { --bgf: grayscale(1); }
+.look.bgFilter-sepia::before { --bgf: sepia(.85); }
+.look.bgFilter-faded::before { --bgf: saturate(.45) contrast(.82) brightness(1.08); }
+.look.bgFilter-vintage::before { --bgf: sepia(.45) saturate(.8) contrast(1.12) hue-rotate(-12deg); }
+.look.bgFilter-warm::before { --bgf: sepia(.3) saturate(1.4) hue-rotate(-12deg); }
+.look.bgFilter-cool::before { --bgf: saturate(1.15) hue-rotate(25deg) brightness(.97); }
+.look.bgFilter-pink::before { --bgf: sepia(1) hue-rotate(290deg) saturate(1.9) brightness(1.05); }
+.look.bgFilter-dreamy::before { --bgf: saturate(1.35) brightness(1.08) contrast(.9) blur(4px); }
+.look.bgFilter-dark::before { --bgf: brightness(.5); }
+.look.bgFilter-bright::before { --bgf: brightness(1.3) saturate(1.2); }
+.look.bgFilter-invert::before { --bgf: invert(1) hue-rotate(180deg); }
 .look.texture-grain::after {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1.6 -.45'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   opacity: .32; mix-blend-mode: overlay;

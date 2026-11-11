@@ -8,7 +8,7 @@ import { h, s, fill, uid, toast, openModal, confirmDialog, swatches, segmented, 
 import { portrait, nameOf, emptyState, worldIcon } from '../parts.js';
 import { seenFrom, openRelEditor } from '../rels.js';
 import { blankPage } from '../model.js';
-import { paint, lookCards, boxCards, card, colorCard, choiceCard, pictureCard, orderList } from '../look.js';
+import { paint, lookCards, boxCards, LOOK_CHOICES, filterCss, card, colorCard, choiceCard, pictureCard, orderList } from '../look.js';
 import { FEATURES } from '../ocfun/index.js';
 import { dataFor, sticker } from '../ocfun/kit.js';
 import * as mood from '../ocfun/mood.js';
@@ -51,6 +51,8 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
   async function applyPageStyle() {
     await paint(bleed, { ...page, accent: null }, char.color);
     if (page.banner) bleed.style.setProperty('--banner', page.banner);
+    if (filterCss(page.pfpFilter)) bleed.style.setProperty('--pfp-filter', filterCss(page.pfpFilter));
+    if (filterCss(page.bannerFilter)) bleed.style.setProperty('--banner-filter', filterCss(page.bannerFilter));
     // their mood ring's color glows softly behind the page
     const tint = mood.moodTint?.(char);
     bleed.classList.toggle('has-mood', !!tint);
@@ -495,10 +497,12 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
       group('top of the page'),
       bannerCard,
       pictureCard('banner picture', page.bannerPic, changed, { maxDim: 2400 }),
+      pick('banner filter', 'bannerFilter', LOOK_CHOICES.bgFilter),
       pick('banner size', 'bannerSize', ['none', 'short', 'normal', 'tall']),
       pick('name + pfp', 'heroAlign', ['left', 'center']),
       pick('pfp shape', 'pfpShape', ['rounded', 'circle', 'square']),
       pick('pfp size', 'pfpSize', ['small', 'normal', 'big']),
+      pick('pfp filter', 'pfpFilter', LOOK_CHOICES.bgFilter),
 
       group('music'),
       card('songs', null, songList, h('button', { class: 'btn ghost sm', onclick: addSongs }, '+ add songs')),

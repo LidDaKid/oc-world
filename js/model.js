@@ -35,7 +35,7 @@ export const blankLook = () => ({ bg: null, text: null, border: null, accent: nu
 export const blankPage = () => ({
   ...blankLook(),
   banner: null, bannerFade: false, bannerPic: { imageId: null }, bannerSize: 'normal',
-  heroAlign: 'left', pfpShape: 'rounded', pfpSize: 'normal', width: 'normal',
+  heroAlign: 'left', pfpShape: 'rounded', pfpSize: 'normal', width: 'normal', pfpFilter: 'none', bannerFilter: 'none',
   tabs: null, hiddenTabs: [], moodLayout: 'grid', videoBg: null,
   musicAutoplay: true, musicShuffle: false,
 });

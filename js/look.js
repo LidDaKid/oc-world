@@ -39,6 +39,21 @@ export const LOOK_CHOICES = {
   texture: ['none', 'grain', 'scanlines', 'glitter', 'stars', 'hearts'],
   bgFilter: ['none', 'b&w', 'sepia', 'faded', 'vintage', 'warm', 'cool', 'pink', 'dreamy', 'dark', 'bright', 'invert'],
 };
+// the filter presets (background, pfp, banner all use these)
+export const FILTERS = {
+  'b&w': 'grayscale(1)',
+  sepia: 'sepia(.85)',
+  faded: 'saturate(.45) contrast(.82) brightness(1.08)',
+  vintage: 'sepia(.45) saturate(.8) contrast(1.12) hue-rotate(-12deg)',
+  warm: 'sepia(.3) saturate(1.4) hue-rotate(-12deg)',
+  cool: 'saturate(1.15) hue-rotate(25deg) brightness(.97)',
+  pink: 'sepia(1) hue-rotate(290deg) saturate(1.9) brightness(1.05)',
+  dreamy: 'saturate(1.35) brightness(1.08) contrast(.9) blur(4px)',
+  dark: 'brightness(.5)',
+  bright: 'brightness(1.3) saturate(1.2)',
+  invert: 'invert(1) hue-rotate(180deg)',
+};
+export const filterCss = id => FILTERS[id] || null;
 const TEXT_SIZES = { small: .9, normal: 1, big: 1.12, huge: 1.25 };
 const num = (v, min, max) => (typeof v === 'number' && isFinite(v) ? Math.min(max, Math.max(min, v)) : null);
 
@@ -98,6 +113,7 @@ export async function paint(el, look, accent) {
   const bgBlur = num(look.bgBlur, 0, 30) || 0;
   el.classList.toggle('bg-fx', bgBlur > 0 || (!!look.bgFilter && look.bgFilter !== 'none'));
   if (bgBlur) st.setProperty('--bg-blur', bgBlur + 'px');
+  if (filterCss(look.bgFilter)) st.setProperty('--bgf', filterCss(look.bgFilter));
   for (const [key, values] of Object.entries(LOOK_CHOICES)) {
     for (const v of values.slice(1)) el.classList.toggle(`${key}-${v.replace(/\W/g, '')}`, look[key] === v);
   }

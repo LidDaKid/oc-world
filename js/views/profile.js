@@ -15,9 +15,18 @@ import * as mood from '../ocfun/mood.js';
 import { pickAndCrop, cropAll } from '../crop.js';
 import { openShareModal } from '../share.js';
 import { moreCards, toolsFor, organize, PICTURE_KEYS } from '../look-more.js';
-import { setFavicon, blinkieNode } from '../look-fx.js';
+import { setFavicon, blinkieNode, setPfpSlides, typeReveal } from '../look-fx.js';
+import { setCode, isLocked, askCode } from '../diary/lock.js';
+import { worldmates } from '../ocfun/kit.js';
 import { pickStickerIcon } from '../parts.js';
 import { stickerNode } from '../diary/stickers.js';
+
+// spoiler sections someone already clicked open (this visit only)
+const seenSpoilers = new WeakSet();
+// "move boxes around" from page style opens the page in arrange mode once
+let arrangeNext = null;
+// the boxes free layout can move (page.layout = { key: { x, y } })
+const LAYOUT_KEYS = ['top', 'hero', 'widgets', 'tabs', 'panel'];
 
 // the tabs you can move around / hide. page style is always last (and only for whoever made the oc).
 const TAB_NAMES = { about: 'about', relationships: 'relationships', gallery: 'gallery', moodboard: 'moodboard', fun: 'more' };
@@ -35,7 +44,8 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
   const ro = mine ? {} : { readOnly: true };
   let shown = tabOrder(page).filter(id => !page.hiddenTabs.includes(id));
   if (!shown.length) shown = ['about'];
-  const tabs = [...shown.map(id => [id, TAB_NAMES[id]]), ...(mine ? [['style', 'page style']] : [])];
+  const tabName = id => (page.tabNames?.[id] || '').trim() || TAB_NAMES[id];
+  const tabs = [...shown.map(id => [id, tabName(id)]), ...(mine ? [['style', 'page style']] : [])];
   const active = tabs.some(t => t[0] === tab) ? tab : tabs[0][0];
   const save = () => store.save('char', char);
   const linkTo = other => (view ? `#/${base}` : world && world.charIds.includes(other.id) ? `#/w/${world.id}/ocs/${other.id}` : `#/oc/${other.id}`);
@@ -65,6 +75,19 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
     bleed.classList.toggle('has-mood', !!tint);
     if (tint) bleed.style.setProperty('--mood', tint);
     bleed.classList.toggle('banner-fade', !!page.bannerFade);
+    // the page can take their mood ring's color
+    const moodColor = page.moodLook === 'on' ? mood.moodTint?.(char) : null;
+    if (moodColor) { bleed.style.setProperty('--c', moodColor); bleed.style.setProperty('--accent', moodColor); }
+    // the music player's skin + visualizer, and the page glowing with the beat
+    music.setLook({ skin: page.playerSkin || 'normal', visualizer: page.visualizer || 'off', listen: page.beatGlow === 'on' });
+    if (page.beatGlow === 'on' && !bleed.beatOn) {
+      bleed.beatOn = true;
+      const beat = () => { if (!bleed.isConnected) return; bleed.style.setProperty('--beat', music.level().toFixed(3)); requestAnimationFrame(beat); };
+      requestAnimationFrame(beat);
+    }
+    bleed.classList.toggle('beat-on', page.beatGlow === 'on');
+    placeBlocks();
+    drawWidgets();
     // the browser tab can wear their pfp
     setFavicon(page.tabIcon === 'their pfp' && char.imageId ? await store.imageURL(char.imageId) : null);
     drawPageStickers();
@@ -88,7 +111,10 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
 
   // ---- the top: pfp, name, which worlds they're in ----
   const pfp = h('button', { class: 'pfp-btn', title: mine ? 'change their picture' : '', disabled: !mine, onclick: changePic });
-  const drawPfp = () => fill(pfp, portrait(char, 'pfp'), mine ? h('span', { class: 'pfp-badge' }, '📷') : null);
+  const drawPfp = () => {
+    fill(pfp, h('span', { class: 'pfp-deco' }), portrait(char, 'pfp'), mine ? h('span', { class: 'pfp-badge' }, '📷') : null);
+    setPfpSlides(bleed, page.pfpSlides, page.pfpSec);
+  };
 
   async function changePic() {
     const file = await pickAndCrop({ aspect: 1 });
@@ -176,7 +202,7 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
               drawSections();
             },
           }, '✕')),
-        autosize(h('textarea', { class: 'section-text', value: sec.text, placeholder: mine ? '…' : '', ...ro, oninput: e => { sec.text = e.target.value; save(); } })))),
+        sectionBody(sec))),
       mine && h('button', {
         class: 'btn ghost sm', onclick: () => {
           char.sections.push({ title: '', text: '' });
@@ -186,12 +212,27 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
         },
       }, '+ section'));
 
+    // what's under a section title: the writing, or a lock, or a spoiler cover over the writing
+    function sectionBody(sec) {
+      const lockObj = sec.lock?.on ? { id: sec.id, lock: sec.lock, cover: { title: { text: sec.title || 'locked' } } } : null;
+      if (lockObj && isLocked(lockObj)) {
+        return h('div', { class: 'section-locked' }, h('span', { class: 'section-lock-icon' }, '🔒'),
+          h('button', { class: 'btn ghost sm', onclick: async () => { if (await askCode(lockObj, { mode: 'open' })) drawSections(); } }, 'unlock'));
+      }
+      const area = autosize(h('textarea', { class: 'section-text', value: sec.text, placeholder: mine ? '…' : '', ...ro, oninput: e => { sec.text = e.target.value; save(); } }));
+      if (!sec.spoiler || seenSpoilers.has(sec)) return area;
+      const wrap = h('div', { class: 'spoiler-wrap' }, area,
+        h('button', { type: 'button', class: 'spoiler-cover', onclick: () => { seenSpoilers.add(sec); wrap.replaceWith(area); autosize(area); } }, 'spoiler'));
+      return wrap;
+    }
+
     drawFacts();
     drawSections();
+    if (page.typeReveal === 'on') requestAnimationFrame(() => typeReveal(sections));
     return [
       facts,
       h('label', { class: 'tags-field' },
-        h('span', { class: 'field-label' }, 'tags'),
+        h('span', { class: 'field-label' }, (page.labels?.tags || '').trim() || 'tags'),
         h('input', {
           type: 'text', value: char.tags.join(', '), placeholder: mine ? 'main cast, villain, band' : '', ...ro,
           oninput: e => { char.tags = e.target.value.split(',').map(t => t.trim()).filter(Boolean); save(); drawMeta(); },
@@ -439,7 +480,11 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
   function styleTab() {
     const wrap = h('div', { class: 'style-grid' });
     const rebuild = () => { save(); render(fill(el), { char, tab: 'style', base, world, go }); }; // for changes to the tabs themselves
-    const tools = toolsFor(page, () => { save(); applyPageStyle(); }, { scope: 'oc', reload: rebuild, ownerId: char.id });
+    const tools = toolsFor(page, () => { save(); applyPageStyle(); }, {
+      scope: 'oc', reload: rebuild, ownerId: char.id, name: char.name,
+      snapshot: () => bleed.querySelector('.page.profile'),
+      arrange: () => { arrangeNext = char.id; go(`${base}/about`); },
+    });
     const changed = tools.changed;
     const group = title => h('h3', { class: 'style-group' }, title);
     const pick = (label, key, options) => choiceCard(label, options, page[key], v => { page[key] = v; changed(); });
@@ -528,6 +573,7 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
 
       group('layout'),
       card('tabs', null, orderList(tabs, page.hiddenTabs, () => { page.tabs = tabs.map(t => t.id); rebuild(); })),
+      namesCard(),
       pick('tab style', 'tabStyle', ['pills', 'underline', 'folder', 'buttons']),
       pick('page width', 'width', ['normal', 'wide', 'full']),
 
@@ -537,6 +583,7 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
       stickersCard(),
       blinkiesCard(),
       sectionColorsCard(),
+      widgetsCard(),
 
       h('div', { class: 'style-card plain' },
         h('button', {
@@ -592,11 +639,78 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
         h('button', { class: 'btn ghost sm', onclick: () => { page.blinkies = [...(page.blinkies || []), { id: 'bl_' + uid(), text: char.name || 'hi', style: 'blinkie', bg: char.color, ink: '#ffffff', anim: 'blink' }]; changed(); draw(); } }, '+ add blinkie'));
     }
 
+    function namesCard() {
+      page.tabNames ||= {};
+      page.labels ||= {};
+      const row = (label, obj, key, ph) => h('label', { class: 'name-row' }, h('span', {}, label),
+        h('input', { type: 'text', value: obj[key] || '', placeholder: ph, maxLength: 24, oninput: e => { obj[key] = e.target.value; save(); } }));
+      return card('tab + heading names', null, h('div', { class: 'name-list' },
+        Object.keys(TAB_NAMES).map(id => row(TAB_NAMES[id], page.tabNames, id, TAB_NAMES[id])),
+        row('tags', page.labels, 'tags', 'tags')));
+    }
+
+    function widgetsCard() {
+      const list = h('div', { class: 'widget-edit-list' });
+      const TYPES = { currently: 'currently', stats: 'stat bars', countdown: 'countdown', quote: 'quote box', visitors: 'visitor counter', guestbook: 'guestbook', playlist: 'mini playlist' };
+      const text = (w, key, ph, max = 80) => h('input', { type: 'text', value: w[key] || '', placeholder: ph, maxLength: max, oninput: e => { w[key] = e.target.value; changed(); } });
+      const draw = () => {
+        page.widgets = Array.isArray(page.widgets) ? page.widgets : [];
+        fill(list, page.widgets.map((w, i) => {
+          const move = d => { page.widgets.splice(i + d, 0, page.widgets.splice(i, 1)[0]); changed(); draw(); };
+          let body = null;
+          if (w.type === 'currently') body = [text(w, 'listening', 'listening to'), text(w, 'reading', 'reading'), text(w, 'watching', 'watching'), text(w, 'feeling', 'feeling')];
+          else if (w.type === 'stats') {
+            w.bars ||= [];
+            body = [segmented(['bars', 'hearts', 'stars'].map(v => ({ value: v, label: v })), w.style || 'bars', v => { w.style = v; changed(); }),
+              ...w.bars.map(b => h('div', { class: 'stat-edit' },
+                h('input', { type: 'text', value: b.label, placeholder: 'kindness', maxLength: 24, oninput: e => { b.label = e.target.value; changed(); } }),
+                h('input', { type: 'range', class: 'look-slider', min: 0, max: 100, value: b.value, oninput: e => { b.value = +e.target.value; changed(); } }),
+                h('button', { type: 'button', class: 'icon-btn sm', title: 'remove', onclick: () => { w.bars = w.bars.filter(x => x !== b); changed(); draw(); } }, '✕'))),
+              h('button', { type: 'button', class: 'btn ghost sm', onclick: () => { w.bars.push({ label: '', value: 50 }); changed(); draw(); } }, '+ bar')];
+          } else if (w.type === 'countdown') body = [text(w, 'label', 'countdown to'),
+            h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!w.useBirthday, onchange: e => { w.useBirthday = e.target.checked; changed(); draw(); } }), ' their birthday'),
+            w.useBirthday ? null : h('input', { type: 'date', value: w.date || '', onchange: e => { w.date = e.target.value; changed(); } })];
+          else if (w.type === 'quote') body = [h('textarea', { rows: 2, maxLength: 300, placeholder: 'the quote', value: w.text || '', oninput: e => { w.text = e.target.value; changed(); } }), text(w, 'by', 'who said it'),
+            segmented(['fancy', 'tape', 'bubble'].map(v => ({ value: v, label: v })), w.frame || 'fancy', v => { w.frame = v; changed(); })];
+          else if (w.type === 'visitors') body = [h('input', { type: 'number', min: 0, value: w.count || '', placeholder: 'start at', oninput: e => { w.count = +e.target.value || 0; changed(); } })];
+          else if (w.type === 'guestbook') body = [h('div', { class: 'muted' }, `${(w.entries || []).length}`),
+            (w.entries || []).length ? h('button', { type: 'button', class: 'link-btn', onclick: () => { w.entries = []; changed(); draw(); } }, 'clear it') : null];
+          return h('div', { class: 'widget-edit' },
+            h('div', { class: 'widget-edit-head' }, h('b', {}, TYPES[w.type]),
+              h('button', { type: 'button', class: 'icon-btn sm', title: 'move up', disabled: i === 0, onclick: () => move(-1) }, '↑'),
+              h('button', { type: 'button', class: 'icon-btn sm', title: 'move down', disabled: i === page.widgets.length - 1, onclick: () => move(1) }, '↓'),
+              h('button', { type: 'button', class: 'icon-btn sm', title: 'remove', onclick: () => { page.widgets = page.widgets.filter(x => x !== w); changed(); draw(); } }, '✕')),
+            w.type === 'quote' || w.type === 'countdown' ? null : text(w, 'title', 'box title'), body);
+        }));
+      };
+      draw();
+      const add = h('select', { onchange: e => {
+        if (!e.target.value) return;
+        page.widgets = [...(page.widgets || []), { id: 'wd_' + uid(), type: e.target.value, ...(e.target.value === 'stats' ? { bars: [{ label: 'kindness', value: 70 }, { label: 'chaos', value: 95 }] } : {}) }];
+        e.target.value = '';
+        changed(); draw();
+      } }, h('option', { value: '' }, '+ add a widget'), Object.entries(TYPES).map(([v, l]) => h('option', { value: v }, l)));
+      return card('widgets', null, list, add);
+    }
+
     function sectionColorsCard() {
-      return card('section colors', null, h('div', { class: 'sec-color-list' }, char.sections.map(sec => h('div', { class: 'sec-color-row' },
+      return card('sections', null, h('div', { class: 'sec-color-list' }, char.sections.map(sec => h('div', { class: 'sec-color-row' },
         h('span', { class: 'sec-color-name' }, sec.title || 'untitled'),
         swatches(sec.color || null, c => { sec.color = c; save(); }),
-        h('button', { type: 'button', class: 'link-btn', onclick: e => { sec.color = null; save(); e.target.previousSibling.set?.(null); } }, 'reset')))));
+        h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!sec.spoiler, onchange: e => { sec.spoiler = e.target.checked; save(); } }), ' spoiler'),
+        h('button', { type: 'button', class: 'btn ghost sm', onclick: async e => {
+          const btn = e.currentTarget;
+          if (sec.lock?.on) { sec.lock = null; save(); btn.textContent = 'lock'; return; }
+          sec.id ||= 'sec_' + uid();
+          const obj = { id: sec.id, lock: { style: 'gold' }, cover: { title: { text: sec.title || 'locked' } } };
+          const code = await askCode(obj, { mode: 'set' });
+          if (!code) return;
+          await setCode(obj, code);
+          sec.lock = obj.lock;
+          save();
+          btn.textContent = 'unlock for good';
+        } }, sec.lock?.on ? 'unlock for good' : 'lock'),
+        h('button', { type: 'button', class: 'link-btn', onclick: e => { sec.color = null; save(); e.target.parentNode.querySelector('.swatches').set?.(null); } }, 'reset')))));
     }
   }
 
@@ -612,6 +726,123 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
     const ctx = { char, mine, save, go, base, world, ocLink: linkTo, data: dataFor(char, app.meta.id) };
     try { funCleanup = app.render(box, ctx) || null; } catch (err) { console.error(err); toast("that didn't open right", 'bad'); }
     return box;
+  }
+
+  // ---- widgets: little 2000s profile boxes under the top part (page.widgets = [{ id, type, ... }]) ----
+  const widgetRow = h('div', { class: 'oc-widgets', dataset: { block: 'widgets' } });
+  function drawWidgets() {
+    const list = Array.isArray(page.widgets) ? page.widgets : [];
+    widgetRow.hidden = !list.length;
+    fill(widgetRow, list.map(w => h('div', { class: `card oc-widget widget-${w.type}` }, widgetBody(w))));
+  }
+  function widgetBody(w) {
+    const head = t => h('div', { class: 'widget-head' }, w.title?.trim() || t);
+    if (w.type === 'currently') {
+      const rows = [['listening to', w.listening], ['reading', w.reading], ['watching', w.watching], ['feeling', w.feeling]].filter(r => r[1]?.trim());
+      return [head('currently'), h('div', { class: 'widget-rows' }, rows.map(([k, v]) => h('div', { class: 'widget-row' }, h('span', { class: 'widget-k' }, k), h('span', { class: 'widget-v' }, v))))];
+    }
+    if (w.type === 'stats') {
+      const style = w.style || 'bars';
+      return [head('stats'), h('div', { class: 'stat-list' }, (w.bars || []).map(b => {
+        const v = Math.max(0, Math.min(100, Number(b.value) || 0));
+        const icons = n => Array.from({ length: n }, (_, i) => h('span', { class: 'stat-ico' + (i < Math.round(v / (100 / n)) ? ' on' : '') }, style === 'hearts' ? '♥' : '★'));
+        return h('div', { class: 'stat-row' }, h('span', { class: 'stat-label' }, b.label || '?'),
+          style === 'bars' ? h('div', { class: 'stat-bar' }, h('i', { style: { width: v + '%' } })) : h('div', { class: 'stat-icons' }, icons(style === 'hearts' ? 10 : 5)),
+          style === 'bars' ? h('span', { class: 'stat-num' }, v + '%') : null);
+      }))];
+    }
+    if (w.type === 'countdown') {
+      const days = daysUntil(w);
+      return [head(w.label?.trim() || 'countdown'), h('div', { class: 'count-big' }, days == null ? '?' : days === 0 ? 'today!' : String(days)), days ? h('div', { class: 'count-small' }, days === 1 ? 'day' : 'days') : null];
+    }
+    if (w.type === 'quote') {
+      return h('figure', { class: 'quote-box frame-' + (w.frame || 'fancy') }, h('blockquote', {}, w.text || '...'), w.by?.trim() ? h('figcaption', {}, '— ' + w.by) : null);
+    }
+    if (w.type === 'visitors') {
+      w.count = (Number(w.count) || Math.floor(1000 + Math.random() * 9000));
+      if (!widgetRow.counted) { widgetRow.counted = true; w.count++; if (mine) save(); }
+      return [head('visitors'), h('div', { class: 'odometer' }, String(w.count).padStart(6, '0').split('').map(d => h('span', {}, d)))];
+    }
+    if (w.type === 'guestbook') {
+      const entries = Array.isArray(w.entries) ? w.entries : (w.entries = []);
+      return [head('guestbook'),
+        h('div', { class: 'gb-list' }, entries.length ? entries.slice(-6).reverse().map(e => h('div', { class: 'gb-entry' },
+          h('div', { class: 'gb-who' }, e.who ? portrait(store.char(e.who) || { name: e.name }, 'xs') : null, h('b', {}, e.who ? nameOf(store.char(e.who)) : e.name || 'someone')),
+          h('div', { class: 'gb-text' }, e.text))) : h('div', { class: 'gb-empty' }, '...')),
+        h('button', { type: 'button', class: 'btn ghost sm', onclick: () => signGuestbook(w) }, 'sign')];
+    }
+    if (w.type === 'playlist') {
+      return [head('playlist'), h('div', { class: 'mini-pl' }, char.playlist.length ? char.playlist.map(sg => h('button', { type: 'button', class: 'mini-song', onclick: () => music.playSong(sg.id) }, h('span', { class: 'mini-play' }, '▶'), sg.title || 'untitled')) : h('div', { class: 'gb-empty' }, '...'))];
+    }
+    return null;
+  }
+  function daysUntil(w) {
+    let target = null;
+    if (w.useBirthday) {
+      const b = char.basics.find(x => /birthday/i.test(x.label))?.value?.trim();
+      const d = b ? new Date(b + (/\d{4}/.test(b) ? '' : ' 2000')) : null;
+      if (d && !isNaN(d)) target = new Date(new Date().getFullYear(), d.getMonth(), d.getDate());
+    } else if (w.date) target = new Date(w.date + 'T00:00:00');
+    if (!target || isNaN(target)) return null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (w.useBirthday && target < today) target.setFullYear(target.getFullYear() + 1);
+    return Math.max(0, Math.round((target - today) / 864e5));
+  }
+  function signGuestbook(w) {
+    const mates = worldmates(char.id).filter(c => c.id !== char.id);
+    let who = mates[0]?.id || null;
+    const name = h('input', { type: 'text', placeholder: 'name', maxLength: 40, hidden: !!who });
+    const text = h('textarea', { rows: 3, maxLength: 300, placeholder: 'message' });
+    const picker = h('select', { onchange: e => { who = e.target.value || null; name.hidden = !!who; } },
+      mates.map(c => h('option', { value: c.id }, nameOf(c))), h('option', { value: '' }, 'someone else'));
+    openModal({
+      title: 'sign the guestbook', body: [mates.length ? picker : null, name, text],
+      actions: [{ label: 'sign', kind: 'primary', onClick: close => {
+        if (!text.value.trim()) return;
+        w.entries.push({ id: 'gb_' + uid(), who: mates.length ? who : null, name: name.value.trim(), text: text.value.trim(), at: Date.now() });
+        save(); drawWidgets(); close();
+      } }],
+    });
+  }
+
+  // ---- free layout: the big boxes can be dragged anywhere (they keep their spot in page.layout) ----
+  function placeBlocks() {
+    const lay = page.layout || {};
+    for (const key of LAYOUT_KEYS) {
+      const node = bleed.querySelector(`[data-block="${key}"]`);
+      if (!node) continue;
+      const at = lay[key];
+      node.style.translate = at && (at.x || at.y) ? `${at.x || 0}px ${at.y || 0}px` : '';
+    }
+  }
+  function arrangeMode() {
+    const pageEl = bleed.querySelector('.page.profile');
+    if (!pageEl || pageEl.classList.contains('arranging')) return;
+    pageEl.classList.add('arranging');
+    const blocks = LAYOUT_KEYS.map(k => bleed.querySelector(`[data-block="${k}"]`)).filter(Boolean);
+    const offs = [];
+    for (const node of blocks) {
+      const key = node.dataset.block;
+      const grip = h('div', { class: 'arrange-grip' });
+      node.append(grip);
+      grip.onpointerdown = e => {
+        e.preventDefault();
+        page.layout ||= {};
+        const at = page.layout[key] ||= { x: 0, y: 0 };
+        const sx = e.clientX, sy = e.clientY, x0 = at.x, y0 = at.y;
+        grip.setPointerCapture(e.pointerId);
+        node.classList.add('dragging');
+        grip.onpointermove = ev => { at.x = Math.round(x0 + ev.clientX - sx); at.y = Math.round(y0 + ev.clientY - sy); node.style.translate = `${at.x}px ${at.y}px`; };
+        grip.onpointerup = () => { grip.onpointermove = null; node.classList.remove('dragging'); save(); };
+      };
+      offs.push(() => grip.remove());
+    }
+    const bar = h('div', { class: 'arrange-bar' },
+      h('button', { class: 'btn ghost sm', onclick: () => { page.layout = {}; save(); placeBlocks(); } }, 'put everything back'),
+      h('button', { class: 'btn primary sm', onclick: () => { offs.forEach(f => f()); bar.remove(); pageEl.classList.remove('arranging'); } }, 'done'));
+    document.body.append(bar);
+    const drop = () => { if (!bleed.isConnected) { bar.remove(); removeEventListener('hashchange', drop); } };
+    addEventListener('hashchange', () => setTimeout(drop, 50));
   }
 
   // ---- 3d stickers stuck anywhere on the page (page.stickers = [{ id, sid, x: % across, y: px down, size, rot }]) ----
@@ -640,17 +871,17 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
 
   // ---- put it together ----
   const TAB_VIEWS = { about: aboutTab, relationships: relsTab, gallery: galleryTab, moodboard: moodTab, fun: funTab, style: styleTab };
-  const panel = h('div', { class: 'profile-panel' }, TAB_VIEWS[active]());
+  const panel = h('div', { class: 'profile-panel', dataset: { block: 'panel' } }, TAB_VIEWS[active]());
 
   el.append(bleed);
   bleed.append(videoBack, h('div', { class: 'page profile' },
     stickerLayer,
-    view ? null : h('div', { class: 'profile-top' },
+    view ? null : h('div', { class: 'profile-top', dataset: { block: 'top' } },
       h('a', { class: 'back-link', href: backHref }, world ? `← ${world.name}` : '← home'),
       mine && h('div', { class: 'profile-top-right' },
         h('button', { class: 'link-btn', onclick: () => openShareModal(char) }, 'share'),
         h('button', { class: 'link-btn danger', onclick: removeOc }, 'delete oc'))),
-    h('div', { class: 'profile-hero' },
+    h('div', { class: 'profile-hero', dataset: { block: 'hero' } },
       banner,
       h('div', { class: 'profile-id' },
         pfp,
@@ -658,13 +889,16 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
           h('input', { type: 'text', class: 'profile-name', value: char.name, placeholder: 'their name', maxLength: 80, ...ro, oninput: e => { char.name = e.target.value; save(); } }),
           h('input', { type: 'text', class: 'profile-tagline', value: char.tagline, placeholder: mine ? 'one line about them' : '', maxLength: 140, ...ro, oninput: e => { char.tagline = e.target.value; save(); } }),
           meta))),
-    h('nav', { class: 'profile-tabs' }, tabs.map(([id, label]) =>
+    widgetRow,
+    h('nav', { class: 'profile-tabs', dataset: { block: 'tabs' } }, tabs.map(([id, label]) =>
       h('a', { class: 'profile-tab' + (id === active ? ' on' : ''), href: `#/${base}/${id}` }, label, tabCounts[id]))),
     panel));
 
   drawCounts();
   applyPageStyle();
   music.show(char);
+  music.setLook({ skin: page.playerSkin || 'normal', visualizer: page.visualizer || 'off', listen: page.beatGlow === 'on' });
+  if (mine && arrangeNext === char.id) { arrangeNext = null; requestAnimationFrame(arrangeMode); }
   drawPfp();
   drawMeta();
   if (!char.name) requestAnimationFrame(() => el.querySelector('.profile-name')?.focus());

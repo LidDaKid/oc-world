@@ -137,11 +137,13 @@ export async function paint(el, look, accent) {
   // falling stuff + cursor use the page's own colors
   const accentNow = accent || '#ff4fa3', inkNow = ink || '#f7effc';
   const FALL_COLORS = { bats: [bg && readableInk(bg) === '#1a1320' ? '#1a1320' : inkNow], rain: [inkNow], snow: ['#ffffff', inkNow], petals: ['#ffb7d5', '#ff8ac4', '#ffd9e8'] };
-  const fallKind = look.fall === 'my picture' ? 'picture' : look.fall;
+  const SEASON = ['snow', 'hearts', 'petals', 'petals', 'petals', 'butterflies', 'butterflies', 'butterflies', 'leaves', 'bats', 'leaves', 'snow'];
+  const chosenFall = (!look.fall || look.fall === 'none') && look.seasonal === 'on' ? SEASON[new Date().getMonth()] : look.fall;
+  const fallKind = chosenFall === 'my picture' ? 'picture' : chosenFall;
   let fallSrc = null;
   if (fallKind === 'picture' && look.fallPic?.imageId) fallSrc = await store.imageURL(look.fallPic.imageId);
   if (fallKind === 'sticker' && look.fallSticker) fallSrc = stickerNode(look.fallSticker)?.querySelector?.('img')?.src || stickerNode(look.fallSticker)?.src || null;
-  setFall(el, fallKind, hex(look.fallColor) ? [look.fallColor] : FALL_COLORS[look.fall] || [accentNow, inkNow],
+  setFall(el, fallKind, hex(look.fallColor) ? [look.fallColor] : FALL_COLORS[chosenFall] || [accentNow, inkNow],
     { amount: look.fallAmount, speed: look.fallSpeed, size: look.fallSize, way: look.fallWay, src: fallSrc });
   const cur = cursorCss(look.cursor, look.cursor === 'bat' ? '#0b0710' : accentNow, look.cursor === 'bat' ? accentNow : '#ffffff');
   el.classList.toggle('cursor-on', !!cur);

@@ -42,6 +42,7 @@ export async function cropAll(files, opts = {}) {
 
 export async function cropImage(file, { aspect = null } = {}) {
   if (window.__autoCrop) return file; // the automated tests skip the crop box (crop.js has its own test)
+  if (file.type === 'image/gif') return file; // cropping would freeze a gif, so it goes in as it is
   let loaded;
   try { loaded = await loadImage(file); } catch (err) {
     console.error(err);

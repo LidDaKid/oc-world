@@ -441,3 +441,258 @@ export function setFavicon(url) {
   const link = document.querySelector('link[rel="icon"]');
   if (link) link.setAttribute('href', url || DEFAULT_ICON);
 }
+
+// ---- animated scenes: css ones are a few blobs, canvas ones draw every frame. they live in .look-under ----
+
+const CSS_SCENES = { aurora: 4, 'lava lamp': 7, fog: 3 };
+export function setScene(el, kind, c) {
+  const under = el.querySelector(':scope > .look-under');
+  if (!under) return;
+  let box = under.querySelector(':scope > .look-scene');
+  const key = kind + '|' + (c.color || c.accent) + '|' + c.ink;
+  if (!kind || kind === 'none') { box?.remove(); return; }
+  if (box && box.sceneKey === key) return;
+  box?.remove();
+  box = document.createElement('div');
+  box.className = 'look-scene scene-' + kind.replace(/\W/g, '');
+  box.sceneKey = key;
+  box.style.setProperty('--sc', c.color || c.accent);
+  box.style.setProperty('--sc-ink', c.ink);
+  under.append(box);
+  if (CSS_SCENES[kind]) {
+    for (let i = 0; i < CSS_SCENES[kind]; i++) box.append(Object.assign(document.createElement('i'), { style: `--i:${i}` }));
+    return;
+  }
+  const cv = document.createElement('canvas');
+  box.append(cv);
+  runScene(cv, kind, c.color || c.accent, c.ink);
+}
+
+function runScene(cv, kind, color, ink) {
+  const g = cv.getContext('2d');
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let w = 0, h = 0, last = performance.now(), t = 0;
+  const size = () => { const d = Math.min(2, devicePixelRatio || 1); w = innerWidth; h = innerHeight; cv.width = w * d; cv.height = h * d; g.setTransform(d, 0, 0, d, 0, 0); };
+  size();
+  addEventListener('resize', size);
+  const R = Math.random;
+  const stars = Array.from({ length: kind === 'warp' ? 260 : 180 }, () => ({ x: R() * 2 - 1, y: R() * 2 - 1, z: R(), s: R() }));
+  const flies = Array.from({ length: 34 }, () => ({ x: R(), y: R(), a: R() * 6.28, v: .02 + R() * .03, p: R() * 6.28 }));
+  const drops = Array.from({ length: 70 }, () => ({ x: R(), y: R(), r: 2 + R() * 5, v: R() < .3 ? .02 + R() * .08 : 0 }));
+  const frame = now => {
+    if (!cv.isConnected) { removeEventListener('resize', size); return; }
+    const dt = calm ? 0 : Math.min(.05, (now - last) / 1000);
+    last = now; t += dt;
+    g.clearRect(0, 0, w, h);
+    if (kind === 'starfield' || kind === 'warp') {
+      const cx = w / 2, cy = h / 2, warp = kind === 'warp';
+      for (const s of stars) {
+        s.z -= dt * (warp ? .45 : .04);
+        if (s.z <= .02) { s.x = R() * 2 - 1; s.y = R() * 2 - 1; s.z = 1; }
+        const k = .5 / s.z, x = cx + s.x * w * k * .5, y = cy + s.y * h * k * .5;
+        const a = Math.min(1, (1 - s.z) * 1.4);
+        g.globalAlpha = a;
+        g.fillStyle = s.s > .8 ? color : ink;
+        if (warp) {
+          const k2 = .5 / Math.min(1, s.z + .05), x2 = cx + s.x * w * k2 * .5, y2 = cy + s.y * h * k2 * .5;
+          g.strokeStyle = g.fillStyle; g.lineWidth = 1 + (1 - s.z) * 2;
+          g.beginPath(); g.moveTo(x2, y2); g.lineTo(x, y); g.stroke();
+        } else {
+          g.beginPath(); g.arc(x, y, .4 + (1 - s.z) * 1.6, 0, 6.28); g.fill();
+        }
+      }
+    } else if (kind === 'fireflies') {
+      for (const f of flies) {
+        f.a += (R() - .5) * dt * 3;
+        f.x = (f.x + Math.cos(f.a) * f.v * dt + 1) % 1;
+        f.y = (f.y + Math.sin(f.a) * f.v * dt + 1) % 1;
+        f.p += dt * 2;
+        const glow = .35 + .65 * Math.abs(Math.sin(f.p));
+        const x = f.x * w, y = f.y * h;
+        const gr = g.createRadialGradient(x, y, 0, x, y, 14);
+        gr.addColorStop(0, color); gr.addColorStop(1, 'transparent');
+        g.globalAlpha = glow * .8; g.fillStyle = gr; g.beginPath(); g.arc(x, y, 14, 0, 6.28); g.fill();
+        g.globalAlpha = glow; g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, 1.6, 0, 6.28); g.fill();
+      }
+    } else if (kind === 'rain on window') {
+      for (const d of drops) {
+        if (d.v) { d.y += d.v * dt * (1 + d.r / 4); if (d.y > 1.05) { d.y = -.05; d.x = R(); } }
+        const x = d.x * w, y = d.y * h;
+        if (d.v) { g.globalAlpha = .18; g.fillStyle = ink; g.fillRect(x - d.r * .35, y - d.r * 9, d.r * .7, d.r * 9); }
+        g.globalAlpha = .35; g.fillStyle = ink; g.beginPath(); g.ellipse(x, y, d.r * .8, d.r, 0, 0, 6.28); g.fill();
+        g.globalAlpha = .7; g.fillStyle = '#fff'; g.beginPath(); g.arc(x - d.r * .25, y - d.r * .35, d.r * .25, 0, 6.28); g.fill();
+      }
+    }
+    g.globalAlpha = 1;
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
+
+// ---- pfp rotation: pictures that take turns inside the pfp ----
+
+export function setPfpSlides(el, list, sec) {
+  const pfp = el.querySelector('.profile-hero .portrait.pfp');
+  if (!pfp) return;
+  let holder = pfp.querySelector(':scope > .pfp-slides');
+  const has = Array.isArray(list) && list.length > 0;
+  if (!holder && has) { holder = document.createElement('div'); holder.className = 'pfp-slides'; pfp.append(holder); }
+  if (holder) setSlides(holder, list, typeof sec === 'number' ? sec : 5);
+}
+
+// ---- banner video ----
+
+export async function setBannerVideo(el, v) {
+  const banner = el.querySelector('.profile-banner');
+  if (!banner) return;
+  let vid = banner.querySelector(':scope > video.banner-video');
+  if (!v?.imageId) { vid?.remove(); banner.classList.remove('has-video'); return; }
+  if (vid?.dataset.id === v.imageId) return;
+  const { store } = await import('./store.js');
+  const url = await store.imageURL(v.imageId);
+  if (!url) return;
+  vid?.remove();
+  vid = Object.assign(document.createElement('video'), { muted: true, loop: true, autoplay: true, playsInline: true, src: url, className: 'banner-video' });
+  vid.dataset.id = v.imageId;
+  banner.prepend(vid);
+  banner.classList.add('has-video');
+  vid.play().catch(() => {});
+}
+
+// ---- sound effects: tiny made-up blips (no sound files). clicks + a softer one on hover ----
+
+let actx = null;
+const SOUNDS = {
+  'soft clicks': { wave: 'sine', f: 660, f2: 520, len: .05, vol: .06 },
+  bubbly: { wave: 'sine', f: 380, f2: 900, len: .09, vol: .07 },
+  retro: { wave: 'square', f: 880, f2: 1320, len: .06, vol: .035 },
+  sparkle: { wave: 'triangle', f: 1500, f2: 2400, len: .12, vol: .05 },
+};
+function blip(kind, soft) {
+  const s = SOUNDS[kind];
+  if (!s) return;
+  try {
+    actx ||= new AudioContext();
+    if (actx.state === 'suspended') actx.resume();
+    const o = actx.createOscillator(), v = actx.createGain(), t = actx.currentTime;
+    o.type = s.wave;
+    o.frequency.setValueAtTime(soft ? s.f * 1.5 : s.f, t);
+    o.frequency.exponentialRampToValueAtTime(soft ? s.f2 * 1.5 : s.f2, t + s.len);
+    v.gain.setValueAtTime(soft ? s.vol * .3 : s.vol, t);
+    v.gain.exponentialRampToValueAtTime(.0001, t + s.len);
+    o.connect(v).connect(actx.destination);
+    o.start(t);
+    o.stop(t + s.len + .02);
+  } catch { /* no sound, no problem */ }
+}
+export function setSounds(el, kind) {
+  el.soundKind = SOUNDS[kind] ? kind : null;
+  if (!el.soundKind || el.soundOn) return;
+  el.soundOn = true;
+  const clicky = 'button, a, .seg, .swatch, .profile-tab, .card, input[type=checkbox]';
+  el.addEventListener('pointerdown', e => { if (el.soundKind && e.target.closest(clicky)) blip(el.soundKind, false); });
+  let lastHover = null;
+  el.addEventListener('pointerover', e => {
+    const t = e.target.closest(clicky);
+    if (!el.soundKind || !t || t === lastHover || e.pointerType === 'touch') return;
+    lastHover = t;
+    blip(el.soundKind, true);
+  });
+}
+
+// ---- the site's top bar takes the page's colors ----
+
+export function setSiteFollow(el, on, c) {
+  const root = document.body;
+  root.classList.toggle('site-follows', on);
+  if (!on) return;
+  const cs = getComputedStyle(el);
+  root.style.setProperty('--follow-bg', cs.getPropertyValue('--page-bg-color').trim() || c.bg || cs.getPropertyValue('--bg').trim());
+  root.style.setProperty('--follow-accent', c.accent);
+  root.style.setProperty('--follow-ink', cs.getPropertyValue('--ink').trim() || c.ink);
+}
+
+// ---- a secret message hidden on the oc page ----
+
+export function setEgg(el, text, spot) {
+  const hero = el.querySelector('.profile-hero');
+  if (!hero) return;
+  el.eggText = text && text.trim() ? text.trim() : '';
+  el.eggSpot = spot || 'tiny star';
+  let star = hero.querySelector(':scope > .egg-star');
+  if (el.eggText && el.eggSpot === 'tiny star') {
+    if (!star) {
+      star = Object.assign(document.createElement('button'), { type: 'button', className: 'egg-star', textContent: '✦' });
+      star.onclick = e => { e.stopPropagation(); showEgg(el, e); };
+      hero.append(star);
+    }
+  } else star?.remove();
+  if (!el.eggOn) {
+    el.eggOn = true;
+    el.addEventListener('dblclick', e => {
+      if (el.eggText && el.eggSpot === 'banner double-click' && e.target.closest('.profile-banner')) showEgg(el, e);
+    });
+  }
+}
+function showEgg(el, e) {
+  document.querySelector('.egg-note')?.remove();
+  const note = Object.assign(document.createElement('div'), { className: 'egg-note', textContent: el.eggText });
+  note.style.left = Math.min(innerWidth - 280, Math.max(10, e.clientX - 120)) + 'px';
+  note.style.top = Math.min(innerHeight - 120, e.clientY + 14) + 'px';
+  note.style.setProperty('--accent', accentOf(el));
+  note.onclick = () => note.remove();
+  document.body.append(note);
+  setTimeout(() => addEventListener('pointerdown', function off(ev) { if (!note.contains(ev.target)) { note.remove(); removeEventListener('pointerdown', off); } }), 0);
+}
+
+// ---- your own font files (kept under an imageId like pictures) ----
+
+const fontsLoaded = new Map();
+export function loadFont(imageId) {
+  if (!fontsLoaded.has(imageId)) {
+    fontsLoaded.set(imageId, (async () => {
+      const { store } = await import('./store.js');
+      const url = await store.imageURL(imageId);
+      if (!url) return null;
+      const name = 'ocw-font-' + imageId;
+      const face = new FontFace(name, `url(${url})`);
+      await face.load();
+      document.fonts.add(face);
+      return name;
+    })().catch(err => { console.error(err); return null; }));
+  }
+  return fontsLoaded.get(imageId);
+}
+
+// ---- writing that types itself out the first time it scrolls into view ----
+
+export function typeReveal(root) {
+  const boxes = [...root.querySelectorAll('.section-text')].filter(t => !t.dataset.typed && t.value);
+  if (!boxes.length) return;
+  const io = new IntersectionObserver(entries => {
+    for (const en of entries) {
+      if (!en.isIntersecting) continue;
+      const t = en.target;
+      io.unobserve(t);
+      if (t.dataset.typed) continue;
+      t.dataset.typed = '1';
+      const full = t.value;
+      const h0 = t.style.height;
+      t.style.height = t.offsetHeight + 'px';
+      let i = 0;
+      const finish = () => { clearInterval(timer); t.value = full; t.style.height = h0; t.readOnly = t.dataset.wasRo === '1'; };
+      t.dataset.wasRo = t.readOnly ? '1' : '';
+      t.readOnly = true;
+      t.value = '';
+      const step = Math.max(1, Math.round(full.length / 220));
+      const timer = setInterval(() => {
+        i = Math.min(full.length, i + step);
+        t.value = full.slice(0, i);
+        if (i >= full.length) finish();
+      }, 18);
+      t.addEventListener('focus', finish, { once: true });
+      t.addEventListener('pointerdown', finish, { once: true });
+    }
+  }, { threshold: .2 });
+  boxes.forEach(b => io.observe(b));
+}

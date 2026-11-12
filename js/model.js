@@ -111,6 +111,8 @@ export function fixWorld(w) {
   w.calendar = fixCalendar(w.calendar);
   w.holidays ||= [];
   w.events ||= [];
+  w.look = { ...blankLook(), ...w.look }; // the world's own page style
+  w.look.wallpaper = { imageId: null, tile: false, ...w.look.wallpaper };
   for (const b of w.boards) { b.nodes ||= []; b.edges ||= []; b.hiddenRels ||= []; }
   for (const m of w.maps) { m.pins ||= []; m.strokes ||= []; }
   w.createdAt ||= Date.now();

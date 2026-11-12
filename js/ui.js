@@ -231,6 +231,8 @@ async function decodeImage(file) {
 export async function shrinkImage(file, maxDim) {
   const src = await decodeImage(file);
   const sw = src.width || src.naturalWidth, sh = src.height || src.naturalHeight;
+  // a gif stays a gif so it keeps moving (redrawing it would keep only the first frame)
+  if (file.type === 'image/gif' && file.size <= 15e6) return { blob: file, width: sw, height: sh };
   const scale = Math.min(1, maxDim / Math.max(sw, sh));
   const width = Math.max(1, Math.round(sw * scale)), height = Math.max(1, Math.round(sh * scale));
   const canvas = h('canvas', { width, height });

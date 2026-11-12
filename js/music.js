@@ -53,6 +53,52 @@ bar.append(
     h('button', { type: 'button', class: 'player-btn player-min', title: 'smaller', onclick: () => { mini = !mini; keep('ocw-player-mini', mini ? '1' : ''); draw(); } })));
 document.body.append(bar);
 
+// ---- skins + visualizer (page style > music extras). the analyser is only made once someone turns one on ----
+const viz = h('canvas', { class: 'player-viz', width: 240, height: 40, hidden: true });
+bar.querySelector('.player-mid').append(viz);
+let actx = null, analyser = null, levels = null, vizKind = 'off', vizLoop = false;
+function ensureAnalyser() {
+  if (analyser) return analyser;
+  try {
+    actx = new AudioContext();
+    const src = actx.createMediaElementSource(audio);
+    analyser = actx.createAnalyser();
+    analyser.fftSize = 128;
+    levels = new Uint8Array(analyser.frequencyBinCount);
+    src.connect(analyser);
+    analyser.connect(actx.destination);
+  } catch (err) { console.error(err); analyser = null; }
+  return analyser;
+}
+audio.addEventListener('play', () => { if (actx?.state === 'suspended') actx.resume(); });
+function level() {
+  if (!analyser || audio.paused) return 0;
+  analyser.getByteFrequencyData(levels);
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += levels[i];
+  return sum / (12 * 255);
+}
+function drawViz() {
+  if (vizKind === 'off' || bar.hidden) { vizLoop = false; return; }
+  const g = viz.getContext('2d'), w = viz.width, hgt = viz.height;
+  g.clearRect(0, 0, w, hgt);
+  const color = getComputedStyle(bar).getPropertyValue('--c').trim() || '#ff4fa3';
+  if (analyser && !audio.paused) {
+    analyser.getByteFrequencyData(levels);
+    g.fillStyle = color; g.strokeStyle = color;
+    if (vizKind === 'bars') {
+      const n = 32, bw = w / n;
+      for (let i = 0; i < n; i++) { const v = levels[i] / 255; g.fillRect(i * bw + 1, hgt - v * hgt, bw - 2, v * hgt); }
+    } else if (vizKind === 'wave') {
+      g.lineWidth = 2; g.beginPath();
+      for (let i = 0; i < 48; i++) { const v = levels[i] / 255, x = (i / 47) * w, y = hgt / 2 + Math.sin(i * .7 + performance.now() / 160) * v * hgt / 2; i ? g.lineTo(x, y) : g.moveTo(x, y); }
+      g.stroke();
+    }
+  }
+  bar.style.setProperty('--level', level().toFixed(3));
+  requestAnimationFrame(drawViz);
+}
+
 function draw() {
   const s = song();
   bar.hidden = !char || !songs().length;
@@ -154,6 +200,27 @@ if ('mediaSession' in navigator) {
 }
 
 export const music = {
+  // how the player looks for this oc: skin + visualizer
+  setLook({ skin = 'normal', visualizer = 'off', listen = false } = {}) {
+    bar.dataset.skin = skin;
+    vizKind = visualizer;
+    bar.dataset.viz = visualizer;
+    viz.hidden = !['bars', 'wave'].includes(visualizer);
+    if (visualizer !== 'off' || listen) ensureAnalyser();
+    if (visualizer !== 'off' && !vizLoop) { vizLoop = true; requestAnimationFrame(drawViz); }
+  },
+  // how loud the song is right now, 0..1 (for the beat glow)
+  level,
+  // play one song from their playlist
+  playSong(id) {
+    if (!char) return;
+    const i = order.indexOf(id);
+    if (i < 0) return;
+    at = i;
+    load(true);
+  },
+  get playingId() { return audio.paused ? null : order[at] || null; },
+
   // an oc's page opened (or redrew). same oc = keep going, new oc = their playlist from the top.
   show(next) {
     if (char && char.id === next.id) {
@@ -189,6 +256,9 @@ export const music = {
   },
 
   stop() {
+    bar.dataset.skin = 'normal';
+    vizKind = 'off';
+    viz.hidden = true;
     audio.pause();
     audio.removeAttribute('src');
     audio.load();

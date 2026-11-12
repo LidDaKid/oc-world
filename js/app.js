@@ -27,6 +27,8 @@ import { renderBook, renderWrite } from './views/diary.js';
 import { renderCover } from './views/diary-cover.js';
 import { openLink } from './share.js';
 import { setFavicon } from './look-fx.js';
+import { paint } from './look.js';
+import { openStyleDrawer } from './look-more.js';
 
 const TABS = [
   { id: 'ocs', label: 'ocs', icon: '⭐', view: ocs },
@@ -87,7 +89,16 @@ function worldSettings(world) {
       field('icon', icon.el),
       field('color', swatches(draft.color, c => draft.color = c)),
       h('div', { class: 'modal-extra' },
-        h('button', { type: 'button', class: 'btn ghost sm', onclick: async () => downloadBackup(await store.exportWorld(world.id), world.name) }, '⬇ back up just this world')),
+        h('button', { type: 'button', class: 'btn ghost sm', onclick: async () => downloadBackup(await store.exportWorld(world.id), world.name) }, '⬇ back up just this world'),
+        h('button', { type: 'button', class: 'btn ghost sm', onclick: () => {
+          document.querySelector('#modal-root .modal-wrap:last-child .icon-btn[title=close]')?.click();
+          const body = document.querySelector('main.world-body');
+          openStyleDrawer({
+            title: 'page style', look: world.look, scope: 'world', name: world.name,
+            snapshot: () => document.querySelector('main.world-body'),
+            onChange: () => { store.save('world', world); const b = document.querySelector('main.world-body.world-look'); if (b) paint(b, world.look, world.color); },
+          });
+        } }, 'page style')),
     ],
     actions: [
       { label: 'cancel', onClick: close => close() },
@@ -153,6 +164,7 @@ async function route() {
   try { view.cleanup?.(); } catch (err) { console.error(err); }
   view = {};
   setFavicon(null); // an oc page may have put their pfp on the browser tab
+  document.body.classList.remove('site-follows');
   document.querySelectorAll('.look-intro').forEach(n => n.remove());
   // a share link is its own little site. going anywhere else (or to another link) starts fresh
   if (bootedView || parts[0] === 'view') {
@@ -197,6 +209,7 @@ async function route() {
     mount(char
       ? profile.render(body, { char, tab: parts[4], sub: parts[5], base: `w/${world.id}/ocs/${char.id}`, world, go })
       : tab.view.render(body, ctx));
+    if (!char) { body.classList.add('world-look'); paint(body, world.look, world.color); }
     return;
   }
 

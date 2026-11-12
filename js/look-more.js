@@ -4,12 +4,14 @@
 //
 // scope: 'all' = home + oc pages, 'oc' = oc pages only, 'home' = home only
 
-import { h, clear, toast, openModal, confirmDialog, uid } from './ui.js';
+import { h, clear, fill, toast, openModal, confirmDialog, uid } from './ui.js';
 import { store } from './store.js';
 import { pickAndCrop } from './crop.js';
 import { shrinkImage } from './ui.js';
 import { card, colorCard, choiceCard, sliderCard, fontCard, pictureCard, font, LOOK_CHOICES, PAGE_BGS, PAGE_INKS, readableInk } from './look.js';
-import { setLayers, setParallax, setBurst, setIntro, setScrollBar, setBackTop, setFixedDeco, setBannerSlides, setBlinkies } from './look-fx.js';
+import { setLayers, setParallax, setBurst, setIntro, setScrollBar, setBackTop, setFixedDeco, setBannerSlides, setBlinkies, setScene, setPfpSlides, setBannerVideo, setSounds, setSiteFollow, setEgg, loadFont } from './look-fx.js';
+import { MAX_VIDEO } from './store.js';
+import { pickFile } from './ui.js';
 import { pickStickerIcon } from './parts.js';
 import { stickerNode } from './diary/stickers.js';
 
@@ -117,11 +119,38 @@ export const SPEC = [
   { group: 'fun', key: 'pageFrame', label: 'page frame', kind: 'choice', values: ['none', 'lace', 'glow', 'chain', 'film', 'dashed'] },
   { group: 'fun', key: 'cornerDeco', label: 'corner decorations', kind: 'choice', values: ['none', 'cobwebs', 'bows', 'stars', 'hearts', 'bats'] },
   { group: 'fun', key: 'pageGlow', label: 'glow behind the page', kind: 'choice', values: ['none', 'color', 'rainbow'] },
+  { group: 'fun', key: 'sounds', label: 'sound effects', kind: 'choice', values: ['off', 'soft clicks', 'bubbly', 'retro', 'sparkle'] },
+  { group: 'fun', key: 'siteFollow', label: 'top bar matches the page', kind: 'choice', values: ['off', 'on'] },
+  { group: 'fun', key: 'seasonal', label: 'seasonal decorations', kind: 'choice', values: ['off', 'on'] },
+  { group: 'fun', scope: 'oc', key: 'moodLook', label: 'page follows their mood', kind: 'choice', values: ['off', 'on'] },
+  { group: 'fun', scope: 'oc', key: 'eggText', label: 'secret message', kind: 'text', max: 200 },
+  { group: 'fun', scope: 'oc', key: 'eggSpot', label: 'secret message spot', kind: 'choice', values: ['tiny star', 'banner double-click'] },
+
+  // ---- moving scenes ----
+  { group: 'background extras', key: 'scene', label: 'animated scene', kind: 'choice', values: ['none', 'aurora', 'starfield', 'warp', 'lava lamp', 'rain on window', 'fireflies', 'fog'] },
+  { group: 'background extras', key: 'sceneColor', label: 'scene color', kind: 'color' },
+
+  // ---- fonts ----
+  { group: 'name + text', key: 'ownFont', label: 'your own font', kind: 'fontfile' },
+  { group: 'name + text', key: 'ownFontUse', label: 'use your font for', kind: 'choice', values: ['titles', 'writing', 'everything', 'name'] },
+  { group: 'name + text', scope: 'oc', key: 'typeReveal', label: 'writing types itself out', kind: 'choice', values: ['off', 'on'] },
+
+  // ---- pfp + banner ----
+  { group: 'pfp + banner extras', scope: 'oc', key: 'pfpSlides', label: 'pfp rotation', kind: 'pics' },
+  { group: 'pfp + banner extras', scope: 'oc', key: 'pfpSec', label: 'pfp rotation speed', kind: 'slider', min: 2, max: 30, start: 5, unit: 's', css: v => v + 's' },
+  { group: 'pfp + banner extras', scope: 'oc', key: 'pfpDeco', label: 'pfp decoration', kind: 'choice', values: ['none', 'cat ears', 'halo', 'devil horns', 'crown', 'bow', 'headphones', 'flower crown', 'bat wings'] },
+  { group: 'pfp + banner extras', scope: 'oc', key: 'pfpDecoColor', label: 'decoration color', kind: 'color' },
+  { group: 'pfp + banner extras', scope: 'oc', key: 'bannerVideo', label: 'banner video', kind: 'video' },
+
+  // ---- music ----
+  { group: 'music extras', scope: 'oc', key: 'playerSkin', label: 'player skin', kind: 'choice', values: ['normal', 'ipod', 'cassette', 'winamp', 'minimal', 'vinyl'] },
+  { group: 'music extras', scope: 'oc', key: 'visualizer', label: 'visualizer', kind: 'choice', values: ['off', 'bars', 'wave', 'glow'] },
+  { group: 'music extras', scope: 'oc', key: 'beatGlow', label: 'page glows with the beat', kind: 'choice', values: ['off', 'on'] },
 ];
 
 // pictures that belong to a look (presets + look codes skip these, so a picture is never shared by two ocs)
-export const PICTURE_KEYS = ['wallpaper', 'bannerPic', 'slides', 'bannerSlides', 'fallPic', 'pfpHover', 'cursorPic', 'videoBg', 'playlist', 'stickers'];
-const NOT_LOOK = ['tabs', 'hiddenTabs', 'musicAutoplay', 'musicShuffle', 'blinkies'];
+export const PICTURE_KEYS = ['wallpaper', 'bannerPic', 'slides', 'bannerSlides', 'fallPic', 'pfpHover', 'cursorPic', 'videoBg', 'playlist', 'stickers', 'pfpSlides', 'bannerVideo', 'ownFont', 'widgets', 'layout'];
+const NOT_LOOK = ['tabs', 'hiddenTabs', 'musicAutoplay', 'musicShuffle', 'blinkies', 'tabNames', 'labels', 'eggText'];
 
 const slug = v => String(v).replace(/\W/g, '');
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -169,6 +198,16 @@ export async function paintMore(el, look, { accent, ink, bg }) {
   setFixedDeco(el, look);
   setBannerSlides(el, look.bannerSlides, look.slideSec);
   setBlinkies(el, look.blinkies);
+  setScene(el, look.scene, { ...c, color: HEX.test(look.sceneColor || '') ? look.sceneColor : null });
+  setPfpSlides(el, look.pfpSlides, look.pfpSec);
+  setBannerVideo(el, look.bannerVideo);
+  setSounds(el, look.sounds);
+  setSiteFollow(el, look.siteFollow === 'on', c);
+  setEgg(el, look.eggText, look.eggSpot);
+  // your own font file
+  const ownFont = look.ownFont?.imageId ? await loadFont(look.ownFont.imageId) : null;
+  for (const u of ['titles', 'writing', 'everything', 'name']) el.classList.toggle('ownfont-' + u, !!ownFont && (look.ownFontUse || 'titles') === u);
+  if (ownFont) st.setProperty('--own-font', `'${ownFont}', system-ui`);
   if (look.cursorPic?.imageId) {
     const url = await store.imageURL(look.cursorPic.imageId);
     if (url) { st.setProperty('--look-cursor', `url("${url}") 16 16, auto`); el.classList.add('cursor-on'); }
@@ -202,6 +241,7 @@ function cardFor(o, look, changed) {
     return pictureCard(o.label, look[k], changed, { maxDim: o.max || 1600 });
   }
   if (o.kind === 'pics') return picsCard(o.label, look, k, changed);
+  if (o.kind === 'video' || o.kind === 'fontfile') return fileCard(o, look, changed);
   if (o.kind === 'sticker') {
     const wrap = h('div', { class: 'style-card' });
     const draw = () => {
@@ -216,6 +256,39 @@ function cardFor(o, look, changed) {
     return wrap;
   }
   return null;
+}
+
+// one video or font file kept like a picture: look[key] = { imageId, name }
+function fileCard(o, look, changed) {
+  const k = o.key, video = o.kind === 'video';
+  const wrap = h('div', { class: 'style-card' });
+  const draw = () => {
+    const has = look[k]?.imageId;
+    clear(wrap).append(
+      h('div', { class: 'style-card-head' }, h('h3', {}, o.label),
+        has ? h('button', { class: 'link-btn', onclick: () => { store.deleteImage(look[k].imageId); look[k] = null; changed(); draw(); } }, 'remove') : h('span')),
+      has && !video ? h('div', { class: 'own-font-name', style: { fontFamily: `'ocw-font-${look[k].imageId}', system-ui` } }, look[k].name || 'your font') : null,
+      h('button', { class: 'btn ghost sm', onclick: add }, has ? 'change' : video ? '+ upload video' : '+ upload font'));
+    if (has && !video) loadFont(look[k].imageId);
+  };
+  async function add() {
+    const file = await pickFile(video ? 'video/*' : '.ttf,.otf,.woff,.woff2,font/*');
+    if (!file) return;
+    if (video && file.size > MAX_VIDEO) { toast(`that video is too big (${MAX_VIDEO / 1e6} mb max)`, 'bad'); return; }
+    if (!video && !/\.(ttf|otf|woff2?)$/i.test(file.name)) { toast('that needs to be a .ttf, .otf or .woff font', 'bad'); return; }
+    try {
+      const old = look[k]?.imageId;
+      look[k] = { imageId: await store.putImage(file), name: file.name.replace(/\.[^.]+$/, '') };
+      if (old) store.deleteImage(old);
+      changed();
+      draw();
+    } catch (err) {
+      console.error(err);
+      toast(`couldn't save ${file.name}`, 'bad');
+    }
+  }
+  draw();
+  return wrap;
 }
 
 // a few pictures in a row (slideshows)
@@ -270,7 +343,7 @@ function applySettings(look, settings) {
 }
 
 // wraps changed() so every change can be undone. returns { changed, card }
-export function toolsFor(look, changed, { scope, reload, ownerId }) {
+export function toolsFor(look, changed, { scope, reload, ownerId, snapshot, arrange, name }) {
   const history = [JSON.stringify(look)];
   let timer = null;
   const tracked = () => {
@@ -382,6 +455,17 @@ export function toolsFor(look, changed, { scope, reload, ownerId }) {
     });
   };
 
+  // the whole page as a png
+  const savePicture = async () => {
+    const node = snapshot();
+    if (!node) return;
+    toast('saving the picture...');
+    try {
+      const { savePNG } = await import('./diary/snapshot.js');
+      await savePNG(node, ((name || 'page').replace(/[^a-z0-9 _-]+/gi, '').trim() || 'page') + '.png');
+    } catch (err) { console.error(err); toast("couldn't save the picture", 'bad'); }
+  };
+
   const toolCard = h('div', { class: 'style-card tools-card' },
     h('div', { class: 'style-card-head' }, h('h3', {}, 'tools')),
     h('div', { class: 'tools-row' },
@@ -389,11 +473,42 @@ export function toolsFor(look, changed, { scope, reload, ownerId }) {
       h('button', { class: 'btn ghost sm', onclick: surprise }, 'surprise me'),
       h('button', { class: 'btn ghost sm', onclick: copyFrom }, 'copy from an oc'),
       h('button', { class: 'btn ghost sm', onclick: exportCode }, 'copy look code'),
-      h('button', { class: 'btn ghost sm', onclick: importCode }, 'paste look code')));
+      h('button', { class: 'btn ghost sm', onclick: importCode }, 'paste look code'),
+      snapshot ? h('button', { class: 'btn ghost sm', onclick: savePicture }, 'save as picture') : null,
+      arrange ? h('button', { class: 'btn ghost sm', onclick: arrange }, 'move boxes around') : null));
   const presetCard = h('div', { class: 'style-card' },
     h('div', { class: 'style-card-head' }, h('h3', {}, 'presets'), h('button', { class: 'link-btn', onclick: savePreset }, 'save this look')),
     presetList);
   return { changed: tracked, cards: [toolCard, presetCard] };
+}
+
+// a page style drawer for a look (world pages use this). onChange saves + repaints
+export async function openStyleDrawer({ title, look, scope, onChange, snapshot, name }) {
+  document.querySelector('.drawer.style-drawer')?.close?.();
+  const { lookCards, boxCards } = await import('./look.js');
+  const group = t => h('h3', { class: 'style-group' }, t);
+  const build = () => {
+    const tools = toolsFor(look, onChange, { scope, reload: () => fill(body, build()), snapshot, name });
+    const b = boxCards(look, tools.changed);
+    const more = moreCards(look, tools.changed, scope);
+    const grid = h('div', { class: 'style-grid' },
+      group('tools'), tools.cards,
+      group('colors + fonts'), lookCards(look, tools.changed, { accent: true }),
+      group('boxes'), b.boxes, group('text + buttons'), b.text, group('over the background'), b.background, group('extras'), b.extras,
+      Object.entries(more).map(([n, cards]) => [group(n), cards]));
+    organize(grid);
+    return grid;
+  };
+  const body = h('div', { class: 'drawer-body' });
+  const close = () => { drawer.remove(); document.body.classList.remove('drawer-open'); };
+  const drawer = h('aside', { class: 'drawer style-drawer' },
+    h('div', { class: 'drawer-head' }, h('h2', {}, title), h('button', { class: 'icon-btn', title: 'close', onclick: close }, '✕')), body);
+  drawer.close = close;
+  fill(body, build());
+  document.body.append(drawer);
+  document.body.classList.add('drawer-open');
+  const drop = () => { close(); removeEventListener('hashchange', drop); };
+  addEventListener('hashchange', drop);
 }
 
 // collapsible groups + a search box over a style grid (h3.style-group headers followed by their cards)

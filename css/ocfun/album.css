@@ -1,0 +1,139 @@
+/* their album (js/ocfun/album.js) */
+
+.al-wrap { --al: #ff4fa3; display: grid; grid-template-columns: minmax(260px, 420px) 1fr; gap: 2rem; align-items: start; }
+@media (max-width: 760px) { .al-wrap { grid-template-columns: 1fr; } }
+
+/* ---- the release on its stage ---- */
+.al-stage {
+  position: relative; padding: 2rem 1.5rem 2.4rem; border-radius: 24px; overflow: hidden;
+  background:
+    radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--al) 40%, transparent), transparent 60%),
+    radial-gradient(circle, rgba(255, 255, 255, .5) 0 1px, transparent 1.6px) 0 0 / 22px 26px,
+    linear-gradient(160deg, #1d1422, #0d0910);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--al) 40%, transparent);
+}
+.al-release { position: relative; width: min(100%, 320px); aspect-ratio: 1; margin: 0 auto; }
+.al-cover { position: absolute; inset: 0; overflow: hidden; background: var(--al); }
+.al-cover-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.al-cover-blank {
+  position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 1.1rem; gap: .2rem;
+  background:
+    radial-gradient(circle at 75% 25%, rgba(255, 255, 255, .55), transparent 35%),
+    repeating-linear-gradient(-35deg, rgba(0, 0, 0, .14) 0 6px, transparent 6px 16px),
+    linear-gradient(160deg, color-mix(in srgb, var(--al) 70%, #fff), var(--al) 50%, color-mix(in srgb, var(--al) 55%, #000));
+}
+.al-cover-word { font-family: var(--font-display); font-size: 2rem; line-height: 1; color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, .35); overflow-wrap: anywhere; }
+.al-cover-by { font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: .75rem; color: rgba(255, 255, 255, .9); }
+.al-cover.big { position: relative; width: min(100%, 280px); aspect-ratio: 1; margin: 0 auto; border-radius: 4px; box-shadow: 0 14px 28px -12px rgba(0, 0, 0, .6); }
+
+/* the disc (cd or record) slides out while something plays */
+.al-disc {
+  position: absolute; top: 4%; left: 4%; width: 92%; aspect-ratio: 1; border-radius: 50%; z-index: 0;
+  transition: transform .7s cubic-bezier(.3, .8, .3, 1);
+}
+.al-disc.spin { animation: al-spin 2.6s linear infinite; }
+.al-release.out .al-disc { transform: translateX(34%); }
+@keyframes al-spin { to { rotate: 360deg; } }
+.al-disc-label { position: absolute; inset: 33%; border-radius: 50%; overflow: hidden; background: var(--al); display: grid; place-items: center; }
+.al-disc-label img { width: 100%; height: 100%; object-fit: cover; }
+.al-disc-label i { position: absolute; width: 18%; aspect-ratio: 1; border-radius: 50%; background: #0d0910; box-shadow: 0 0 0 3px rgba(255, 255, 255, .25); }
+.al-release.cd .al-disc {
+  background:
+    radial-gradient(circle, transparent 0 15%, rgba(255, 255, 255, .7) 15.5% 16.5%, transparent 17%),
+    conic-gradient(from 20deg, #e9eef8, #ffd1ea, #c9f6ff, #fff6c4, #e2d1ff, #ffd1ea, #c9f6ff, #e9eef8);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .6), 0 10px 22px -10px rgba(0, 0, 0, .6);
+}
+.al-release.cd .al-disc-label { inset: 30%; background: color-mix(in srgb, var(--al) 70%, #fff); }
+.al-release.vinyl .al-disc {
+  background: repeating-radial-gradient(circle, #121014 0 2px, #26212a 2px 3px), #121014;
+  box-shadow: 0 0 0 2px #000, 0 14px 26px -10px rgba(0, 0, 0, .7);
+}
+.al-release.vinyl .al-disc::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 30deg, transparent, rgba(255, 255, 255, .14) 8%, transparent 16%, transparent 50%, rgba(255, 255, 255, .1) 58%, transparent 66%); }
+
+/* cd: a jewel case */
+.al-case {
+  position: absolute; inset: 0; z-index: 1; border-radius: 4px; overflow: hidden;
+  box-shadow: 0 18px 32px -14px rgba(0, 0, 0, .75), inset 0 0 0 1px rgba(255, 255, 255, .35);
+}
+.al-case .al-cover { left: 9%; }
+.al-case-spine {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 9%; z-index: 2; display: grid; place-items: center;
+  background: linear-gradient(90deg, #2a2230, #4a3f52 40%, #2a2230); border-right: 1px solid rgba(255, 255, 255, .25);
+}
+.al-case-spine span { writing-mode: vertical-rl; rotate: 180deg; color: #f3e9ff; font-size: .62rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; overflow: hidden; max-height: 95%; }
+.al-case-shine, .al-sleeve-shine {
+  position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  background: linear-gradient(125deg, rgba(255, 255, 255, .42) 0%, rgba(255, 255, 255, .08) 28%, transparent 40%, transparent 70%, rgba(255, 255, 255, .14) 88%, transparent);
+}
+/* vinyl: a cardboard sleeve */
+.al-sleeve { position: absolute; inset: 0; z-index: 1; border-radius: 3px; overflow: hidden; box-shadow: 0 18px 32px -14px rgba(0, 0, 0, .75), inset 0 0 0 1px rgba(0, 0, 0, .3); }
+.al-sleeve::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; box-shadow: inset 0 0 18px rgba(0, 0, 0, .35); background: repeating-linear-gradient(90deg, rgba(0, 0, 0, .03) 0 2px, transparent 2px 4px); }
+
+/* ---- the info side ---- */
+.al-info { display: grid; gap: .5rem; }
+.al-kind { font-size: .72rem; font-weight: 800; letter-spacing: .2em; text-transform: uppercase; color: var(--al); }
+.al-title { font-family: var(--font-display); font-size: clamp(1.8rem, 4vw, 2.6rem); line-height: 1.05; margin: 0; overflow-wrap: anywhere; }
+.al-artist { font-weight: 800; color: var(--ink2); }
+.al-year { font-weight: 600; }
+.al-tracks { display: grid; gap: .2rem; margin-top: .5rem; counter-reset: tr; }
+.al-track {
+  display: grid; grid-template-columns: 2.1rem 1.6rem 1fr auto auto; align-items: center; gap: .5rem;
+  padding: .35rem .5rem; border-radius: 12px; transition: background .15s;
+}
+.al-track:hover { background: color-mix(in srgb, var(--al) 12%, transparent); }
+.al-track.on { background: color-mix(in srgb, var(--al) 22%, transparent); }
+.al-play {
+  width: 2rem; height: 2rem; border-radius: 50%; border: 0; display: grid; place-items: center; cursor: pointer;
+  background: var(--al); color: #fff; font: 800 .72rem var(--font-body); box-shadow: 0 4px 10px -4px var(--al);
+}
+.al-play:disabled { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--ink2); box-shadow: none; cursor: default; }
+.al-track-n { font-variant-numeric: tabular-nums; color: var(--ink2); font-weight: 800; font-size: .8rem; }
+.al-track-title { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.al-track.on .al-track-title { color: var(--al); }
+.al-track-dur { color: var(--ink2); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.al-mini-btn { border: 1.5px solid color-mix(in srgb, var(--al) 60%, transparent); background: none; color: var(--ink); border-radius: 999px; padding: .05rem .55rem; font: 700 .72rem var(--font-body); cursor: pointer; }
+.al-mini-btn:hover { background: var(--al); color: #fff; }
+.al-empty { color: var(--ink2); padding: .4rem .5rem; }
+.al-now { margin-top: .4rem; padding: .7rem .9rem; border-radius: 14px; background: color-mix(in srgb, var(--al) 14%, transparent); display: grid; gap: .35rem; }
+.al-now-title { font-weight: 800; }
+.al-progress { height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 14%, transparent); overflow: hidden; }
+.al-progress i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--al), color-mix(in srgb, var(--al) 40%, #fff)); }
+.al-time { font-size: .75rem; color: var(--ink2); font-variant-numeric: tabular-nums; }
+.al-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .6rem; }
+.al-actions .btn:not(.ghost) { background: var(--al); color: #fff; }
+
+/* ---- editing ---- */
+.al-edit { display: grid; gap: .7rem; }
+.al-field { display: grid; gap: .3rem; }
+.al-field > span { font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); }
+.al-row { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.al-row input[type=text] { flex: 1; min-width: 8rem; }
+.al-edit-tracks { display: grid; gap: .6rem; }
+.al-edit-track { display: grid; gap: .45rem; padding: .7rem; border-radius: 14px; border: 1.5px dashed color-mix(in srgb, var(--al) 50%, var(--edge)); }
+.al-lyrics-edit { font-family: 'Caveat', cursive; font-size: 1.15rem; line-height: 1.35; min-height: 4rem; }
+
+/* ---- the lyrics booklet ---- */
+.al-booklet { --al: #ff4fa3; display: grid; gap: .8rem; perspective: 1400px; }
+.al-page {
+  min-height: 420px; padding: 2rem 2.2rem; border-radius: 6px; color: #241a28; transform-origin: left center;
+  background:
+    radial-gradient(circle at 100% 0, color-mix(in srgb, var(--al) 22%, transparent), transparent 40%),
+    linear-gradient(90deg, rgba(0, 0, 0, .08), transparent 4%),
+    #fffaf3;
+  box-shadow: 0 18px 34px -14px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(0, 0, 0, .08);
+}
+.al-page.flip-in-r { animation: al-flip-r .45s cubic-bezier(.3, .7, .3, 1); }
+.al-page.flip-in-l { animation: al-flip-l .45s cubic-bezier(.3, .7, .3, 1); }
+@keyframes al-flip-r { from { transform: rotateY(-70deg); opacity: .3; } }
+@keyframes al-flip-l { from { transform: rotateY(50deg); opacity: .3; transform-origin: right center; } }
+.al-page-front { display: grid; justify-items: center; gap: .6rem; text-align: center; }
+.al-page-title { font-family: var(--font-display); font-size: 2rem; color: #241a28; margin-top: .6rem; }
+.al-page-by { font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--al); font-size: .85rem; }
+.al-page-song h3 { font-family: var(--font-display); font-size: 1.6rem; margin: 0 0 1rem; color: #241a28; }
+.al-page-num { font-weight: 800; color: var(--al); letter-spacing: .1em; }
+.al-page-lyrics { white-space: pre-wrap; font-family: 'Special Elite', monospace; font-size: 1rem; line-height: 1.75; color: #3a2d40; }
+.al-page-back ol { margin: 0; padding-left: 1.6rem; display: grid; gap: .35rem; font-weight: 700; font-size: 1.05rem; }
+.al-page-back ol li::marker { color: var(--al); font-weight: 800; }
+.al-page-small { margin-top: 2rem; font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: #7a6c80; }
+.al-booklet-nav { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.al-page-n { font-weight: 800; color: var(--ink2); font-variant-numeric: tabular-nums; }

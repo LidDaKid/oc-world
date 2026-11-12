@@ -1,0 +1,86 @@
+/* star chart (js/ocfun/starchart.js): a gold zodiac wheel in a night sky */
+
+.sc-sky {
+  --gold: #e8c36a; --gold2: #fff0b8; --nightink: #f4ecff;
+  position: relative; overflow: hidden; border-radius: 26px; padding: clamp(.8rem, 3vw, 2rem); color: var(--nightink);
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, .9) 0 1px, transparent 1.5px) 0 0 / 53px 47px,
+    radial-gradient(circle, rgba(255, 240, 184, .7) 0 1px, transparent 1.4px) 21px 17px / 89px 71px,
+    radial-gradient(circle, rgba(255, 255, 255, .5) 0 .7px, transparent 1.1px) 7px 31px / 31px 29px,
+    radial-gradient(120% 70% at 20% 0%, rgba(177, 140, 255, .35), transparent 60%),
+    radial-gradient(90% 60% at 100% 100%, rgba(255, 79, 163, .25), transparent 60%),
+    linear-gradient(180deg, #0d0a24, #1a0f33 60%, #0b0718);
+  border: 1.5px solid rgba(232, 195, 106, .35);
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, .5);
+}
+.sc-top { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: clamp(1rem, 3vw, 2rem); align-items: start; }
+
+/* ---- wheel ---- */
+.sc-wheel-box { position: relative; width: 100%; max-width: 360px; aspect-ratio: 1; margin: 0 auto; }
+.sc-wheel { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 0 14px rgba(232, 195, 106, .25)); }
+.sc-halo { fill: none; stroke: rgba(232, 195, 106, .25); stroke-width: 1; stroke-dasharray: 2 5; }
+.sc-ring { fill: none; stroke: var(--gold); stroke-width: 1.6; }
+.sc-ring.thin { stroke-width: 1; stroke-opacity: .7; }
+.sc-slice { stroke: none; transition: fill-opacity .3s; }
+.sc-spoke { stroke: var(--gold); stroke-width: 1; stroke-opacity: .8; }
+.sc-tick { stroke: var(--gold); stroke-width: .8; stroke-opacity: .6; }
+.sc-glyph { fill: var(--gold); font: 400 17px 'Segoe UI Symbol', 'Noto Sans Symbols', serif; text-anchor: middle; dominant-baseline: central; opacity: .75; }
+.sc-glyph.on { fill: var(--gold2); opacity: 1; filter: drop-shadow(0 0 4px var(--gold)); }
+.sc-tri { fill: rgba(255, 240, 184, .07); stroke: var(--gold2); stroke-width: 1; stroke-dasharray: 3 3; }
+.sc-dot { fill: #120c26; stroke: var(--gold2); stroke-width: 1.6; }
+.sc-sun .sc-dot { fill: #ff9a3d; }
+.sc-moon .sc-dot { fill: #b8c4ff; }
+.sc-rising .sc-dot { fill: #ff4fa3; }
+.sc-sym { fill: #120c26; font: 700 10px 'Segoe UI Symbol', 'Nunito', sans-serif; text-anchor: middle; dominant-baseline: central; }
+.sc-center { position: absolute; left: 50%; top: 50%; translate: -50% -50%; width: 34%; aspect-ratio: 1; }
+.sc-pfp { width: 100% !important; height: 100% !important; border-radius: 50% !important; font-size: 1.6rem; box-shadow: 0 0 0 3px var(--gold), 0 0 22px rgba(232, 195, 106, .5); }
+
+/* ---- pickers ---- */
+.sc-side { display: grid; gap: 1.1rem; min-width: 0; }
+.sc-picks { display: grid; gap: .7rem; }
+.sc-pick-row { display: grid; gap: .3rem; }
+.sc-pick-label { display: flex; align-items: center; gap: .45rem; font: 700 .75rem 'Nunito', sans-serif; text-transform: uppercase; letter-spacing: .2em; color: var(--gold); }
+.sc-pick-sym { display: inline-grid; place-items: center; min-width: 1.6rem; height: 1.6rem; padding: 0 .2rem; border-radius: 999px; border: 1.5px solid var(--gold); font-size: .78rem; letter-spacing: 0; }
+.sc-signs { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: .25rem; }
+.sc-sign {
+  aspect-ratio: 1; min-width: 0; padding: 0; border-radius: 50%; cursor: pointer; display: grid; place-items: center;
+  border: 1.5px solid rgba(232, 195, 106, .3); background: rgba(255, 255, 255, .04); color: var(--nightink);
+  font: 400 1.05rem 'Segoe UI Symbol', 'Noto Sans Symbols', serif; transition: transform .15s, background .15s, border-color .15s;
+}
+.sc-sign:hover:not(:disabled) { transform: scale(1.12); border-color: var(--el); }
+.sc-sign.on { background: color-mix(in srgb, var(--el) 45%, transparent); border-color: var(--gold2); color: #fff; box-shadow: 0 0 12px color-mix(in srgb, var(--el) 70%, transparent); }
+.sc-sign:disabled { cursor: default; }
+
+/* ---- what each sign is ---- */
+.sc-info { display: grid; gap: .55rem; }
+.sc-info:empty { display: none; }
+.sc-card { display: flex; gap: .8rem; align-items: center; padding: .6rem .8rem; border-radius: 16px; background: linear-gradient(120deg, color-mix(in srgb, var(--el) 22%, transparent), rgba(255, 255, 255, .03)); border: 1px solid rgba(232, 195, 106, .3); }
+.sc-card-glyph { flex: none; width: 2.8rem; height: 2.8rem; display: grid; place-items: center; border-radius: 50%; border: 1.5px solid var(--gold); color: var(--gold2); font: 1.5rem 'Segoe UI Symbol', serif; text-shadow: 0 0 8px var(--gold); }
+.sc-card-text { min-width: 0; }
+.sc-card-place { font: 700 .66rem 'Nunito', sans-serif; text-transform: uppercase; letter-spacing: .18em; color: var(--gold); }
+.sc-card-sign { font: 400 1.35rem 'Playfair Display', serif; font-style: italic; line-height: 1.1; }
+.sc-card-tags { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .25rem; }
+.sc-card-tags span { font-size: .72rem; font-weight: 700; padding: .05rem .5rem; border-radius: 999px; background: rgba(255, 255, 255, .08); }
+.sc-card-dates { font-size: .75rem; color: rgba(244, 236, 255, .6); margin-top: .2rem; }
+
+/* ---- compatibility ---- */
+.sc-matches { margin-top: 1.6rem; padding-top: 1.2rem; border-top: 1px dashed rgba(232, 195, 106, .4); }
+.sc-h { font: 400 1.4rem 'Playfair Display', serif; font-style: italic; color: var(--gold2); margin-bottom: .7rem; }
+.sc-match-list { display: grid; gap: .5rem; }
+.sc-match { display: grid; grid-template-columns: minmax(0, 11rem) 9rem minmax(0, 1fr); gap: .8rem; align-items: center; padding: .45rem .7rem; border-radius: 14px; background: rgba(255, 255, 255, .05); }
+.sc-match-who { display: flex; align-items: center; gap: .5rem; min-width: 0; color: var(--nightink); text-decoration: none; font-weight: 800; }
+.sc-match-who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc-their { font-size: .9rem; color: var(--gold2); }
+.sc-their-pick { width: 100%; min-width: 0; background: rgba(0, 0, 0, .3) !important; color: var(--nightink) !important; border-color: rgba(232, 195, 106, .4) !important; }
+.sc-meter { display: flex; align-items: center; gap: .55rem; min-width: 0; }
+.sc-meter-bar { flex: 1; min-width: 3rem; height: .55rem; border-radius: 999px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+.sc-meter-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #b18cff, #ff4fa3, var(--gold)); box-shadow: 0 0 10px rgba(255, 79, 163, .6); }
+.sc-meter b { font-size: .9rem; color: var(--gold2); min-width: 2.4rem; }
+.sc-word { font: italic .85rem 'Playfair Display', serif; color: rgba(244, 236, 255, .8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+@media (max-width: 760px) {
+  .sc-top { grid-template-columns: 1fr; }
+  .sc-signs { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .sc-match { grid-template-columns: 1fr 1fr; }
+  .sc-meter { grid-column: 1 / -1; }
+}

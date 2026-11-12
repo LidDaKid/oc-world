@@ -20,5 +20,23 @@ import * as mood from './mood.js';
 import * as mixtape from './mixtape.js';
 import * as ships from './ships.js';
 import * as diaries from './diaries.js';
+import * as stories from './stories.js';
+import * as scenes from './scenes.js';
+import * as secrets from './secrets.js';
+import * as comics from './comics.js';
+import * as album from './album.js';
+import * as lyrics from './lyrics.js';
+import * as answering from './answering.js';
+import * as vlogs from './vlogs.js';
+import * as backpack from './backpack.js';
+import * as memorybox from './memorybox.js';
+import * as sketchbook from './sketchbook.js';
+import * as receipts from './receipts.js';
+import * as handheld from './handheld.js';
+import * as schoolfile from './schoolfile.js';
+import * as starchart from './starchart.js';
+import * as familytree from './familytree.js';
+import * as quiz from './quiz.js';
 
-export const FEATURES = [phone, computer, social, magazine, letters, room, dressup, locker, polaroids, card, ids, yearbook, timeline, mood, mixtape, ships, diaries];
+export const FEATURES = [phone, computer, social, magazine, letters, room, dressup, locker, polaroids, card, ids, yearbook, timeline, mood, mixtape, ships, diaries,
+  stories, scenes, secrets, comics, album, lyrics, answering, vlogs, backpack, memorybox, sketchbook, receipts, handheld, schoolfile, starchart, familytree, quiz];

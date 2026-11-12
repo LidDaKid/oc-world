@@ -1,0 +1,62 @@
+/* scenes (js/ocfun/scenes.js) */
+
+.scn-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: .9rem; }
+.scn-card {
+  display: grid; gap: .45rem; padding: 0 0 .8rem; text-align: left; cursor: pointer; overflow: hidden; border-radius: 16px;
+  border: 1.5px solid var(--edge); background: color-mix(in srgb, var(--ink) 5%, transparent); color: var(--ink);
+  transition: transform .2s cubic-bezier(.2, .9, .3, 1.4), border-color .2s;
+}
+.scn-card:hover { transform: translateY(-4px) rotate(-1deg); border-color: var(--accent); }
+.scn-card-clap {
+  display: flex; justify-content: space-between; padding: .35rem .8rem; font: 800 .7rem var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: #fff;
+  background: repeating-linear-gradient(-45deg, #111 0 14px, #f4f4f4 14px 28px); text-shadow: 0 0 3px #000, 0 0 3px #000;
+}
+.scn-card-title { padding: 0 .9rem; font: 700 1.15rem var(--font-display); }
+.scn-card-line { padding: 0 .9rem; color: var(--ink2); font-size: .88rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.scn-card-faces { display: flex; padding: 0 .9rem; }
+.scn-card-faces .portrait { margin-right: -.35rem; border: 2px solid var(--panel); width: 1.7rem; height: 1.7rem; }
+
+.scn-stage { border-radius: 22px; padding: clamp(1rem, 3vw, 1.6rem); border: 1.5px solid var(--edge); background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.scn-head { display: grid; gap: .45rem; justify-items: center; text-align: center; margin-bottom: 1.2rem; }
+.scn-title { font-size: clamp(1.4rem, 4vw, 2rem); }
+.scn-title-in { font: 700 1.4rem var(--font-display); text-align: center; }
+.scn-setting-in { text-align: center; }
+.scn-setting { font: 800 .78rem var(--font-body); letter-spacing: .2em; text-transform: uppercase; color: var(--accent); }
+.scn-lines { display: grid; gap: .7rem; }
+
+/* chat style */
+.scn-msg { display: flex; align-items: flex-end; gap: .55rem; max-width: 80%; }
+.scn-msg.me { flex-direction: row-reverse; margin-left: auto; }
+.scn-msg .portrait { flex: none; box-shadow: 0 0 0 2px var(--c); }
+.scn-bubble-wrap { display: grid; gap: .15rem; min-width: 0; }
+.scn-msg.me .scn-bubble-wrap { justify-items: end; }
+.scn-name { font: 800 .72rem var(--font-body); color: var(--c); letter-spacing: .04em; padding: 0 .6rem; }
+.scn-bubble {
+  padding: .55rem .9rem; border-radius: 18px 18px 18px 4px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.4;
+  background: color-mix(in srgb, var(--c) 22%, var(--panel2)); border: 1.5px solid color-mix(in srgb, var(--c) 45%, transparent);
+}
+.scn-msg.me .scn-bubble { border-radius: 18px 18px 4px 18px; background: var(--c); color: #1a0d16; border-color: transparent; box-shadow: 0 6px 16px -8px var(--c); }
+.scn-narr { justify-self: center; max-width: 85%; text-align: center; font-style: italic; color: var(--ink2); padding: .2rem .8rem; border-top: 1px dashed var(--edge); border-bottom: 1px dashed var(--edge); white-space: pre-wrap; }
+
+/* screenplay style */
+.scn-script { background: #fdfcf7; color: #1b1b1b; font-family: 'Courier Prime', 'Special Elite', 'Courier New', monospace; box-shadow: 0 16px 34px -20px rgba(0, 0, 0, .7); }
+.scn-script .scn-title { font-family: 'Special Elite', 'Courier New', monospace; text-transform: uppercase; color: #1b1b1b; text-decoration: underline; }
+.scn-script .scn-setting { color: #1b1b1b; font-family: 'Special Elite', monospace; }
+.scn-script .scn-lines { max-width: 36rem; margin: 0 auto; gap: 1rem; }
+.scn-script .segmented { background: rgba(0, 0, 0, .06); }
+.scn-script .seg { color: #333; }
+.scn-dlg { display: grid; justify-items: center; }
+.scn-dlg-name { font-family: 'Special Elite', monospace; text-transform: uppercase; letter-spacing: .08em; }
+.scn-dlg-name::after { content: ''; display: block; height: 2px; margin-top: 1px; background: var(--c); }
+.scn-dlg-text { max-width: 26rem; text-align: left; font-family: 'Special Elite', monospace; line-height: 1.5; white-space: pre-wrap; }
+.scn-action { margin: 0; font-family: 'Special Elite', monospace; line-height: 1.5; white-space: pre-wrap; }
+.scn-script :is(input, textarea, select) { color: #1b1b1b; background: rgba(0, 0, 0, .04); border-color: rgba(0, 0, 0, .2); }
+
+/* editing */
+.scn-edit-line { display: grid; grid-template-columns: 9rem 1fr auto; gap: .45rem; align-items: start; }
+.scn-edit-line textarea { resize: none; min-height: 2.4rem; }
+.scn-edit-tools { display: flex; gap: .1rem; }
+.scn-who { width: 100%; }
+.scn-new { display: grid; grid-template-columns: 9rem 1fr auto; gap: .45rem; align-items: end; margin-top: 1.1rem; padding-top: 1rem; border-top: 1.5px dashed var(--edge); }
+.scn-new textarea { resize: none; }
+@media (max-width: 560px) { .scn-edit-line, .scn-new { grid-template-columns: 1fr; } .scn-msg { max-width: 100%; } }

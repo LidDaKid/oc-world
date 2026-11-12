@@ -1,0 +1,42 @@
+/* receipts (js/ocfun/receipts.js): thermal paper receipts in a messy pile */
+
+.rc-pile { display: flex; flex-wrap: wrap; gap: 1.4rem 1rem; justify-content: center; align-items: flex-start; padding: 1rem .4rem 2rem; }
+.rc-pick { border: 0; padding: 0; background: none; cursor: pointer; rotate: var(--tilt, 0deg); transition: rotate .25s, translate .25s; filter: drop-shadow(0 12px 14px rgba(0, 0, 0, .45)); }
+.rc-pick:hover { rotate: 0deg; translate: 0 -6px; }
+.rc-pick:nth-child(3n+2) { margin-top: 2.2rem; }
+.rc-pick:nth-child(3n) { margin-top: .8rem; }
+
+.rc-paper { --paper: #fbfaf5; position: relative; width: 250px; padding: 26px 18px 30px; text-align: left; color: #29242c;
+  font: 700 13px/1.45 'Courier New', 'Special Elite', monospace; letter-spacing: .02em;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 .4 0 0 0 0 .38 0 0 0 0 .36 0 0 0 .12 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E"),
+    linear-gradient(100deg, rgba(0, 0, 0, .03), transparent 30%, rgba(0, 0, 0, .04) 60%, transparent),
+    var(--paper);
+  -webkit-mask: conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / 12px 51% repeat-x, conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 12px 51% repeat-x;
+  mask: conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / 12px 51% repeat-x, conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 12px 51% repeat-x; }
+.rc-paper.big { width: 300px; font-size: 14px; }
+.rc-store { text-align: center; font: 800 1.35em/1.1 'Courier New', monospace; text-transform: uppercase; letter-spacing: .12em; margin-bottom: 4px; overflow-wrap: anywhere; }
+.rc-small { text-align: center; font-size: .85em; opacity: .8; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.rc-line { margin: 8px 0; border-top: 2px dashed rgba(41, 36, 44, .55); }
+.rc-item, .rc-row { display: flex; justify-content: space-between; gap: 10px; }
+.rc-name { min-width: 0; overflow-wrap: anywhere; text-transform: uppercase; }
+.rc-total { font-size: 1.15em; font-weight: 800; margin: 2px 0; }
+.rc-row span:first-child { text-transform: uppercase; }
+.rc-foot { text-align: center; text-transform: uppercase; letter-spacing: .2em; font-size: .9em; margin: 4px 0 8px; }
+.rc-bar { height: 38px; margin: 6px 6px 2px; }
+.rc-code { letter-spacing: .35em; }
+.rc-note { position: absolute; right: 8px; bottom: 58px; max-width: 160px; rotate: -9deg; padding: 2px 6px; color: #d81e3a;
+  font: 400 1.75em/1 'Reenie Beanie', 'Caveat', cursive; letter-spacing: 0; text-shadow: 0 0 1px rgba(216, 30, 58, .4); pointer-events: none; }
+.rc-paper.big .rc-note { right: 10px; }
+
+/* opened */
+.rc-view { display: grid; place-items: center; padding: .6rem; filter: drop-shadow(0 14px 16px rgba(0, 0, 0, .5)); }
+.rc-edit { display: grid; grid-template-columns: 1fr auto; gap: 1.2rem; align-items: start; }
+@media (max-width: 720px) { .rc-edit { grid-template-columns: 1fr; } }
+.rc-form { display: grid; gap: .55rem; min-width: 0; }
+.rc-field { display: grid; gap: .25rem; font: 800 .78rem var(--font-body); color: var(--ink2); }
+.rc-field > input, .rc-field > textarea { font: 600 .95rem var(--font-body); color: var(--ink); }
+.rc-two { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.rc-items-edit { display: grid; gap: .35rem; }
+.rc-item-edit { display: grid; grid-template-columns: 1fr 4rem 5.5rem auto; gap: .35rem; align-items: center; }
+.rc-items-edit > .btn { justify-self: start; }

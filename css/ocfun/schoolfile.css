@@ -1,0 +1,137 @@
+/* school file (js/ocfun/schoolfile.js): a manila folder with paperwork inside */
+
+.sf-desk {
+  padding: clamp(.5rem, 3vw, 2rem); border-radius: 26px; min-width: 0;
+  background: radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%), color-mix(in srgb, var(--ink) 4%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--edge) 60%, transparent);
+}
+.sf-folder {
+  --manila: #e9c98b; --manila2: #d9b26a; --print: #2b2230;
+  position: relative; max-width: 900px; margin: .4rem auto 0; padding: 0 0 .9rem;
+  filter: drop-shadow(0 16px 22px rgba(0, 0, 0, .4));
+}
+.sf-label {
+  margin-right: auto; display: flex; gap: .5rem; align-items: baseline; min-width: 0; max-width: 100%;
+  padding: .35rem 1rem .5rem; border-radius: 12px 12px 0 0; background: var(--manila); color: var(--print);
+  font: 700 .72rem 'Special Elite', monospace; text-transform: uppercase; letter-spacing: .14em;
+}
+.sf-label b { font: 400 1.25rem 'Permanent Marker', cursive; text-transform: none; letter-spacing: 0; color: #2140a8; }
+.sf-tabs { position: relative; z-index: 1; display: flex; align-items: flex-end; gap: .25rem; padding: 0 1rem; flex-wrap: wrap; }
+.sf-label b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sf-tab {
+  padding: .45rem .7rem .5rem; border: 0; border-radius: 10px 10px 0 0; cursor: pointer; white-space: nowrap;
+  background: color-mix(in srgb, var(--manila2) 80%, #000 5%); color: color-mix(in srgb, var(--print) 75%, transparent);
+  font: 700 .74rem 'Special Elite', monospace; letter-spacing: .02em; translate: 0 4px; transition: translate .15s;
+}
+.sf-tab:hover { translate: 0 0; }
+.sf-tab.on { background: var(--manila); color: var(--print); translate: 0 0; }
+.sf-inside {
+  position: relative; padding: 1.6rem clamp(.6rem, 3vw, 2rem) 1.4rem; border-radius: 6px 6px 14px 14px;
+  background:
+    repeating-linear-gradient(115deg, rgba(120, 80, 20, .04) 0 2px, transparent 2px 7px),
+    linear-gradient(180deg, var(--manila), var(--manila2));
+}
+.sf-clip {
+  position: absolute; top: 8px; left: 50%; translate: -50% 0; z-index: 3; width: 110px; height: 26px; border-radius: 8px 8px 4px 4px;
+  background: linear-gradient(180deg, #e9ecf2, #9aa1ad); box-shadow: 0 3px 4px rgba(0, 0, 0, .35), inset 0 1px 0 #fff;
+}
+.sf-sheet { position: relative; min-width: 0; color: var(--print); }
+
+/* ---- paper + form fields ---- */
+.sf-paper {
+  position: relative; padding: clamp(1rem, 3vw, 1.8rem); border-radius: 3px;
+  background: linear-gradient(180deg, #fffdf6, #f7f1e2); box-shadow: 0 2px 0 #e0d6bf, 0 4px 0 #ece4d0, 0 10px 18px -8px rgba(0, 0, 0, .4);
+}
+.sf-field, .sf-area {
+  width: 100%; min-width: 0; border: 0 !important; border-bottom: 1.5px solid rgba(43, 34, 48, .35) !important; border-radius: 0 !important;
+  background: transparent !important; color: #1e2a6b !important; font: 400 1.15rem 'Patrick Hand', cursive !important; padding: .05rem .2rem !important; box-shadow: none !important;
+}
+.sf-area { resize: vertical; line-height: 1.6rem; background: repeating-linear-gradient(transparent 0 calc(1.6rem - 1px), rgba(110, 150, 210, .45) calc(1.6rem - 1px) 1.6rem) !important; border-bottom: 0 !important; }
+.sf-field::placeholder, .sf-area::placeholder { color: rgba(43, 34, 48, .3); }
+.sf-field:disabled, .sf-area:disabled { opacity: 1; -webkit-text-fill-color: #1e2a6b; }
+.sf-add { margin-top: .9rem; background: #fffdf6 !important; color: #2b2230 !important; border-color: rgba(43, 34, 48, .3) !important; }
+.sf-x { border: 0; background: none; color: #a8264f; cursor: pointer; font-size: .85rem; padding: .1rem .3rem; border-radius: 6px; }
+.sf-x:hover { background: rgba(168, 38, 79, .12); }
+.sf-none { padding: 2rem; text-align: center; color: rgba(43, 34, 48, .5); font: 1.4rem 'Patrick Hand', cursive; }
+
+/* ---- stamps ---- */
+.sf-stamp {
+  position: absolute; pointer-events: none; padding: .25rem .8rem; border: 3px double currentColor; border-radius: 6px;
+  font: 800 1rem 'Special Elite', monospace; text-transform: uppercase; letter-spacing: .16em; opacity: .7; rotate: -10deg; mix-blend-mode: multiply;
+}
+.sf-stamp-office { right: 1.2rem; bottom: .8rem; color: #2140a8; }
+.sf-stamp-red { right: 1rem; top: 2.6rem; color: #c8102e; rotate: 9deg; }
+.sf-stamp-ok { right: 1.2rem; bottom: 1.4rem; color: #12925a; opacity: 0; scale: 1.4; transition: opacity .2s, scale .25s cubic-bezier(.2, .9, .3, 1.4); }
+.sf-permission.signed .sf-stamp-ok { opacity: .75; scale: 1; }
+
+/* ---- report card ---- */
+.sf-letterhead { display: flex; align-items: center; gap: .9rem; padding-bottom: .8rem; border-bottom: 3px double #a8264f; }
+.sf-crest { width: 3rem; height: 3rem; flex: none; display: grid; place-items: center; border-radius: 50% 50% 46% 46% / 40% 40% 60% 60%; background: #a8264f; color: #ffd84d; font-size: 1.4rem; box-shadow: inset 0 0 0 3px #ffd84d, 0 2px 4px rgba(0, 0, 0, .3); }
+.sf-lh-text { flex: 1; min-width: 0; }
+.sf-school { font: 400 1.5rem 'Playfair Display', serif !important; color: #2b2230 !important; font-weight: 700 !important; }
+.sf-lh-sub { font: 700 .7rem 'Special Elite', monospace; text-transform: uppercase; letter-spacing: .2em; color: #a8264f; margin-top: .15rem; }
+.sf-gpa { flex: none; width: 4.4rem; height: 4.4rem; border-radius: 50%; display: grid; place-content: center; text-align: center; border: 3px dashed #a8264f; color: #a8264f; rotate: 8deg; }
+.sf-gpa small { font: 700 .62rem 'Special Elite', monospace; text-transform: uppercase; letter-spacing: .15em; }
+.sf-gpa b { font: 400 1.5rem 'Permanent Marker', cursive; line-height: 1; }
+.sf-info { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: .8rem; margin: .9rem 0; }
+.sf-info label, .sf-slip-row label, .sf-block { display: grid; gap: .1rem; min-width: 0; }
+.sf-info span, .sf-slip-row span, .sf-block > span { font: 700 .66rem 'Special Elite', monospace; text-transform: uppercase; letter-spacing: .14em; color: rgba(43, 34, 48, .6); }
+.sf-student { font: 400 1.35rem 'Permanent Marker', cursive; color: #2140a8; }
+.sf-table { width: 100%; border-collapse: collapse; font-size: .9rem; table-layout: fixed; }
+.sf-table th { text-align: left; font: 700 .66rem 'Special Elite', monospace; text-transform: uppercase; letter-spacing: .14em; color: #fff; background: #2b2230; padding: .4rem .5rem; }
+.sf-table th:nth-child(1) { width: 28%; }
+.sf-table th:nth-child(2) { width: 15%; }
+.sf-table th:nth-child(4) { width: 2rem; }
+.sf-table td { padding: .25rem .4rem; border-bottom: 1px solid rgba(43, 34, 48, .15); vertical-align: middle; }
+.sf-table tr:nth-child(even) td { background: rgba(168, 38, 79, .04); }
+.sf-grade-cell { text-align: center; }
+.sf-grade { width: 100%; max-width: 4.2rem; border: 0 !important; background: transparent !important; text-align: center; font: 400 1.5rem 'Permanent Marker', cursive !important; padding: 0 !important; cursor: pointer; }
+select.sf-grade { appearance: none; -webkit-appearance: none; }
+.sf-grade.grade-a { color: #12925a !important; }
+.sf-grade.grade-b { color: #2140a8 !important; }
+.sf-grade.grade-c { color: #c77a00 !important; }
+.sf-grade.grade-f { color: #c8102e !important; }
+.sf-grade.grade-none { color: rgba(43, 34, 48, .3) !important; }
+.sf-x-cell { text-align: right; }
+.sf-report .sf-add { margin-bottom: 1.6rem; }
+
+/* ---- teacher notes: index cards ---- */
+.sf-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 1.1rem; }
+.sf-index {
+  rotate: var(--r); padding: .5rem .8rem .8rem; border-radius: 2px;
+  background: repeating-linear-gradient(#fffef9 0 calc(1.6rem - 1px), rgba(110, 150, 210, .5) calc(1.6rem - 1px) 1.6rem) 0 2.4rem / 100% calc(100% - 2.4rem) no-repeat, #fffef9;
+  box-shadow: 0 8px 14px -8px rgba(0, 0, 0, .45);
+}
+.sf-index-head { display: flex; align-items: center; gap: .3rem; border-bottom: 2px solid #e8708a; padding-bottom: .2rem; margin-bottom: .2rem; }
+.sf-teacher { font: 400 1.2rem 'Permanent Marker', cursive !important; color: #a8264f !important; border-bottom: 0 !important; }
+.sf-index-text { background: none !important; min-height: 6.4rem; }
+
+/* ---- slips ---- */
+.sf-slips { display: grid; gap: 1.2rem; }
+.sf-slip { position: relative; padding: 1rem 1.2rem 1.1rem; border-radius: 3px; box-shadow: 0 10px 18px -10px rgba(0, 0, 0, .5); display: grid; gap: .65rem; }
+.sf-detention { background: linear-gradient(180deg, #ffd3df, #ffc2d3); border-top: 6px solid #c8102e; }
+.sf-permission { background: linear-gradient(180deg, #fffbd9, #fff2b0); }
+.sf-slip-head { display: flex; align-items: center; gap: .6rem; }
+.sf-slip-head b { font: 800 1.15rem 'Special Elite', monospace; text-transform: uppercase; letter-spacing: .22em; flex: 1; }
+.sf-slip-no { font: .75rem 'Special Elite', monospace; color: #c8102e; }
+.sf-slip-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: .8rem; }
+.sf-perm-line { font: 1rem 'Special Elite', monospace; }
+.sf-perm-line b { font: 400 1.25rem 'Permanent Marker', cursive; color: #2140a8; padding: 0 .2rem; }
+.sf-sign-line { display: grid; min-height: 3rem; align-content: end; border-bottom: 1.5px solid rgba(43, 34, 48, .55); max-width: 22rem; }
+.sf-sign-line small { order: 2; font: 700 .62rem 'Special Elite', monospace; text-transform: uppercase; letter-spacing: .14em; color: rgba(43, 34, 48, .55); translate: 0 1.1rem; }
+.sf-sig { font: 400 1.7rem 'Homemade Apple', cursive; color: #1e2a6b; line-height: 1.2; rotate: -3deg; transform-origin: left; animation: sf-sign .6s ease-out; }
+@keyframes sf-sign { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+.sf-check { display: flex; align-items: center; gap: .4rem; margin-top: 1rem; font: 700 .8rem 'Special Elite', monospace; text-transform: uppercase; letter-spacing: .12em; color: rgba(43, 34, 48, .7); width: fit-content; cursor: pointer; }
+.sf-tear { position: absolute; left: 0; right: 0; bottom: -7px; height: 8px; background: radial-gradient(circle at 6px -1px, transparent 6px, #fff2b0 6.5px) 0 0 / 12px 8px repeat-x; }
+.sf-detention .sf-area { background: repeating-linear-gradient(transparent 0 calc(1.6rem - 1px), rgba(200, 16, 46, .35) calc(1.6rem - 1px) 1.6rem) !important; }
+
+@media (max-width: 560px) {
+  .sf-info { grid-template-columns: 1fr 1fr; }
+  .sf-info label:first-child { grid-column: 1 / -1; }
+  .sf-table th:nth-child(1) { width: 32%; }
+  .sf-table th:nth-child(2) { width: 18%; }
+  .sf-tabs { padding: 0 .3rem; }
+  .sf-label { flex-basis: 100%; border-radius: 12px 12px 0 0; }
+  .sf-tab { flex: 1 1 auto; padding-inline: .5rem; }
+  .sf-gpa { width: 3.6rem; height: 3.6rem; }
+}

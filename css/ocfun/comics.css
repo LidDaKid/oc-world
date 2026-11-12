@@ -1,0 +1,75 @@
+/* comic maker (js/ocfun/comics.js) */
+
+.cmx-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 1rem; }
+.cmx-thumb { display: grid; gap: .45rem; padding: .6rem; border-radius: 14px; cursor: pointer; border: 1.5px solid var(--edge); background: color-mix(in srgb, var(--ink) 4%, transparent); color: var(--ink); transition: transform .2s cubic-bezier(.2, .9, .3, 1.4); }
+.cmx-thumb:hover { transform: translateY(-4px) rotate(-1.5deg); border-color: var(--accent); }
+.cmx-thumb-title { font: 400 1.15rem 'Bangers', var(--font-display); letter-spacing: .04em; }
+
+.cmx-edit-head { display: grid; gap: .6rem; margin-bottom: 1rem; }
+.cmx-title-in { font: 700 1.3rem var(--font-display); }
+.cmx-sheet {
+  padding: clamp(.8rem, 3vw, 1.4rem); border-radius: 6px; background: #fffef7; color: #111;
+  background-image: radial-gradient(rgba(0, 0, 0, .09) 1px, transparent 1.4px); background-size: 7px 7px;
+  box-shadow: 0 20px 40px -22px rgba(0, 0, 0, .8), 0 0 0 1px rgba(0, 0, 0, .15);
+}
+.cmx-title { text-align: center; color: #111; font: 400 clamp(2rem, 5.5vw, 3.2rem)/1 'Bangers', var(--font-display); letter-spacing: .06em; margin-bottom: .8rem; text-transform: uppercase; text-shadow: 3px 3px 0 var(--accent); }
+
+.cmx-page { display: grid; gap: 10px; }
+.cmx-page.layout-1 { grid-template-columns: 1fr; }
+.cmx-page.layout-2 { grid-template-columns: 1fr 1fr; }
+.cmx-page.layout-3 { grid-template-columns: repeat(3, 1fr); }
+.cmx-page.layout-2x2 { grid-template-columns: 1fr 1fr; }
+.cmx-page.layout-12 { grid-template-columns: 1fr 1fr; }
+.cmx-page.layout-12 > :first-child { grid-column: 1 / -1; }
+.cmx-page.layout-21 { grid-template-columns: 1fr 1fr; }
+.cmx-page.layout-21 > :last-child { grid-column: 1 / -1; }
+.cmx-page.layout-4strip { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 640px) { .cmx-page.layout-3, .cmx-page.layout-4strip { grid-template-columns: 1fr 1fr; } }
+.cmx-page.mini { gap: 4px; padding: 4px; background: #fffef7; border-radius: 4px; }
+.cmx-page.mini .cmx-frame { aspect-ratio: 1; border-width: 2px; }
+
+.cmx-panel { display: grid; gap: .4rem; min-width: 0; }
+.cmx-frame {
+  position: relative; aspect-ratio: 4 / 3; overflow: hidden; border: 4px solid #111; background: #fff; border-radius: 2px;
+  box-shadow: 4px 4px 0 #111;
+}
+.cmx-page.layout-1 .cmx-frame, .cmx-page.layout-12 > :first-child .cmx-frame, .cmx-page.layout-21 > :last-child .cmx-frame { aspect-ratio: 16 / 7; }
+.cmx-page.layout-4strip .cmx-frame, .cmx-page.layout-3 .cmx-frame { aspect-ratio: 3 / 4; }
+.cmx-pic { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cmx-empty { background: repeating-linear-gradient(45deg, #f2f0ea 0 10px, #e9e6dd 10px 20px); }
+.cmx-initials { display: grid; place-items: center; font: 700 3rem var(--font-display); color: #fff; background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--c) 70%, #fff), var(--c)); }
+.cmx-caption {
+  position: absolute; top: 0; left: 0; max-width: 70%; z-index: 2; padding: .3rem .6rem; background: #ffe45c; color: #111;
+  border-right: 3px solid #111; border-bottom: 3px solid #111; font: 800 .8rem/1.25 'Special Elite', monospace; text-transform: uppercase;
+}
+
+/* bubbles */
+.cmx-bubble { position: absolute; z-index: 3; max-width: 55%; min-width: 3.5rem; }
+.cmx-bubble-text {
+  position: relative; padding: .45rem .75rem; background: #fff; color: #111; border: 3px solid #111; border-radius: 50% / 45%;
+  font: 400 1.12rem/1.1 'Bangers', 'Fredoka', system-ui; letter-spacing: .05em; text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; outline: none;
+  min-height: 1.6em;
+}
+.cmx-bubble.kind-speech .cmx-bubble-text::before { content: ''; position: absolute; left: 20%; bottom: -17px; border: 9px solid transparent; border-top: 15px solid #111; border-bottom: 0; transform: skewX(-18deg); }
+.cmx-bubble.kind-speech .cmx-bubble-text::after { content: ''; position: absolute; left: calc(20% + 4px); bottom: -10px; border: 5px solid transparent; border-top: 10px solid #fff; border-bottom: 0; transform: skewX(-18deg); }
+.cmx-bubble.kind-thought .cmx-bubble-text { border-radius: 40px; font-style: italic; }
+.cmx-bubble.kind-thought .cmx-bubble-text::after { content: ''; position: absolute; left: 18%; bottom: -20px; width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 3px solid #111; }
+.cmx-bubble.kind-thought .cmx-bubble-text::before { content: ''; position: absolute; left: calc(18% - 12px); bottom: -32px; width: 7px; height: 7px; border-radius: 50%; background: #fff; border: 2.5px solid #111; }
+.cmx-bubble.kind-shout { filter: drop-shadow(2.5px 0 0 #111) drop-shadow(-2.5px 0 0 #111) drop-shadow(0 2.5px 0 #111) drop-shadow(0 -2.5px 0 #111) drop-shadow(3px 3px 0 var(--accent)); }
+.cmx-bubble.kind-shout .cmx-bubble-text {
+  border: 0; border-radius: 0; padding: 1.1rem 1.4rem; background: #ffe45c; font-size: 1.15rem; text-transform: uppercase;
+  clip-path: polygon(50% 0, 60% 14%, 78% 4%, 76% 22%, 98% 22%, 86% 38%, 100% 52%, 84% 60%, 94% 80%, 72% 74%, 66% 96%, 52% 80%, 36% 98%, 32% 76%, 8% 84%, 16% 62%, 0 50%, 14% 38%, 2% 18%, 24% 22%, 24% 2%, 40% 14%);
+}
+.cmx-panel.editing .cmx-bubble-text { cursor: text; }
+.cmx-panel.editing .cmx-bubble-text:focus { box-shadow: 0 0 0 3px var(--accent); }
+.cmx-bubble-tools { position: absolute; top: -1.7rem; left: 0; display: flex; gap: 2px; opacity: .55; transition: opacity .15s; user-select: none; }
+.cmx-bubble:hover .cmx-bubble-tools, .cmx-bubble:focus-within .cmx-bubble-tools { opacity: 1; }
+.cmx-bubble.tools-below .cmx-bubble-tools { top: auto; bottom: -1.9rem; }
+.cmx-bubble.kind-speech.tools-below .cmx-bubble-tools { bottom: -2.6rem; }
+.cmx-grip, .cmx-mini { width: 1.5rem; height: 1.5rem; border-radius: 50%; border: 2px solid #111; background: #fff; color: #111; font-size: .75rem; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.cmx-grip { cursor: move; touch-action: none; background: var(--accent); }
+
+.cmx-panel-tools { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; }
+.cmx-panel-tools .btn { color: #111; border-color: rgba(0, 0, 0, .3); }
+.cmx-oc { width: auto; min-width: 0; color: #111; background: #fff; border-color: rgba(0, 0, 0, .3); }
+.cmx-cap-in { flex: 1 1 100%; color: #111; background: #fff8cc; border-color: rgba(0, 0, 0, .3); font-family: 'Special Elite', monospace; }

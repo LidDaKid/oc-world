@@ -1,0 +1,58 @@
+/* family tree (js/ocfun/familytree.js): oval portraits on a velvet wall, joined with gold lines */
+
+.ft-wall {
+  --gold: #d9b45a; --gold2: #fbe6a6;
+  position: relative; overflow-x: auto; border-radius: 26px; padding: clamp(1rem, 3vw, 2.2rem);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 79, 163, .16), transparent 60%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .025) 0 2px, transparent 2px 22px),
+    radial-gradient(circle at 11px 11px, rgba(217, 180, 90, .14) 0 2px, transparent 2.5px) 0 0 / 44px 44px,
+    linear-gradient(180deg, #2a0f22, #1a0a18 70%, #12070f);
+  border: 3px solid transparent;
+  border-image: linear-gradient(135deg, #8a6a24, var(--gold2), #8a6a24, var(--gold), #8a6a24) 1;
+  box-shadow: inset 0 0 70px rgba(0, 0, 0, .6);
+  color: #f6e9d2;
+}
+.ft-stage { position: relative; min-width: max-content; margin: 0 auto; width: fit-content; }
+.ft-lines { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.ft-line { fill: none; stroke: var(--gold); stroke-width: 2.2; stroke-linecap: round; filter: drop-shadow(0 0 3px rgba(251, 230, 166, .5)); }
+.ft-line.soft { stroke-dasharray: 5 6; stroke-width: 1.6; opacity: .75; }
+.ft-line.love { stroke: #ff6fae; filter: drop-shadow(0 0 4px rgba(255, 111, 174, .7)); }
+.ft-heart { fill: #ff6fae; font-size: 18px; text-anchor: middle; dominant-baseline: central; filter: drop-shadow(0 0 4px #ff6fae); }
+
+.ft-tree { position: relative; display: grid; gap: 3.2rem; padding: .6rem 1rem 1rem; }
+.ft-row { display: grid; justify-items: center; gap: .5rem; }
+.ft-row-label { font: 400 .95rem 'Playfair Display', serif; font-style: italic; color: var(--gold2); opacity: .75; letter-spacing: .06em; }
+.ft-row-label:empty { display: none; }
+.ft-row-people { display: flex; justify-content: center; gap: 2.6rem; flex-wrap: nowrap; }
+
+.ft-node { display: grid; justify-items: center; gap: .45rem; width: 7.4rem; text-decoration: none; color: inherit; position: relative; z-index: 1; }
+a.ft-node:hover .ft-frame { transform: translateY(-4px) rotate(-2deg); }
+.ft-frame {
+  width: 5.6rem; aspect-ratio: 4 / 5; padding: 6px; border-radius: 50%; transition: transform .2s cubic-bezier(.2, .9, .3, 1.3);
+  background: conic-gradient(from 20deg, #8a6a24, var(--gold2), #b38b35, #fff2c4, #8a6a24, var(--gold), #8a6a24);
+  box-shadow: 0 10px 18px -6px rgba(0, 0, 0, .7), inset 0 0 0 2px rgba(0, 0, 0, .25);
+}
+.ft-pic { width: 100% !important; height: 100% !important; border-radius: 50% !important; border: 3px solid #1a0a18 !important; font-size: 1.4rem; }
+.ft-me .ft-frame { width: 7rem; box-shadow: 0 0 0 4px rgba(255, 79, 163, .45), 0 0 30px rgba(255, 79, 163, .5), 0 12px 20px -6px rgba(0, 0, 0, .7); }
+.ft-me { width: 8.6rem; }
+.ft-plaque {
+  display: grid; justify-items: center; max-width: 100%; padding: .2rem .7rem .3rem; border-radius: 4px; text-align: center;
+  background: linear-gradient(180deg, #f7e2a3, #c99b3e); color: #3a2410; box-shadow: 0 3px 6px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .6);
+}
+.ft-plaque b { font: 700 .88rem 'Playfair Display', serif; max-width: 6.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ft-plaque span { font: 700 .62rem 'Nunito', sans-serif; text-transform: uppercase; letter-spacing: .12em; opacity: .75; max-width: 6.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ft-me .ft-plaque { background: linear-gradient(180deg, #ffb3d6, #ff4fa3); color: #2a0a1b; }
+.ft-partner .ft-frame { background: conic-gradient(from 20deg, #b0306e, #ffc2df, #d14a8b, #fff0f7, #b0306e); }
+
+.ft-empty { display: grid; justify-items: center; gap: .8rem; padding: 3rem 1rem; }
+.ft-empty-stk { width: 84px; height: 84px; filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .5)); }
+.ft-empty h3 { font: 400 1.4rem 'Playfair Display', serif; font-style: italic; color: var(--gold2); }
+
+@media (max-width: 560px) {
+  .ft-row-people { gap: 1.2rem; }
+  .ft-node { width: 5.6rem; }
+  .ft-frame { width: 4.4rem; }
+  .ft-me .ft-frame { width: 5.4rem; }
+  .ft-me { width: 6.4rem; }
+}

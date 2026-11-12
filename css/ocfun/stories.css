@@ -1,0 +1,82 @@
+/* stories (js/ocfun/stories.js) */
+
+.stz-shelf {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 1.4rem 1.1rem; padding: 1.2rem 1rem 2.2rem; border-radius: 22px;
+  background:
+    linear-gradient(transparent calc(100% - 22px), color-mix(in srgb, var(--accent) 35%, #2a1520) calc(100% - 22px), color-mix(in srgb, var(--accent) 20%, #140a10)) ,
+    color-mix(in srgb, var(--ink) 4%, transparent);
+  border: 1.5px solid var(--edge);
+}
+.stz-book { display: flex; flex-direction: column; align-items: center; gap: .45rem; padding: 0; border: 0; background: none; cursor: pointer; color: var(--ink); }
+.stz-book .stz-cover { transition: transform .25s cubic-bezier(.2, .9, .3, 1.4), box-shadow .25s; }
+.stz-book:hover .stz-cover { transform: translateY(-8px) rotate(-2deg); box-shadow: 10px 18px 24px -12px rgba(0, 0, 0, .7), 0 0 0 2px var(--accent); }
+.stz-book-meta { font: 800 .72rem var(--font-body); color: var(--ink2); letter-spacing: .08em; }
+
+.stz-cover {
+  --bc: #ff4fa3; position: relative; width: 120px; aspect-ratio: 2 / 3; border-radius: 4px 10px 10px 4px; overflow: hidden;
+  background: radial-gradient(120% 80% at 70% 10%, color-mix(in srgb, var(--bc) 55%, #fff) 0, transparent 60%), var(--bc);
+  box-shadow: 6px 10px 18px -8px rgba(0, 0, 0, .65), inset 0 0 0 1px rgba(255, 255, 255, .15);
+}
+.stz-cover.big { width: min(240px, 60vw); }
+.stz-cover-pic { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.stz-cover-text {
+  position: absolute; left: 12%; right: 8%; bottom: 10%; padding: .35rem .5rem; border-radius: 4px; text-align: center;
+  background: color-mix(in srgb, #0b0710 62%, transparent); backdrop-filter: blur(3px); border: 1px solid rgba(255, 255, 255, .25);
+}
+.stz-cover-title { font: 700 .95rem/1.15 var(--font-display); color: #fff; overflow-wrap: anywhere; }
+.stz-cover.big .stz-cover-title { font-size: 1.5rem; }
+.stz-spine { position: absolute; left: 0; top: 0; bottom: 0; width: 9%; background: linear-gradient(90deg, rgba(0, 0, 0, .45), rgba(255, 255, 255, .12) 60%, rgba(0, 0, 0, .2)); }
+
+.stz-story { display: grid; grid-template-columns: auto 1fr; gap: 1.6rem; align-items: start; }
+@media (max-width: 640px) { .stz-story { grid-template-columns: 1fr; justify-items: center; } .stz-side { width: 100%; } }
+.stz-side { display: grid; gap: .8rem; min-width: 0; }
+.stz-title { font-size: clamp(1.6rem, 4vw, 2.3rem); }
+.stz-blurb { margin: 0; color: var(--ink2); font-style: italic; white-space: pre-wrap; }
+.stz-h { font-size: 1.05rem; margin-top: .4rem; color: var(--accent); }
+.stz-label { font: 800 .74rem var(--font-body); color: var(--ink2); letter-spacing: .08em; text-transform: uppercase; }
+.stz-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.stz-edit-head { display: grid; gap: .6rem; }
+.stz-title-in { font: 700 1.5rem var(--font-display); }
+.stz-cast { display: flex; flex-wrap: wrap; gap: .35rem; }
+.stz-cast-chip {
+  display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .7rem .2rem .25rem; border-radius: 999px; font: 800 .82rem var(--font-body);
+  border: 1.5px solid color-mix(in srgb, var(--c) 60%, transparent); background: color-mix(in srgb, var(--c) 16%, transparent); color: var(--ink);
+}
+button.stz-cast-chip { cursor: pointer; opacity: .5; background: none; border-style: dashed; }
+button.stz-cast-chip.on { opacity: 1; border-style: solid; background: color-mix(in srgb, var(--c) 22%, transparent); }
+
+.stz-chapters { list-style: none; margin: 0; padding: 0; display: grid; gap: .35rem; }
+.stz-ch { display: flex; align-items: center; gap: .4rem; }
+.stz-ch-open {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: .7rem; padding: .55rem .8rem; border-radius: 12px; cursor: pointer; text-align: left;
+  border: 1.5px solid var(--edge); background: color-mix(in srgb, var(--ink) 4%, transparent); color: var(--ink); font: 700 .95rem var(--font-body);
+  transition: background .15s, transform .15s;
+}
+.stz-ch-open:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); transform: translateX(4px); }
+.stz-ch-n { font: 700 1rem var(--font-display); color: var(--accent); }
+.stz-ch-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stz-ch-tools { display: flex; gap: .15rem; }
+
+/* reading + writing: a book page */
+.stz-page, .stz-write {
+  --bc: #ff4fa3; position: relative; max-width: 44rem; margin: 0 auto; padding: clamp(1.4rem, 5vw, 3rem) clamp(1.2rem, 6vw, 3.4rem);
+  background: linear-gradient(90deg, rgba(0, 0, 0, .06), transparent 6%), #fffaf2; color: #2a2230; border-radius: 4px 14px 14px 4px;
+  box-shadow: 0 18px 40px -20px rgba(0, 0, 0, .7), -6px 0 0 color-mix(in srgb, var(--bc) 70%, #000), -10px 0 0 color-mix(in srgb, var(--bc) 40%, #000);
+}
+.stz-page-num { text-align: center; font: 800 .74rem var(--font-body); letter-spacing: .3em; text-transform: uppercase; color: color-mix(in srgb, var(--bc) 70%, #2a2230); }
+.stz-page-title { text-align: center; font-family: 'Playfair Display', serif; font-size: clamp(1.6rem, 4vw, 2.2rem); margin: .4rem 0 .2rem; color: #2a2230; }
+.stz-page-flourish { text-align: center; color: color-mix(in srgb, var(--bc) 80%, #2a2230); letter-spacing: .6em; margin-bottom: 1.4rem; }
+.stz-page-text { font-family: 'Playfair Display', serif; font-size: 1.08rem; line-height: 1.8; }
+.stz-page-text p { margin: 0 0 1em; white-space: pre-wrap; text-indent: 1.6em; }
+.stz-page-text p:first-child { text-indent: 0; }
+.stz-page-text p:first-child::first-letter { float: left; font-size: 3.4em; line-height: .85; padding: .08em .1em 0 0; color: color-mix(in srgb, var(--bc) 85%, #2a2230); }
+.stz-page-end { text-align: center; margin-top: 2rem; font: italic 1rem 'Playfair Display', serif; color: #7a6f80; letter-spacing: .2em; }
+.stz-nav { display: flex; justify-content: center; align-items: center; gap: .6rem; margin: 1.2rem 0 .4rem; flex-wrap: wrap; }
+.stz-ch-pick { width: auto; max-width: 16rem; }
+.stz-write { display: grid; gap: .6rem; }
+.stz-write-title { text-align: center; font: 700 1.8rem 'Playfair Display', serif; background: none !important; border: 0 !important; color: #2a2230 !important; box-shadow: none !important; }
+.stz-write-text {
+  min-height: 22rem; resize: none; font: 1.08rem/1.8 'Playfair Display', serif; color: #2a2230 !important; border: 0 !important; box-shadow: none !important;
+  background: repeating-linear-gradient(transparent 0 calc(1.8em - 1px), rgba(42, 34, 48, .1) calc(1.8em - 1px) 1.8em) !important; background-attachment: local !important;
+}
+.stz-count { justify-self: end; font: 800 .75rem var(--font-body); color: #7a6f80; }

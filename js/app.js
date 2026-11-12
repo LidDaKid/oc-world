@@ -23,6 +23,9 @@ import * as web from './views/graph.js';
 import * as maps from './views/maps.js';
 import * as lore from './views/lore.js';
 import * as calendar from './views/calendar.js';
+import * as newspaper from './views/newspaper.js';
+import * as alignment from './views/alignment.js';
+import * as tiers from './views/tiers.js';
 import { renderBook, renderWrite } from './views/diary.js';
 import { renderCover } from './views/diary-cover.js';
 import { openLink } from './share.js';
@@ -36,6 +39,9 @@ const TABS = [
   { id: 'maps', label: 'maps', icon: '🗺️', view: maps },
   { id: 'lore', label: 'lore', icon: '📖', view: lore },
   { id: 'calendar', label: 'calendar', icon: '📅', view: calendar },
+  { id: 'newspaper', label: 'newspaper', icon: '📰', view: newspaper },
+  { id: 'alignment', label: 'alignment', icon: '⚖️', view: alignment },
+  { id: 'tiers', label: 'tiers', icon: '🏆', view: tiers },
 ];
 
 const app = document.getElementById('app');

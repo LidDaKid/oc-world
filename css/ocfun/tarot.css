@@ -1,0 +1,59 @@
+/* tarot (js/ocfun/tarot.js) */
+.tro-app { display: grid; gap: 1.4rem; --gold: #e9c46a; --night: #1a0f2e; }
+.tro-cloth { position: relative; overflow: hidden; display: grid; justify-items: center; gap: 1.1rem; padding: 1.6rem 1rem 1.4rem; border-radius: 26px; color: #f6eefb;
+  background: radial-gradient(circle at 50% 0%, rgba(177, 140, 255, .35), transparent 60%),
+    radial-gradient(circle, rgba(233, 196, 106, .5) 1px, transparent 1.6px) 0 0 / 34px 34px,
+    radial-gradient(circle, rgba(255, 255, 255, .35) 1px, transparent 1.4px) 17px 11px / 51px 47px,
+    linear-gradient(180deg, #2a0f3e, #120a22);
+  border: 2px solid rgba(233, 196, 106, .55); box-shadow: inset 0 0 0 6px rgba(233, 196, 106, .08), inset 0 0 60px rgba(0, 0, 0, .5); }
+.tro-cloth::before { content: ''; position: absolute; inset: 10px; border: 1px dashed rgba(233, 196, 106, .4); border-radius: 18px; pointer-events: none; }
+.tro-for { font: 400 clamp(1.4rem, 4vw, 2rem)/1 'Playfair Display', serif; font-style: italic; color: var(--gold); text-shadow: 0 0 18px rgba(233, 196, 106, .5); }
+.tro-table { display: flex; gap: clamp(.6rem, 3vw, 1.8rem); justify-content: center; flex-wrap: wrap; }
+.tro-spot { display: grid; justify-items: center; gap: .5rem; }
+.tro-spot-name { font: 800 .7rem var(--font-body); letter-spacing: .25em; text-transform: uppercase; color: var(--gold); }
+
+/* a card: back + front, flips in 3d */
+.tro-card { width: clamp(6.4rem, 22vw, 9.5rem); aspect-ratio: 2 / 3; perspective: 900px; }
+.tro-inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform .8s cubic-bezier(.3, .8, .3, 1); }
+.tro-card.flipped .tro-inner { transform: rotateY(180deg); }
+.tro-side { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 10px; overflow: hidden; box-shadow: 0 14px 26px -12px rgba(0, 0, 0, .8); }
+.tro-side-front { transform: rotateY(180deg); }
+@media (prefers-reduced-motion: reduce) { .tro-inner { transition: none; } }
+.tro-back { width: 100%; height: 100%; display: grid; place-items: center; color: var(--gold);
+  background: repeating-linear-gradient(45deg, rgba(233, 196, 106, .12) 0 2px, transparent 2px 10px), repeating-linear-gradient(-45deg, rgba(233, 196, 106, .12) 0 2px, transparent 2px 10px), linear-gradient(160deg, #4a1f6e, #1a0f2e 60%, #2a0a1b);
+  border: 3px solid var(--gold); outline: 1px solid var(--gold); outline-offset: -8px; }
+.tro-back-art, .tro-art { display: block; width: 80%; }
+.tro-back-art svg, .tro-art svg { display: block; width: 100%; height: auto; }
+.tro-face { width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr auto; justify-items: center; align-items: center; padding: .4rem .3rem; color: #3b1d4a;
+  background: radial-gradient(circle at 50% 42%, #fff8e6, #f3dfb4 70%, #d9b977); border: 3px solid var(--gold); outline: 1px solid #8a6a2c; outline-offset: -7px; }
+.tro-face .tro-art { width: 74%; color: #6a3d8f; filter: drop-shadow(0 1px 0 rgba(233, 196, 106, .8)); }
+.tro-face.rev .tro-art, .tro-face.rev .tro-num, .tro-face.rev .tro-name { rotate: 180deg; }
+.tro-num { font: 700 .85rem 'Playfair Display', serif; letter-spacing: .1em; color: #8a6a2c; }
+.tro-name { font: 700 clamp(.6rem, 2vw, .82rem)/1.1 'Playfair Display', serif; text-transform: uppercase; letter-spacing: .08em; text-align: center; padding: 0 .2rem .15rem; }
+
+.tro-actions { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: center; }
+.tro-actions .btn.ghost { color: var(--gold); border-color: rgba(233, 196, 106, .6); }
+.tro-meanings { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .7rem; width: 100%; max-width: 46rem; }
+.tro-mean { padding: .7rem .9rem; border-radius: 14px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(233, 196, 106, .3); font-size: .92rem; line-height: 1.35;
+  animation: tro-in .5s calc(var(--i) * .65s + .9s) both ease-out; }
+@keyframes tro-in { from { opacity: 0; translate: 0 10px; } }
+@media (prefers-reduced-motion: reduce) { .tro-mean { animation: none; } }
+.tro-mean-head { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; margin-bottom: .25rem; }
+.tro-mean-head b { font: 700 1.05rem 'Playfair Display', serif; color: var(--gold); }
+.tro-mean-spot { font: 800 .62rem var(--font-body); letter-spacing: .2em; text-transform: uppercase; color: #b18cff; }
+.tro-rev-tag { font: 800 .62rem var(--font-body); letter-spacing: .12em; text-transform: uppercase; padding: .05rem .4rem; border-radius: 999px; background: rgba(255, 93, 108, .25); color: #ff8a95; }
+
+.tro-kept { display: grid; gap: .8rem; }
+.tro-kept-title { font: 400 1.5rem 'Playfair Display', serif; font-style: italic; }
+.tro-reading { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1rem; padding: .9rem; border-radius: 20px; background: color-mix(in srgb, var(--ink) 5%, transparent); border: 1.5px solid var(--edge); }
+@media (max-width: 560px) { .tro-reading { grid-template-columns: 1fr; } }
+.tro-reading-cards { display: flex; gap: .4rem; }
+.tro-mini { display: grid; justify-items: center; gap: .2rem; font: 800 .58rem var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--ink2); }
+.tro-mini .tro-card { width: 4.2rem; }
+.tro-mini .tro-name { font-size: .42rem; }
+.tro-mini .tro-num { font-size: .55rem; }
+.tro-reading-side { display: grid; gap: .4rem; align-content: start; min-width: 0; }
+.tro-date { font: 800 .72rem var(--font-body); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.tro-reading-names { font: 400 1rem 'Playfair Display', serif; font-style: italic; overflow-wrap: anywhere; }
+.tro-note { width: 100%; white-space: pre-wrap; }
+.tro-reading .link-btn { justify-self: start; }

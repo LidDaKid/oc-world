@@ -1,0 +1,92 @@
+/* cootie catcher (js/ocfun/cootie.js): a folded paper fortune teller, seen from above */
+
+.ctc { display: grid; gap: 1.2rem; }
+.ctc-table {
+  position: relative; display: grid; justify-items: center; gap: 1rem; padding: 1.4rem 1rem 1.8rem; border-radius: 22px; overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(255, 255, 255, .5) 0 2px, transparent 3px) 0 0 / 46px 46px,
+    radial-gradient(circle at 70% 60%, rgba(255, 138, 196, .5) 0 1.5px, transparent 2.5px) 0 0 / 33px 33px,
+    linear-gradient(160deg, #ffd6ea, #e9dbff 55%, #cfe9ff);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .6), 0 16px 30px -16px rgba(0, 0, 0, .55);
+}
+.ctc-whose { font: 1.7rem 'Permanent Marker', cursive; color: #2a1d30; rotate: -2deg; }
+.ctc-steps { display: flex; gap: .3rem; flex-wrap: wrap; justify-content: center; }
+.ctc-step { padding: .2rem .7rem; border-radius: 999px; font: 800 .8rem var(--font-body); color: #8a6f8d; background: rgba(255, 255, 255, .55); border: 1.5px dashed rgba(138, 111, 141, .5); }
+.ctc-step.done { color: #2a1d30; border-style: solid; background: rgba(255, 255, 255, .85); text-decoration: line-through; text-decoration-color: #ff4fa3; }
+.ctc-step.on { color: #fff; background: #ff4fa3; border: 1.5px solid #ff4fa3; box-shadow: 0 4px 12px -4px #ff4fa3; }
+
+.ctc-stage { perspective: 900px; padding: 2.2rem; }
+.ctc-cc { --s: min(280px, 72vw); position: relative; width: var(--s); height: var(--s); transform-style: preserve-3d; transform: rotateX(18deg); }
+.ctc-inner {
+  position: absolute; inset: 6%; border-radius: 4px;
+  background:
+    linear-gradient(45deg, transparent calc(50% - .5px), rgba(0, 0, 0, .14) 50%, transparent calc(50% + .5px)),
+    linear-gradient(-45deg, transparent calc(50% - .5px), rgba(0, 0, 0, .14) 50%, transparent calc(50% + .5px)),
+    radial-gradient(circle, #fff 0 30%, #f3ecf7 100%);
+  box-shadow: inset 0 0 30px rgba(80, 40, 90, .35);
+}
+.ctc-qs { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; transform-style: preserve-3d; }
+.ctc-q {
+  --qc: #ff4fa3; position: relative; border: 0; padding: 0; cursor: pointer; display: grid; place-items: center; overflow: hidden;
+  background:
+    linear-gradient(45deg, transparent calc(50% - 1px), rgba(255, 255, 255, .55) 50%, transparent calc(50% + 1px)),
+    linear-gradient(-45deg, transparent calc(50% - 1px), rgba(0, 0, 0, .18) 50%, transparent calc(50% + 1px)),
+    conic-gradient(from 45deg, color-mix(in srgb, var(--qc) 70%, #fff) 0 25%, var(--qc) 0 50%, color-mix(in srgb, var(--qc) 72%, #000) 0 75%, color-mix(in srgb, var(--qc) 88%, #000) 0);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12), 0 6px 14px -6px rgba(0, 0, 0, .5);
+  transform: translateZ(40px); transition: transform .28s cubic-bezier(.3, .8, .3, 1.2), filter .2s;
+}
+.ctc-q.q0 { border-radius: 10px 2px 2px 2px; }
+.ctc-q.q1 { border-radius: 2px 10px 2px 2px; }
+.ctc-q.q2 { border-radius: 2px 2px 2px 10px; }
+.ctc-q.q3 { border-radius: 2px 2px 10px 2px; }
+.ctc-q::after { /* paper grain */ content: ''; position: absolute; inset: 0; background: radial-gradient(rgba(255, 255, 255, .22) 1px, transparent 1.4px) 0 0 / 7px 7px; mix-blend-mode: soft-light; pointer-events: none; }
+.ctc-q:not(:disabled):hover { filter: brightness(1.08) saturate(1.1); }
+.ctc-q:disabled { cursor: default; }
+.ctc-q.picked { filter: drop-shadow(0 0 10px #fff); }
+.ctc-q-name {
+  position: relative; z-index: 1; font: clamp(1rem, 4.5vw, 1.45rem) 'Permanent Marker', cursive; color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, .3), 0 0 8px rgba(0, 0, 0, .25); rotate: -8deg; max-width: 90%; overflow-wrap: anywhere; text-align: center;
+}
+.ctc-q.q1 .ctc-q-name, .ctc-q.q2 .ctc-q-name { rotate: 7deg; }
+/* opening: top/bottom pull apart, or left/right */
+.ctc-cc[data-way="ns"] .q0, .ctc-cc[data-way="ns"] .q1 { transform: translateZ(40px) translateY(-13%) rotateX(22deg); }
+.ctc-cc[data-way="ns"] .q2, .ctc-cc[data-way="ns"] .q3 { transform: translateZ(40px) translateY(13%) rotateX(-22deg); }
+.ctc-cc[data-way="ew"] .q0, .ctc-cc[data-way="ew"] .q2 { transform: translateZ(40px) translateX(-13%) rotateY(-22deg); }
+.ctc-cc[data-way="ew"] .q1, .ctc-cc[data-way="ew"] .q3 { transform: translateZ(40px) translateX(13%) rotateY(22deg); }
+/* the numbers inside the gap */
+.ctc-n {
+  position: absolute; z-index: 0; width: 2.4rem; height: 2.4rem; translate: -50% -50%; border-radius: 50%; border: 2px solid #ff4fa3;
+  background: #fff; color: #c2185b; font: 700 1.5rem/1 'Caveat', cursive; display: grid; place-items: center; cursor: pointer;
+  opacity: 0; pointer-events: none; transition: opacity .2s, scale .15s;
+}
+.ctc-n-ns { top: 50%; }
+.ctc-n-ns.p0 { left: 10%; } .ctc-n-ns.p1 { left: 32%; } .ctc-n-ns.p2 { left: 68%; } .ctc-n-ns.p3 { left: 90%; }
+.ctc-n-ew { left: 50%; }
+.ctc-n-ew.p0 { top: 10%; } .ctc-n-ew.p1 { top: 32%; } .ctc-n-ew.p2 { top: 68%; } .ctc-n-ew.p3 { top: 90%; }
+.ctc-cc[data-way="ns"] .ctc-n-ns, .ctc-cc[data-way="ew"] .ctc-n-ew { opacity: 1; }
+.ctc-stage.picking .ctc-cc[data-way="ns"] .ctc-n-ns, .ctc-stage.picking .ctc-cc[data-way="ew"] .ctc-n-ew { pointer-events: auto; z-index: 5; transform: translateZ(60px); animation: ctc-bob 1.2s ease-in-out infinite; }
+.ctc-n:not(:disabled):hover { scale: 1.15; background: #ff4fa3; color: #fff; }
+@keyframes ctc-bob { 50% { scale: 1.08; } }
+
+/* the fortune */
+.ctc-fortune {
+  --qc: #ff4fa3; position: relative; display: grid; justify-items: center; gap: .5rem; max-width: 22rem; padding: 1.3rem 1.4rem 1.1rem; text-align: center;
+  background: repeating-linear-gradient(180deg, transparent 0 1.6rem, rgba(90, 140, 220, .25) 1.6rem calc(1.6rem + 1px)), #fffdf5;
+  border-radius: 4px; border-top: 6px solid var(--qc); box-shadow: 0 16px 28px -12px rgba(0, 0, 0, .55); rotate: -1.5deg;
+  animation: ctc-unfold .55s cubic-bezier(.2, .9, .3, 1.3);
+}
+@keyframes ctc-unfold { from { transform: perspective(600px) rotateX(-90deg); opacity: 0; } }
+.ctc-fortune-n { position: absolute; top: -1.1rem; left: -1rem; width: 2.4rem; height: 2.4rem; border-radius: 50%; display: grid; place-items: center; background: var(--qc); color: #fff; font: 700 1.5rem 'Caveat', cursive; box-shadow: 0 4px 10px -4px rgba(0, 0, 0, .5); }
+.ctc-fortune-text { font: 1.75rem/1.15 'Caveat', cursive; color: #2a1d30; }
+.ctc-fortune-path { font: 700 .78rem var(--font-body); color: #8a6f8d; letter-spacing: .05em; }
+
+/* editing */
+.ctc-edit { display: grid; gap: 1rem; }
+.ctc-edit-colors { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .7rem; }
+.ctc-edit-color { display: grid; gap: .4rem; padding: .7rem; border-radius: 14px; border: 2px solid var(--qc); background: color-mix(in srgb, var(--qc) 12%, transparent); }
+.ctc-edit-fortunes { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: .45rem .8rem; }
+.ctc-edit-fortune { display: flex; align-items: center; gap: .5rem; }
+.ctc-edit-fortune span { width: 1.8rem; height: 1.8rem; flex: none; border-radius: 50%; display: grid; place-items: center; background: #ff4fa3; color: #fff; font: 700 1.1rem 'Caveat', cursive; }
+.ctc-edit-fortune input { flex: 1; min-width: 0; }
+
+@media (prefers-reduced-motion: reduce) { .ctc * { animation: none !important; transition: none !important; } }

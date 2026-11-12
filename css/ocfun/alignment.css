@@ -1,0 +1,63 @@
+/* alignment chart (js/ocfun/alignment-core.js): oc app + the world's alignment tab. a glossy 2000s poster */
+
+.alc-page { max-width: 64rem; }
+.alc { display: grid; gap: 1rem; min-width: 0; }
+.alc-top { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; }
+.alc-title { font: 400 clamp(1.6rem, 4vw, 2.4rem)/1 'Bangers', var(--font-display); letter-spacing: .06em; color: var(--ink); text-shadow: 3px 3px 0 var(--c, var(--accent)); flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.alc-title-input { flex: 1; min-width: 10rem; font: 400 1.6rem 'Bangers', var(--font-display) !important; letter-spacing: .05em; }
+.alc-tools { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-left: auto; }
+
+.alc-poster {
+  padding: clamp(.5rem, 2vw, 1.1rem); border-radius: 22px; overflow-x: auto;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, .5) 0 1.5px, transparent 2.5px) 0 0 / 34px 34px,
+    radial-gradient(circle at 70% 60%, rgba(255, 255, 255, .3) 0 1px, transparent 2px) 0 0 / 22px 22px,
+    linear-gradient(150deg, #2a0a1b, #1b1838 55%, #0f0a14);
+  border: 3px solid #fff; box-shadow: 0 0 0 3px #111, 0 18px 40px -18px rgba(0, 0, 0, .8);
+}
+.alc-grid { display: grid; grid-template-columns: 2.2rem repeat(3, minmax(6.5rem, 1fr)); grid-auto-rows: auto; gap: .45rem; min-width: 22rem; }
+.alc-corner { display: block; }
+.alc-axis { display: grid; place-items: center; color: #fff; font: 400 1.05rem 'Permanent Marker', cursive; letter-spacing: .04em; text-transform: lowercase; text-shadow: 0 2px 0 #000; min-height: 2rem; }
+.alc-axis-y { writing-mode: vertical-rl; rotate: 180deg; }
+.alc-axis-y span { display: block; }
+.alc-axis-input { width: 100%; min-width: 0; padding: .2rem .4rem !important; text-align: center; font: 400 .95rem 'Permanent Marker', cursive !important; }
+.alc-axis-y .alc-axis-input { writing-mode: horizontal-tb; rotate: 180deg; width: 6rem; }
+.alc-cell {
+  --t: #ff8ac4;
+  position: relative; display: grid; grid-template-rows: auto 1fr; gap: .35rem; min-height: 8.5rem; padding: .5rem; border-radius: 14px;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, .55), transparent 45%),
+    linear-gradient(160deg, var(--t), color-mix(in srgb, var(--t) 55%, #000));
+  border: 3px solid #111; box-shadow: inset 0 -6px 0 rgba(0, 0, 0, .18), 0 4px 0 #000;
+  transition: transform .15s, box-shadow .15s;
+}
+.alc-cell:nth-child(odd) { rotate: -.4deg; }
+.alc-cell.over, .alc-grid.picking .alc-cell:hover { transform: scale(1.03); box-shadow: inset 0 -6px 0 rgba(0, 0, 0, .18), 0 0 0 4px #fff, 0 0 22px var(--t); cursor: copy; }
+.alc-cell-name { justify-self: center; text-align: center; padding: .15rem .6rem; border-radius: 999px; background: #111; color: #fff; font: 400 1rem 'Bangers', var(--font-display); letter-spacing: .08em; text-transform: uppercase; line-height: 1.1; box-shadow: 2px 2px 0 color-mix(in srgb, var(--t) 70%, #fff); }
+.alc-cell-input { width: 100%; text-align: center; font: 400 1rem 'Bangers', var(--font-display) !important; letter-spacing: .06em; }
+.alc-faces { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: .35rem; }
+
+.alc-chip { display: grid; justify-items: center; gap: .15rem; width: 4.4rem; cursor: grab; touch-action: none; user-select: none; transition: transform .15s; }
+.alc-chip .portrait { border: 3px solid #fff !important; box-shadow: 0 3px 0 #111, 0 6px 12px -4px rgba(0, 0, 0, .6); }
+.alc-chip-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 800 .72rem 'Nunito', sans-serif; color: #fff; background: #111; padding: 0 .4rem; border-radius: 999px; }
+.alc-chip:hover { transform: translateY(-2px) rotate(-3deg); }
+.alc-chip.picked .portrait { box-shadow: 0 0 0 4px var(--c), 0 0 18px var(--c) !important; }
+.alc-chip.picked { transform: scale(1.08); }
+.alc-chip.alc-lifted { opacity: .3; }
+.alc-ghost { position: fixed; z-index: 999; pointer-events: none; translate: -50% -50%; rotate: -6deg; scale: 1.1; }
+.alc-tray.ro .alc-chip, .alc-faces .alc-chip { cursor: pointer; }
+
+.alc-tray {
+  display: flex; flex-wrap: wrap; gap: .6rem; min-height: 5.6rem; padding: .7rem; border-radius: 18px;
+  border: 2.5px dashed var(--edge); background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+.alc-tray .alc-chip-name { color: var(--ink); background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.alc-tray.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+@media (max-width: 560px) {
+  .alc-grid { grid-template-columns: 1.6rem repeat(3, minmax(5.4rem, 1fr)); min-width: 19rem; gap: .3rem; }
+  .alc-cell { min-height: 7rem; padding: .35rem; }
+  .alc-cell-name { font-size: .82rem; }
+  .alc-chip { width: 3.4rem; }
+  .alc-chip .portrait.md { width: 2.4rem; height: 2.4rem; }
+}

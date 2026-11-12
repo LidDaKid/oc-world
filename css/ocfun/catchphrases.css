@@ -1,0 +1,64 @@
+/* catchphrases (js/ocfun/catchphrases.js): a wall of speech bubbles */
+
+.cph { position: relative; }
+.cph-say-btn { background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #ffd84d)); color: var(--accent-ink); border: 0; }
+.cph-wall {
+  position: relative; padding: 1.6rem 1.2rem 4.4rem; border-radius: 22px; min-height: 16rem; overflow: hidden;
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--c) 30%, transparent) 1.5px, transparent 2px) 0 0 / 18px 18px,
+    linear-gradient(160deg, color-mix(in srgb, var(--c) 16%, transparent), transparent 60%),
+    color-mix(in srgb, var(--ink) 4%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--c) 35%, var(--edge));
+}
+.cph-grid { columns: 3 12rem; column-gap: 1.4rem; }
+.cph-cell { display: block; width: 100%; break-inside: avoid; margin: 0 0 1.6rem; padding: 0; border: 0; background: none; font: inherit; text-align: center; color: var(--ink); }
+button.cph-cell { cursor: pointer; }
+button.cph-cell:hover .cph-bubble { transform: scale(1.05) rotate(0deg); }
+.cph-when { margin-top: .75rem; font: 600 1.1rem 'Caveat', cursive; color: var(--ink2); }
+.cph-empty { display: grid; place-items: center; min-height: 12rem; color: var(--ink2); }
+.cph-me { position: absolute; right: 1rem; bottom: .8rem; }
+.cph-me .portrait { box-shadow: 0 0 0 3px var(--c), 0 6px 14px rgba(0, 0, 0, .35); }
+
+/* the bubbles */
+.cph-bubble {
+  position: relative; display: inline-block; max-width: 100%; padding: .7rem 1.1rem; color: var(--ink); background: var(--paper);
+  border: 3px solid #1d1722; border-radius: 26px; rotate: var(--r, 0deg); box-shadow: 4px 5px 0 rgba(0, 0, 0, .28);
+  transition: transform .2s cubic-bezier(.2, .9, .3, 1.5);
+}
+.cph-words { display: block; white-space: pre-wrap; overflow-wrap: anywhere; font: 700 1.05rem/1.2 var(--font-body); }
+.cph-bubble.sz-small .cph-words { font-size: .88rem; }
+.cph-bubble.sz-big .cph-words { font: 400 1.6rem/1.05 'Bangers', var(--font-display); letter-spacing: .04em; }
+.cph-bubble.st-speech::after, .cph-bubble.st-whisper::after {
+  content: ''; position: absolute; left: 22%; bottom: -16px; width: 22px; height: 18px; background: var(--paper);
+  border-right: 3px solid #1d1722; border-bottom: 3px solid #1d1722; transform: skewX(35deg) rotate(25deg); border-radius: 0 0 6px 0;
+}
+.cph-bubble.st-shout { border-radius: 4px; padding: 1rem 1.3rem; background: #ffe45c; --ink: #1d1722;
+  clip-path: polygon(0 12%, 12% 10%, 8% 0, 26% 8%, 40% 0, 50% 10%, 66% 0, 72% 10%, 92% 2%, 88% 16%, 100% 24%, 92% 40%, 100% 56%, 90% 66%, 98% 84%, 80% 82%, 76% 100%, 60% 88%, 44% 100%, 36% 88%, 16% 98%, 18% 84%, 0 86%, 8% 66%, 0 50%, 8% 34%); box-shadow: none; filter: drop-shadow(3px 4px 0 rgba(0, 0, 0, .3)); border: 0; }
+.cph-bubble.st-shout .cph-words { text-transform: uppercase; font-weight: 900; }
+.cph-bubble.st-thought { border-radius: 50% / 44%; padding: 1rem 1.4rem; }
+.cph-bubble.st-thought::before, .cph-bubble.st-thought::after { content: ''; position: absolute; background: var(--paper); border: 3px solid #1d1722; border-radius: 50%; }
+.cph-bubble.st-thought::before { width: 16px; height: 16px; left: 18%; bottom: -16px; }
+.cph-bubble.st-thought::after { width: 9px; height: 9px; left: 12%; bottom: -27px; }
+.cph-bubble.st-whisper { border-style: dashed; }
+.cph-bubble.st-whisper::after { border-right-style: dashed; border-bottom-style: dashed; }
+.cph-bubble.st-whisper .cph-words { font-style: italic; font-weight: 600; opacity: .85; }
+.cph-bubble.st-text { border-radius: 20px 20px 4px 20px; border: 0; background: linear-gradient(180deg, color-mix(in srgb, var(--paper) 80%, #fff), var(--paper)); box-shadow: 0 4px 10px rgba(0, 0, 0, .25); }
+.cph-bubble.st-text .cph-words { font-weight: 600; }
+
+/* "say something" */
+.cph-stage { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 1rem; background: rgba(8, 4, 14, .62); backdrop-filter: blur(5px); cursor: pointer; animation: cph-fade .2s ease-out; }
+@keyframes cph-fade { from { opacity: 0; } }
+.cph-stage-inner { display: grid; justify-items: center; gap: 1.4rem; max-width: min(40rem, 100%); }
+.cph-bubble.big-say { animation: cph-pop .45s cubic-bezier(.2, .9, .3, 1.5); padding: 1.4rem 2rem; }
+.cph-bubble.big-say .cph-words { font-size: clamp(1.6rem, 5vw, 2.8rem); }
+.cph-bubble.big-say.sz-small .cph-words, .cph-bubble.big-say.sz-medium .cph-words { font-size: clamp(1.4rem, 4vw, 2.2rem); }
+@keyframes cph-pop { 0% { scale: .2; rotate: -15deg; opacity: 0; } 70% { scale: 1.08; } 100% { scale: 1; } }
+.cph-stage-who { display: flex; align-items: center; gap: .6rem; color: #fff; font-size: 1.1rem; margin-top: .6rem; }
+.cph-stage-who .portrait { box-shadow: 0 0 0 3px #fff; }
+.cph-stage-when { color: #e8dff2; font: 600 1.35rem 'Caveat', cursive; text-align: center; }
+
+.cph-form { display: grid; gap: .6rem; }
+.cph-form .segmented { justify-self: start; }
+.cph-prev { display: grid; place-items: center; min-height: 6rem; padding: 1rem 0 1.4rem; }
+.cph-bubble.flat { rotate: 0deg; }
+@media (max-width: 520px) { .cph-grid { columns: 1; } .cph-wall { padding-inline: .8rem; } }

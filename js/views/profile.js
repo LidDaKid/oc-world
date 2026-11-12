@@ -719,8 +719,14 @@ export function render(el, { char, tab, sub, base, world, go, view = false }) {
   function funTab() {
     const app = FEATURES.find(f => f.meta.id === sub);
     if (!app) {
-      return h('div', { class: 'fun-grid' }, FEATURES.map(f =>
-        h('a', { class: 'fun-tile', href: `#/${base}/fun/${f.meta.id}` }, sticker(f.meta.icon), h('span', {}, f.meta.label))));
+      // lots of apps: a search box over the grid
+      const grid = h('div', { class: 'fun-grid' }, FEATURES.map(f =>
+        h('a', { class: 'fun-tile', href: `#/${base}/fun/${f.meta.id}`, dataset: { name: f.meta.label } }, sticker(f.meta.icon), h('span', {}, f.meta.label))));
+      const find = h('input', { type: 'search', class: 'fun-find', placeholder: 'find an app', oninput: () => {
+        const q = find.value.trim().toLowerCase();
+        for (const t of grid.children) t.hidden = !!q && !t.dataset.name.includes(q);
+      } });
+      return h('div', { class: 'fun-home' }, find, grid);
     }
     const box = h('div', { class: 'fun-app fun-' + app.meta.id });
     const ctx = { char, mine, save, go, base, world, ocLink: linkTo, data: dataFor(char, app.meta.id) };

@@ -1,0 +1,59 @@
+/* day in their life (js/ocfun/dayinlife.js): a timeline of their day + a "now" line */
+
+.dil-page {
+  max-width: 40rem; margin: 0 auto; padding: 1.2rem 1.2rem 1.6rem; border-radius: 22px;
+  background:
+    radial-gradient(120% 60% at 0% 0%, color-mix(in srgb, var(--c) 22%, transparent), transparent 60%),
+    radial-gradient(90% 50% at 100% 100%, color-mix(in srgb, var(--c) 14%, transparent), transparent 60%),
+    color-mix(in srgb, var(--ink) 4%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--c) 35%, var(--edge));
+}
+.dil-head { display: flex; align-items: center; gap: 1.1rem; padding: .4rem .2rem 1.2rem; margin-bottom: .6rem; border-bottom: 2px dashed color-mix(in srgb, var(--c) 40%, transparent); }
+.dil-clock { position: relative; flex: none; width: 84px; height: 84px; border-radius: 50%; background: radial-gradient(circle, #fff 0 60%, #f1ecf7 100%); border: 5px solid var(--c); box-shadow: 0 8px 18px -8px var(--c), inset 0 0 0 2px rgba(0, 0, 0, .06); }
+.dil-tick { position: absolute; left: 50%; top: 4px; width: 2px; height: 7px; margin-left: -1px; background: #b9b0c4; transform-origin: 1px 33px; rotate: var(--a); border-radius: 2px; }
+.dil-tick:nth-child(3n + 1) { height: 10px; width: 3px; margin-left: -1.5px; background: #2a2230; transform-origin: 1.5px 33px; }
+.dil-hand { position: absolute; left: 50%; bottom: 50%; transform-origin: 50% 100%; rotate: var(--a); border-radius: 3px; background: #2a2230; }
+.dil-hand.hr { width: 4px; height: 21px; margin-left: -2px; }
+.dil-hand.mn { width: 3px; height: 30px; margin-left: -1.5px; background: var(--c); }
+.dil-pin { position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; margin: -4.5px; border-radius: 50%; background: #2a2230; box-shadow: 0 0 0 2px #fff; }
+.dil-head-text { min-width: 0; }
+.dil-head-kicker { font: 800 .72rem var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--c); }
+.dil-head-what { font: 700 1.5rem/1.15 var(--font-display); overflow-wrap: anywhere; }
+.dil-head-where { color: var(--ink2); font-weight: 700; }
+
+.dil-line { position: relative; display: grid; gap: .55rem; padding-left: 0; }
+.dil-row { display: grid; grid-template-columns: 5.4rem 22px 1fr; align-items: center; gap: .5rem; position: relative; }
+.dil-row::before { content: ''; position: absolute; left: calc(5.4rem + .5rem + 10px); top: -.6rem; bottom: -.6rem; width: 2px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
+.dil-time { text-align: right; font: 800 .85rem var(--font-body); color: var(--ink2); font-variant-numeric: tabular-nums; }
+.dil-dot { position: relative; z-index: 1; width: 16px; height: 16px; margin: auto; border-radius: 50%; background: var(--c); border: 3px solid var(--bg2); box-shadow: 0 0 0 2px var(--c); }
+.dil-card {
+  display: grid; gap: .1rem; text-align: left; padding: .6rem .85rem; border-radius: 14px; font: inherit; color: var(--ink);
+  background: color-mix(in srgb, var(--c) 14%, var(--panel, transparent)); border: 1.5px solid color-mix(in srgb, var(--c) 45%, transparent); border-left: 5px solid var(--c);
+}
+button.dil-card { cursor: pointer; transition: transform .15s; }
+button.dil-card:hover { transform: translateX(4px); }
+.dil-what { font-weight: 800; overflow-wrap: anywhere; }
+.dil-where { font-size: .82rem; color: var(--ink2); }
+.dil-row.on .dil-card { background: color-mix(in srgb, var(--c) 30%, var(--panel, transparent)); box-shadow: 0 0 0 2px var(--c), 0 8px 20px -8px var(--c); }
+.dil-row.on .dil-dot { animation: dil-pulse 1.6s ease-in-out infinite; }
+@keyframes dil-pulse { 50% { box-shadow: 0 0 0 2px var(--c), 0 0 0 8px color-mix(in srgb, var(--c) 25%, transparent); } }
+
+.dil-now { display: grid; grid-template-columns: 5.4rem 1fr auto; align-items: center; gap: .5rem; margin: .1rem 0; }
+.dil-now-time { text-align: right; font: 800 .78rem var(--font-body); color: #ff4a6a; font-variant-numeric: tabular-nums; }
+.dil-now i { height: 2px; background: #ff4a6a; position: relative; box-shadow: 0 0 8px #ff4a6a; }
+.dil-now i::before { content: ''; position: absolute; left: 4px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; background: #ff4a6a; box-shadow: 0 0 10px #ff4a6a; }
+.dil-now-label { font: 800 .7rem var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: #ff4a6a; }
+.dil-empty { display: grid; place-items: center; padding: 2.4rem 1rem; color: var(--ink2); }
+.dil-form { display: grid; gap: .6rem; }
+
+@media (max-width: 520px) {
+  .dil-row, .dil-now { grid-template-columns: 4.4rem 18px 1fr; }
+  .dil-now { grid-template-columns: 4.4rem 1fr auto; }
+  .dil-row::before { left: calc(4.4rem + .5rem + 8px); }
+  .dil-head-what { font-size: 1.2rem; }
+  .dil-clock { width: 68px; height: 68px; }
+  .dil-tick { transform-origin: 1px 25px; }
+  .dil-tick:nth-child(3n + 1) { transform-origin: 1.5px 25px; }
+  .dil-hand.hr { height: 16px; }
+  .dil-hand.mn { height: 23px; }
+}

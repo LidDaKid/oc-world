@@ -1,0 +1,71 @@
+/* photo booth (js/ocfun/photobooth.js): photo strips, filters, doodles + draggable stickers */
+
+.pbo-shelf { display: flex; flex-wrap: wrap; gap: 1.4rem 1.6rem; justify-content: center; align-items: flex-start; padding: 1.2rem .4rem 2rem; min-height: 280px; border-radius: 16px;
+  background: radial-gradient(circle at 50% 0, rgba(255, 255, 255, .08), transparent 60%), repeating-linear-gradient(90deg, rgba(255, 79, 163, .07) 0 22px, transparent 22px 44px); }
+.pbo-pick { border: 0; padding: 0; background: none; cursor: pointer; rotate: var(--tilt, 0deg); transition: rotate .25s, translate .25s; filter: drop-shadow(0 12px 14px rgba(0, 0, 0, .5)); }
+.pbo-pick:hover { rotate: 0deg; translate: 0 -6px; }
+
+/* an empty booth: a curtain + the slot the strip comes out of */
+.pbo-curtain { position: relative; width: 180px; height: 260px; border-radius: 12px 12px 4px 4px;
+  background: repeating-linear-gradient(90deg, #a3123a 0 14px, #7d0b2a 14px 28px); box-shadow: inset 0 18px 18px -12px rgba(0, 0, 0, .6), 0 16px 26px -12px rgba(0, 0, 0, .7); }
+.pbo-sign { position: absolute; top: -18px; left: 50%; translate: -50% 0; padding: .3rem 1rem; border-radius: 8px; background: #111; color: #ffd84d;
+  font: 400 1.3rem/1 'Bangers', 'Pixelify Sans', sans-serif; letter-spacing: .14em; text-transform: uppercase; box-shadow: 0 0 0 2px #ffd84d, 0 0 18px rgba(255, 216, 77, .55); animation: pbo-blink 1.6s steps(1) infinite; }
+@keyframes pbo-blink { 50% { color: #ff4fa3; box-shadow: 0 0 0 2px #ff4fa3, 0 0 18px rgba(255, 79, 163, .6); } }
+.pbo-slot { position: absolute; bottom: 18px; left: 50%; translate: -50% 0; width: 70px; height: 8px; border-radius: 4px; background: #111; box-shadow: inset 0 2px 3px rgba(0, 0, 0, .8), 0 1px 0 rgba(255, 255, 255, .2); }
+
+/* the strip */
+.pbo-strip { --strip: #fff; --strip-ink: #1a1320; --look: none; position: relative; width: 140px; padding: 10px 10px 8px; background: var(--strip); display: grid; gap: 8px; color: var(--strip-ink);
+  background-image: linear-gradient(90deg, rgba(0, 0, 0, .04), transparent 30%, rgba(0, 0, 0, .05)); border-radius: 2px; overflow: hidden; container-type: inline-size; }
+.pbo-strip.big { width: min(220px, 60vw); }
+.pbo-frame { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #2a2730; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .25); }
+.pbo-pic { width: 100%; height: 100%; object-fit: cover; display: block; filter: var(--look); }
+.pbo-empty { width: 100%; height: 100%; background: radial-gradient(circle at 50% 40%, #4a4553, #26232c); }
+.pbo-frame::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, .28)); pointer-events: none; }
+.pbo-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; padding: 2px 2px 0; min-height: 18px; }
+.pbo-cap { font: 400 15cqw/1 'Caveat', cursive; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pbo-date { font: 700 7.5cqw/1 'Courier New', monospace; letter-spacing: .08em; opacity: .8; white-space: nowrap; color: #e1572a; text-shadow: 0 0 1px rgba(225, 87, 42, .5); }
+
+/* doodles drawn over the frames */
+.pbo-doodles { position: absolute; inset: 0; pointer-events: none; background-repeat: no-repeat; }
+.pbo-d-hearts .pbo-doodles { background:
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M20 34C9 26 4 20 4 14a8 8 0 0 1 16-2 8 8 0 0 1 16 2c0 6-5 12-16 20z' fill='none' stroke='%23ff4fa3' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E") 6% 6% / 26% auto no-repeat,
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M20 34C9 26 4 20 4 14a8 8 0 0 1 16-2 8 8 0 0 1 16 2c0 6-5 12-16 20z' fill='%23ff4fa3'/%3E%3C/svg%3E") 92% 38% / 18% auto no-repeat,
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M20 34C9 26 4 20 4 14a8 8 0 0 1 16-2 8 8 0 0 1 16 2c0 6-5 12-16 20z' fill='none' stroke='%23fff' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E") 10% 70% / 20% auto no-repeat; }
+.pbo-d-stars .pbo-doodles { background:
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M20 3l5 11 12 1-9 8 3 12-11-6-11 6 3-12-9-8 12-1z' fill='none' stroke='%23ffd84d' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E") 88% 4% / 24% auto no-repeat,
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M20 3l5 11 12 1-9 8 3 12-11-6-11 6 3-12-9-8 12-1z' fill='%23fff'/%3E%3C/svg%3E") 6% 48% / 16% auto no-repeat,
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M20 3l5 11 12 1-9 8 3 12-11-6-11 6 3-12-9-8 12-1z' fill='%23ffd84d'/%3E%3C/svg%3E") 90% 80% / 20% auto no-repeat; }
+.pbo-d-sparkles .pbo-doodles { background:
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M20 2c1.5 11 6 16.5 18 18-12 1.5-16.5 7-18 18-1.5-11-6-16.5-18-18 12-1.5 16.5-7 18-18z' fill='%23fff'/%3E%3C/svg%3E") 8% 4% / 22% auto no-repeat,
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M20 2c1.5 11 6 16.5 18 18-12 1.5-16.5 7-18 18-1.5-11-6-16.5-18-18 12-1.5 16.5-7 18-18z' fill='%23b18cff'/%3E%3C/svg%3E") 90% 30% / 18% auto no-repeat,
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M20 2c1.5 11 6 16.5 18 18-12 1.5-16.5 7-18 18-1.5-11-6-16.5-18-18 12-1.5 16.5-7 18-18z' fill='%23fff'/%3E%3C/svg%3E") 12% 62% / 14% auto no-repeat,
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M20 2c1.5 11 6 16.5 18 18-12 1.5-16.5 7-18 18-1.5-11-6-16.5-18-18 12-1.5 16.5-7 18-18z' fill='%23ff8ac4'/%3E%3C/svg%3E") 88% 88% / 20% auto no-repeat; }
+.pbo-d-scribbles .pbo-doodles { background:
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='60'%3E%3Cpath d='M4 40c10-30 22 20 32-6s20 22 30-2 18 18 28-4 14 10 22 0' fill='none' stroke='%23ff4fa3' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E") 50% 23% / 80% auto no-repeat,
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ccircle cx='30' cy='30' r='22' fill='none' stroke='%237df9d0' stroke-width='4' stroke-dasharray='6 5'/%3E%3C/svg%3E") 86% 55% / 30% auto no-repeat,
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='40'%3E%3Cpath d='M6 30l14-18 6 14 12-20 6 18 14-12 10 16' fill='none' stroke='%23ffd84d' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14% 80% / 44% auto no-repeat; }
+
+.pbo-stickers { position: absolute; inset: 0; pointer-events: none; }
+.pbo-stk { position: absolute; translate: -50% -50%; rotate: var(--rot, 0deg); line-height: 0; }
+.pbo-stk :is(img, .stk) { width: 100% !important; height: auto !important; max-width: none; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .35)); }
+.pbo-stk.movable { pointer-events: auto; cursor: grab; touch-action: none; }
+
+/* editor */
+.pbo-view { display: grid; place-items: center; padding: .6rem; filter: drop-shadow(0 14px 18px rgba(0, 0, 0, .5)); }
+.pbo-edit { display: grid; grid-template-columns: 1fr auto; gap: 1.2rem; align-items: start; }
+@media (max-width: 720px) { .pbo-edit { grid-template-columns: 1fr; } }
+.pbo-form { display: grid; gap: .6rem; min-width: 0; }
+.pbo-field { display: grid; gap: .3rem; font: 800 .78rem var(--font-body); color: var(--ink2); }
+.pbo-field > input { font: 600 .95rem var(--font-body); color: var(--ink); }
+.pbo-two { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.pbo-slots { display: flex; gap: .45rem; flex-wrap: wrap; }
+.pbo-slot-pic { position: relative; width: 74px; aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden; border: 1.5px solid var(--edge); }
+.pbo-slot-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pbo-x { position: absolute; top: 2px; right: 2px; width: 1.2rem; height: 1.2rem; border-radius: 50%; border: 0; background: rgba(0, 0, 0, .6); color: #fff; font-size: .65rem; cursor: pointer; }
+.pbo-slot-add { width: 74px; aspect-ratio: 4 / 3; border-radius: 8px; border: 1.5px dashed var(--edge); background: none; color: var(--ink2); font-size: 1.4rem; cursor: pointer; }
+.pbo-slot-add:hover { border-color: var(--accent); color: var(--accent); }
+.pbo-stk-list { display: grid; gap: .35rem; }
+.pbo-stk-row { display: grid; grid-template-columns: 2.2rem 1fr auto; gap: .5rem; align-items: center; }
+.pbo-stk-prev { width: 2.2rem; height: 2.2rem; display: grid; place-items: center; }
+.pbo-stk-prev :is(img, .stk) { max-width: 100%; max-height: 100%; width: 100%; height: auto; }
+.pbo-stk-list > .btn { justify-self: start; }

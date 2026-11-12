@@ -1,0 +1,68 @@
+/* fan wiki (js/ocfun/wiki.js): a fandom wiki page */
+
+.wki-page {
+  --wk-ink: #1f1b24; --wk-soft: #5e5768; --wk-line: #d9d3e0; --wk-link: color-mix(in srgb, var(--c) 55%, #2a3cff);
+  background: #fdfcff; color: var(--wk-ink); border-radius: 8px; overflow: hidden;
+  box-shadow: 0 18px 40px -22px rgba(0, 0, 0, .7); border: 1px solid #e6e1ec; padding-bottom: 1rem;
+}
+.wki-page a { color: var(--wk-link); text-decoration: none; }
+.wki-page a:hover { text-decoration: underline; }
+.wki-top {
+  display: flex; align-items: center; gap: 1rem; padding: .6rem 1.2rem; color: #fff;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 75%, #1a1320), color-mix(in srgb, var(--c) 40%, #1a1320));
+}
+.wki-site { display: flex; align-items: center; gap: .5rem; font: 800 .95rem var(--font-body); }
+.wki-site-logo { width: 1.7rem; height: 1.7rem; border-radius: 6px; display: grid; place-items: center; background: #fff; color: var(--c); font: 900 1rem Georgia, serif; }
+.wki-search { margin-left: auto; padding: .25rem .9rem; border-radius: 999px; background: rgba(255, 255, 255, .2); font-size: .85rem; min-width: 8rem; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wki-title { margin: 1.1rem 1.4rem 0; font: 400 2.2rem/1.15 'Playfair Display', Georgia, serif; color: var(--wk-ink); border-bottom: 1px solid var(--wk-line); padding-bottom: .3rem; overflow-wrap: anywhere; }
+.wki-sub { margin: .3rem 1.4rem .9rem; font-size: .78rem; color: var(--wk-soft); }
+.wki-body { padding: 0 1.4rem; display: flow-root; }
+.wki-body p { margin: 0 0 .8rem; line-height: 1.6; }
+.wki-lead { font-size: 1.02rem; }
+
+.wki-info { float: right; width: min(17rem, 100%); margin: 0 0 1rem 1.2rem; border: 1px solid var(--wk-line); background: #f6f3fa; font-size: .85rem; border-radius: 4px; overflow: hidden; }
+.wki-info-title { padding: .5rem; text-align: center; background: var(--c); color: #fff; font: 700 1.1rem 'Playfair Display', Georgia, serif; text-shadow: 0 1px 4px rgba(0, 0, 0, .35); overflow-wrap: anywhere; }
+.wki-info-pic { padding: .6rem; display: grid; place-items: center; }
+.wki-info-img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 3px; display: block; }
+.wki-info-portrait { width: 100%; aspect-ratio: 1; border-radius: 3px; font-size: 3rem; }
+.wki-info-cap { padding: 0 .7rem .6rem; text-align: center; font-style: italic; color: var(--wk-soft); }
+.wki-info-band { padding: .3rem .5rem; text-align: center; font-weight: 800; background: color-mix(in srgb, var(--c) 30%, #fff); color: var(--wk-ink); }
+.wki-info-table { width: 100%; border-collapse: collapse; }
+.wki-info-table th, .wki-info-table td { padding: .35rem .6rem; border-top: 1px solid var(--wk-line); vertical-align: top; text-align: left; overflow-wrap: anywhere; }
+.wki-info-table th { width: 40%; font-weight: 800; color: var(--wk-soft); }
+.wki-info-none { text-align: center !important; color: var(--wk-soft); }
+
+.wki-quote { margin: 0 0 1rem; padding: .7rem 1rem; border-left: 4px solid var(--c); background: #f6f3fa; font-style: italic; font-family: 'Playfair Display', Georgia, serif; display: grid; gap: .3rem; }
+.wki-quote cite { font-size: .85rem; color: var(--wk-soft); font-style: normal; font-family: var(--font-body); }
+.wki-toc { display: inline-block; min-width: 12rem; max-width: 100%; margin: 0 0 1rem; padding: .6rem 1rem .6rem .8rem; border: 1px solid var(--wk-line); background: #f6f3fa; font-size: .9rem; }
+.wki-toc-title { font-weight: 800; text-align: center; margin-bottom: .3rem; }
+.wki-toc ol { margin: 0; padding-left: 1.4rem; }
+.wki-sec { scroll-margin-top: 1rem; }
+.wki-h2 { display: flex; align-items: baseline; gap: .6rem; margin: 1.2rem 0 .6rem; padding-bottom: .2rem; border-bottom: 1px solid var(--wk-line); font: 400 1.5rem 'Playfair Display', Georgia, serif; color: var(--wk-ink); }
+.wki-h2 span { overflow-wrap: anywhere; }
+.wki-edit { margin-left: auto; font: 400 .78rem var(--font-body); color: var(--wk-link) !important; background: none; border: 0; padding: 0; cursor: pointer; }
+.wki-rels { margin: 0 0 .8rem; padding-left: 1.2rem; display: grid; gap: .3rem; }
+.wki-rels a { display: inline-flex; align-items: center; gap: .35rem; vertical-align: middle; }
+.wki-redlink { color: #c8324a; }
+.wki-rel-label { color: var(--wk-soft); }
+.wki-trivia { margin: 0 0 .8rem; padding-left: 1.2rem; display: grid; gap: .3rem; line-height: 1.5; }
+.wki-cats { margin: 1.2rem 1.4rem 0; padding: .5rem .7rem; border: 1px solid var(--wk-line); background: #f6f3fa; font-size: .82rem; display: flex; flex-wrap: wrap; gap: .3rem .6rem; align-items: center; }
+.wki-cat { color: var(--wk-link); }
+.wki-cat + .wki-cat::before { content: '| '; color: var(--wk-soft); }
+
+.wki-editor { padding: 0 1.4rem; }
+.wki-ed-list { display: grid; gap: .8rem; }
+.wki-ed-block { display: grid; gap: .45rem; padding: .8rem; border: 1.5px dashed var(--wk-line); border-radius: 10px; background: #f6f3fa; }
+.wki-ed-label { font-weight: 800; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--wk-soft); }
+.wki-ed-head { display: flex; gap: .3rem; align-items: center; }
+.wki-ed-head input { flex: 1; min-width: 0; }
+.wki-editor :is(input, textarea) { background: #fff; color: var(--wk-ink); border-color: var(--wk-line); }
+.wki-editor .icon-btn { color: var(--wk-ink); }
+.wki-editor .btn.ghost { color: var(--wk-ink); border-color: var(--wk-line); justify-self: start; }
+
+@media (max-width: 560px) {
+  .wki-info { float: none; width: 100%; margin: 0 0 1rem; }
+  .wki-title { font-size: 1.7rem; margin-inline: 1rem; }
+  .wki-sub, .wki-cats { margin-inline: 1rem; }
+  .wki-body, .wki-editor { padding: 0 1rem; }
+}

@@ -37,6 +37,35 @@ import * as schoolfile from './schoolfile.js';
 import * as starchart from './starchart.js';
 import * as familytree from './familytree.js';
 import * as quiz from './quiz.js';
+import * as headcanons from './headcanons.js';
+import * as askbox from './askbox.js';
+import * as wiki from './wiki.js';
+import * as dayinlife from './dayinlife.js';
+import * as bucketlist from './bucketlist.js';
+import * as catchphrases from './catchphrases.js';
+import * as alignment from './alignment.js';
+import * as tierlist from './tierlist.js';
+import * as newspaper from './newspaper.js';
+import * as yearreview from './yearreview.js';
+import * as movieposter from './movieposter.js';
+import * as wanted from './wanted.js';
+import * as passport from './passport.js';
+import * as photobooth from './photobooth.js';
+import * as locket from './locket.js';
+import * as bdaycards from './bdaycards.js';
+import * as mash from './mash.js';
+import * as cootie from './cootie.js';
+import * as slambook from './slambook.js';
+import * as eightball from './eightball.js';
+import * as bracelets from './bracelets.js';
+import * as wouldyou from './wouldyou.js';
+import * as pet from './pet.js';
+import * as tarot from './tarot.js';
+import * as cafe from './cafe.js';
+import * as nails from './nails.js';
+import * as makeup from './makeup.js';
+import * as stickeralbum from './stickeralbum.js';
 
 export const FEATURES = [phone, computer, social, magazine, letters, room, dressup, locker, polaroids, card, ids, yearbook, timeline, mood, mixtape, ships, diaries,
-  stories, scenes, secrets, comics, album, lyrics, answering, vlogs, backpack, memorybox, sketchbook, receipts, handheld, schoolfile, starchart, familytree, quiz];
+  stories, scenes, secrets, comics, album, lyrics, answering, vlogs, backpack, memorybox, sketchbook, receipts, handheld, schoolfile, starchart, familytree, quiz,
+  headcanons, askbox, wiki, dayinlife, bucketlist, catchphrases, alignment, tierlist, newspaper, yearreview, movieposter, wanted, passport, photobooth, locket, bdaycards, mash, cootie, slambook, eightball, bracelets, wouldyou, pet, tarot, cafe, nails, makeup, stickeralbum];

@@ -27,3 +27,7 @@
 /* the mood ring's color, glowing behind an oc's page */
 .profile-bleed.has-mood { background-image: radial-gradient(70% 45% at 50% 0%, color-mix(in srgb, var(--mood) 30%, transparent), transparent 70%); }
 .profile-bleed.has-mood.has-wallpaper { background-image: none; }
+
+/* the search box over the apps */
+.fun-find { width: 100%; max-width: 22rem; margin: 0 0 .9rem; }
+.fun-tile[hidden] { display: none; }

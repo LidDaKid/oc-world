@@ -1260,3 +1260,14 @@ input.cal-in-y { width: 7rem; }
   .tab-icon { font-size: 1.1rem; }
   .tab.on::after { bottom: -.35rem; }
 }
+
+/* 8 world tabs: on smaller screens the tab bar scrolls sideways inside itself */
+@media (max-width: 760px) {
+  .topbar .tabs { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; padding-bottom: .5rem; margin-bottom: -.5rem; }
+  .topbar .tabs::-webkit-scrollbar { display: none; }
+  .topbar .tab { flex: none; }
+  .topbar .tab-label { white-space: nowrap; }
+}
+@media (max-width: 520px) {
+  .topbar .tab { min-width: 3.5rem; }
+}

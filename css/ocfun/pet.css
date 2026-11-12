@@ -1,0 +1,78 @@
+/* their pet (js/ocfun/pet.js) */
+.petx-app { display: grid; gap: 1rem; }
+.petx-tabs { display: flex; flex-wrap: wrap; gap: .45rem; }
+.petx-tab { --pc: var(--accent); display: inline-flex; align-items: center; gap: .45rem; padding: .3rem .85rem .3rem .35rem; border-radius: 999px; border: 2px solid color-mix(in srgb, var(--pc) 55%, transparent);
+  background: color-mix(in srgb, var(--pc) 12%, transparent); color: var(--ink); font: 800 .88rem var(--font-body); cursor: pointer; transition: transform .15s; }
+.petx-tab:hover { transform: translateY(-2px); }
+.petx-tab.on { background: var(--pc); color: #1a1320; border-color: var(--pc); box-shadow: 0 6px 16px -6px var(--pc); }
+.petx-tab-art { width: 1.9rem; height: 1.9rem; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: rgba(255, 255, 255, .5); }
+.petx-tab-art :is(img, .stk) { width: 100%; height: 100%; object-fit: cover; }
+.petx-add { padding: .45rem 1rem; border-style: dashed; background: none; }
+.petx-empty { display: grid; place-items: center; padding: 3rem 1rem; }
+.petx-empty-art { width: 7rem; opacity: .5; filter: grayscale(.4); }
+.petx-empty-art .stk { width: 100%; }
+
+.petx-card { --pc: var(--accent); display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); gap: 1.6rem; padding: 1.4rem; border-radius: 26px;
+  background: radial-gradient(circle at 12% 10%, color-mix(in srgb, var(--pc) 26%, transparent), transparent 55%),
+    radial-gradient(circle, color-mix(in srgb, var(--pc) 22%, transparent) 1.5px, transparent 2px) 0 0 / 18px 18px,
+    color-mix(in srgb, var(--ink) 4%, transparent);
+  border: 2px solid color-mix(in srgb, var(--pc) 45%, transparent); }
+@media (max-width: 620px) { .petx-card { grid-template-columns: 1fr; justify-items: center; } .petx-right { width: 100%; } }
+.petx-left { display: grid; gap: 1rem; justify-items: center; align-content: start; }
+.petx-frame { position: relative; width: 13rem; aspect-ratio: 1; border-radius: 42% 42% 38% 38%; display: grid; place-items: center; overflow: hidden;
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--pc) 40%, #fff), color-mix(in srgb, var(--pc) 70%, #1a1320));
+  border: 6px solid #fff; box-shadow: 0 0 0 4px var(--pc), 0 18px 30px -14px var(--pc); rotate: -2deg; }
+.petx-frame :is(.stk, img) { width: 78%; height: auto; filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .35)); }
+.petx-frame.has-pic .petx-pic { width: 100%; height: 100%; object-fit: cover; filter: none; }
+.petx-paws { position: absolute; inset: 0; pointer-events: none; opacity: .35;
+  background: radial-gradient(ellipse 7px 8px at 18% 82%, #fff 98%, transparent), radial-gradient(circle 3px at 13% 74%, #fff 98%, transparent), radial-gradient(circle 3px at 18% 71%, #fff 98%, transparent), radial-gradient(circle 3px at 23% 74%, #fff 98%, transparent),
+    radial-gradient(ellipse 7px 8px at 84% 20%, #fff 98%, transparent), radial-gradient(circle 3px at 79% 12%, #fff 98%, transparent), radial-gradient(circle 3px at 84% 9%, #fff 98%, transparent), radial-gradient(circle 3px at 89% 12%, #fff 98%, transparent); }
+.petx-frame.has-pic .petx-paws { display: none; }
+
+/* the id tag: shiny metal in a few shapes, hanging off a ring */
+.petx-tag { position: relative; display: grid; justify-items: center; animation: petx-swing 3.2s ease-in-out infinite; transform-origin: 50% 0; }
+@keyframes petx-swing { 0%, 100% { rotate: -5deg; } 50% { rotate: 5deg; } }
+@media (prefers-reduced-motion: reduce) { .petx-tag { animation: none; } }
+.petx-ring { width: 1.3rem; height: 1.3rem; border-radius: 50%; border: 3px solid #cfd2da; margin-bottom: -.45rem; position: relative; z-index: 1; box-shadow: 0 1px 2px rgba(0, 0, 0, .4); }
+.petx-tag-face { display: grid; place-items: center; text-align: center; padding: .6rem 1.4rem; min-width: 9rem;
+  background: linear-gradient(160deg, #fff 0%, color-mix(in srgb, var(--pc) 35%, #e3e5ea) 35%, color-mix(in srgb, var(--pc) 70%, #9aa0ad) 70%, #fff 100%);
+  color: #1a1320; box-shadow: inset 0 2px 0 rgba(255, 255, 255, .8), inset 0 -3px 6px rgba(0, 0, 0, .25), 0 8px 14px -6px rgba(0, 0, 0, .5); }
+.petx-tag-name { font: 700 1.25rem/1 var(--font-display); letter-spacing: .04em; text-shadow: 0 1px 0 rgba(255, 255, 255, .7); }
+.petx-tag-sub { font: 800 .65rem var(--font-body); letter-spacing: .14em; text-transform: uppercase; opacity: .7; margin-top: .25rem; }
+.petx-tag.shape-bone .petx-tag-face { border-radius: 999px; -webkit-mask: radial-gradient(circle 15px at 10px 12px, #000 98%, transparent) , radial-gradient(circle 15px at 10px calc(100% - 12px), #000 98%, transparent), radial-gradient(circle 15px at calc(100% - 10px) 12px, #000 98%, transparent), radial-gradient(circle 15px at calc(100% - 10px) calc(100% - 12px), #000 98%, transparent), linear-gradient(#000 0 0) center / calc(100% - 24px) 70% no-repeat;
+  mask: radial-gradient(circle 15px at 10px 12px, #000 98%, transparent), radial-gradient(circle 15px at 10px calc(100% - 12px), #000 98%, transparent), radial-gradient(circle 15px at calc(100% - 10px) 12px, #000 98%, transparent), radial-gradient(circle 15px at calc(100% - 10px) calc(100% - 12px), #000 98%, transparent), linear-gradient(#000 0 0) center / calc(100% - 24px) 70% no-repeat; padding: 1rem 2.2rem; }
+.petx-tag.shape-heart .petx-tag-face { width: 9.5rem; height: 8.5rem; padding: 0 .8rem 1.4rem; min-width: 0;
+  clip-path: path('M76 136C30 104 0 78 0 44A38 38 0 0 1 76 24a38 38 0 0 1 76 20c0 34-30 60-76 92z'); }
+.petx-tag.shape-round .petx-tag-face { width: 8rem; aspect-ratio: 1; border-radius: 50%; min-width: 0; padding: .5rem; }
+.petx-tag.shape-star .petx-tag-face { width: 10rem; aspect-ratio: 1; min-width: 0; padding: 1.5rem 1rem .8rem;
+  clip-path: polygon(50% 0, 63% 35%, 100% 37%, 71% 59%, 81% 96%, 50% 75%, 19% 96%, 29% 59%, 0 37%, 37% 35%); }
+.petx-tag.shape-star .petx-tag-name { font-size: 1rem; }
+
+.petx-right { display: grid; gap: .8rem; align-content: start; min-width: 0; }
+.petx-name { font: 700 clamp(1.8rem, 5vw, 2.6rem)/1 var(--font-display); color: var(--pc); text-shadow: 0 3px 0 color-mix(in srgb, var(--pc) 35%, transparent); overflow-wrap: anywhere; }
+.petx-rows { display: grid; gap: .3rem; }
+.petx-row { display: flex; gap: .6rem; align-items: baseline; padding-bottom: .3rem; border-bottom: 1.5px dashed color-mix(in srgb, var(--pc) 35%, transparent); }
+.petx-k { font: 800 .7rem var(--font-body); letter-spacing: .12em; text-transform: uppercase; color: var(--ink2); width: 5rem; flex: none; }
+.petx-v { font-weight: 700; overflow-wrap: anywhere; }
+.petx-likes { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .6rem; }
+.petx-like { padding: .6rem .8rem; border-radius: 16px; display: grid; gap: .15rem; }
+.petx-like b { font: 800 .7rem var(--font-body); letter-spacing: .12em; text-transform: uppercase; }
+.petx-like.yes { background: color-mix(in srgb, #7df9d0 20%, transparent); }
+.petx-like.yes b { color: #2fd8a2; }
+.petx-like.no { background: color-mix(in srgb, #ff5d6c 18%, transparent); }
+.petx-like.no b { color: #ff5d6c; }
+.petx-stats { display: grid; gap: .45rem; }
+.petx-stat { display: grid; grid-template-columns: 6rem 1fr; gap: .6rem; align-items: center; font-size: .88rem; }
+.petx-stat-k { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.petx-stat-bar { height: .85rem; border-radius: 999px; background: color-mix(in srgb, var(--ink) 12%, transparent); overflow: hidden; }
+.petx-stat-bar i { display: block; height: 100%; border-radius: inherit;
+  background: repeating-linear-gradient(-45deg, rgba(255, 255, 255, .25) 0 6px, transparent 6px 12px), linear-gradient(90deg, var(--pc), color-mix(in srgb, var(--pc) 45%, #fff)); }
+
+.petx-editing .petx-frame { width: 11rem; }
+.petx-art-btns { display: flex; gap: .4rem; flex-wrap: wrap; justify-content: center; }
+.petx-group { display: grid; gap: .35rem; width: 100%; }
+.petx-group > span, .petx-field > span { font: 800 .7rem var(--font-body); letter-spacing: .12em; text-transform: uppercase; color: var(--ink2); }
+.petx-field { display: grid; gap: .25rem; }
+.petx-stat-edit { display: grid; gap: .4rem; justify-items: start; }
+.petx-stat-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: .4rem; align-items: center; width: 100%; }
+.petx-editing .link-btn.danger { justify-self: start; }

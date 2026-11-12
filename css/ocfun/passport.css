@@ -1,0 +1,78 @@
+/* passport (js/ocfun/passport.js): a passport booklet with a photo page + stamp pages */
+
+.psp-wrap { --cover: #5e1424; display: grid; place-items: center; padding: 1rem 8px 1.2rem; perspective: 1400px; }
+.psp-nav { display: flex; align-items: center; justify-content: center; gap: .8rem; margin-bottom: .6rem; }
+.psp-pg { font: 800 .85rem var(--font-body); color: var(--ink2); min-width: 7rem; text-align: center; }
+
+/* cover */
+.psp-cover { position: relative; width: min(250px, 72vw); aspect-ratio: 5 / 7; border: 0; border-radius: 6px 14px 14px 6px; cursor: pointer; color: #e8c977;
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 12% 8% 10%;
+  background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, .12), transparent 45%), repeating-linear-gradient(45deg, rgba(0, 0, 0, .1) 0 2px, transparent 2px 5px), var(--cover);
+  box-shadow: inset 6px 0 10px rgba(0, 0, 0, .45), inset -1px 0 0 rgba(255, 255, 255, .12), 0 20px 34px -14px rgba(0, 0, 0, .8); transition: transform .3s; transform-origin: left center; }
+.psp-cover:hover { transform: rotateY(-12deg); }
+.psp-cover-top, .psp-cover-bottom { font: 700 1.25rem/1 'Playfair Display', serif; letter-spacing: .32em; text-transform: uppercase; text-shadow: 0 1px 0 rgba(0, 0, 0, .5), 0 0 6px rgba(232, 201, 119, .35); }
+.psp-cover-bottom { font-size: .85rem; letter-spacing: .4em; }
+.psp-crest { position: relative; width: 44%; aspect-ratio: 1; border: 3px solid #e8c977; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 0 10px rgba(232, 201, 119, .25), inset 0 0 0 6px var(--cover), inset 0 0 0 7.5px #e8c977; }
+.psp-crest span { font-size: 2.4rem; line-height: 1; }
+.psp-crest i { position: absolute; inset: 16%; border: 1.5px dashed rgba(232, 201, 119, .6); border-radius: 50%; }
+.psp-crest i + i { inset: 30%; border-style: solid; }
+.psp-chip { position: absolute; bottom: 4%; right: 8%; width: 22px; height: 14px; border: 1.5px solid #e8c977; border-radius: 3px; opacity: .8; }
+
+/* open spread */
+.psp-spread { display: grid; grid-template-columns: 1fr 1fr; width: 100%; max-width: 640px; box-sizing: border-box; border-radius: 8px; overflow: hidden; box-shadow: 0 0 0 6px var(--cover), 0 24px 40px -16px rgba(0, 0, 0, .8); }
+@media (max-width: 600px) { .psp-spread { grid-template-columns: 1fr; } }
+.psp-page { position: relative; min-height: 330px; padding: 16px 14px 22px; color: #2c2a3a; overflow: hidden;
+  background: repeating-linear-gradient(135deg, rgba(140, 120, 200, .07) 0 2px, transparent 2px 9px), repeating-radial-gradient(circle at 50% 120%, rgba(214, 120, 160, .1) 0 2px, transparent 2px 12px), linear-gradient(#f6f1e7, #efe8f3); }
+.psp-left { box-shadow: inset -14px 0 16px -12px rgba(0, 0, 0, .35); }
+.psp-right { box-shadow: inset 14px 0 16px -12px rgba(0, 0, 0, .35); }
+.psp-watermark { position: absolute; inset: 22% 20%; border-radius: 50%; border: 2px solid rgba(120, 90, 170, .12); box-shadow: inset 0 0 0 12px rgba(120, 90, 170, .05); pointer-events: none; }
+.psp-num { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; font: 700 .7rem 'Courier New', monospace; opacity: .5; }
+.psp-sig-title { margin-top: 2px; font: 700 .62rem 'Courier New', monospace; letter-spacing: .1em; text-transform: uppercase; opacity: .6; border-top: 1px solid rgba(0, 0, 0, .35); padding-top: 3px; }
+.psp-sig { margin-top: 32%; padding: 0 4px; font: 400 1.7rem/1.3 'Homemade Apple', 'Caveat', cursive; color: #1f2a6b; rotate: -4deg; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+.psp-visa { position: absolute; bottom: 30px; left: 0; right: 0; text-align: center; font: 700 1.6rem 'Playfair Display', serif; letter-spacing: .5em; text-transform: uppercase; color: rgba(120, 90, 170, .2); }
+
+/* photo page */
+.psp-id-head { display: grid; grid-template-columns: 1fr auto auto auto; gap: .6rem; align-items: center; font: 700 .62rem 'Courier New', monospace; text-transform: uppercase; letter-spacing: .08em; opacity: .75; margin-bottom: 10px; }
+.psp-id-head span:first-child { font: 700 .95rem 'Playfair Display', serif; letter-spacing: .25em; opacity: 1; }
+.psp-id-body { display: grid; grid-template-columns: 96px 1fr; gap: 12px; }
+.psp-photo { width: 96px; aspect-ratio: 4 / 5; overflow: hidden; border-radius: 4px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .25); background: #ddd; display: grid; place-items: center; }
+.psp-photo-img { width: 100%; height: 100%; object-fit: cover; filter: saturate(.85) contrast(1.05); }
+.psp-photo-pfp { width: 80%; height: auto; aspect-ratio: 1; border-radius: 4px; font-size: 1.6rem; }
+.psp-fields { display: grid; gap: 6px; min-width: 0; }
+.psp-row { display: grid; gap: 1px; }
+.psp-row span { font: 700 .56rem 'Courier New', monospace; letter-spacing: .08em; text-transform: uppercase; opacity: .6; }
+.psp-row b { font: 700 .92rem/1.1 'Courier New', monospace; text-transform: uppercase; overflow-wrap: anywhere; }
+.psp-mrz { position: absolute; left: 0; right: 0; bottom: 10px; padding: 0 10px; font: 700 .7rem/1.35 'Courier New', monospace; letter-spacing: .05em; white-space: nowrap; overflow: hidden; opacity: .85; }
+
+/* stamps */
+.psp-stamp-grid { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; justify-items: center; min-height: 290px; }
+.psp-stamp { --ink: #c0172f; position: relative; width: 112px; height: 112px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 8px; color: var(--ink);
+  border: 3px solid var(--ink); background: transparent; rotate: var(--rot, 0deg); translate: var(--dx, 0) var(--dy, 0); text-align: center; font: inherit; opacity: .82; mix-blend-mode: multiply;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.4 2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23g)'/%3E%3C/svg%3E");
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.4 2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23g)'/%3E%3C/svg%3E"); }
+button.psp-stamp { cursor: pointer; }
+button.psp-stamp:hover { opacity: 1; scale: 1.05; }
+.psp-way { font: 800 .55rem 'Courier New', monospace; letter-spacing: .2em; text-transform: uppercase; }
+.psp-place { font: 900 1rem/1 'Playfair Display', serif; text-transform: uppercase; letter-spacing: .04em; max-width: 100%; overflow-wrap: anywhere; }
+.psp-date { font: 800 .6rem 'Courier New', monospace; letter-spacing: .06em; }
+.psp-circle { border-radius: 50%; box-shadow: inset 0 0 0 4px transparent, inset 0 0 0 5.5px var(--ink); }
+.psp-square { border-radius: 4px; border-width: 4px; outline: 1.5px solid var(--ink); outline-offset: -9px; }
+.psp-oval { width: 140px; height: 92px; border-radius: 50%; }
+.psp-triangle { border: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); background: color-mix(in srgb, var(--ink) 16%, transparent); padding-top: 34px; }
+.psp-triangle .psp-place { font-size: .8rem; }
+.psp-postage { border: 0; border-radius: 0; background: radial-gradient(circle, transparent 0 4px, var(--ink) 4.5px) -5px -5px / 10px 10px; padding: 12px; }
+.psp-postage::before { content: ''; position: absolute; inset: 6px; background: #f7f1ea; z-index: -1; }
+.psp-postage > * { position: relative; }
+.psp-star { border: 0; clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); background: color-mix(in srgb, var(--ink) 18%, transparent); width: 128px; height: 124px; padding-top: 18px; }
+.psp-star .psp-place { font-size: .72rem; }
+.psp-star .psp-way, .psp-triangle .psp-way, .psp-star .psp-date { display: none; }
+.psp-triangle .psp-date { font-size: .5rem; }
+
+/* editor */
+.psp-form { display: grid; gap: .55rem; min-width: 0; }
+.psp-field { display: grid; gap: .25rem; font: 800 .78rem var(--font-body); color: var(--ink2); }
+.psp-field > input { font: 600 .95rem var(--font-body); color: var(--ink); }
+.psp-stamp-edit { display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: center; }
+@media (max-width: 560px) { .psp-stamp-edit { grid-template-columns: 1fr; } }
+.psp-prev { display: grid; place-items: center; width: 170px; height: 170px; justify-self: center; border-radius: 10px; background: linear-gradient(#f6f1e7, #efe8f3); }
+.psp-prev .psp-stamp { --dx: 0; --dy: 0; }

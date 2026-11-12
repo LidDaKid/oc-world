@@ -1,0 +1,65 @@
+/* birthday cards (js/ocfun/bdaycards.js): cards on a shelf under bunting, opening like real cards */
+
+.bdc-shelf { position: relative; padding: 2.8rem .6rem 0; border-radius: 16px; overflow: hidden; min-height: 300px;
+  background: radial-gradient(circle at 15% 20%, rgba(255, 216, 77, .18) 0 3px, transparent 4px) 0 0 / 46px 52px, radial-gradient(circle at 70% 60%, rgba(255, 79, 163, .2) 0 2px, transparent 3px) 0 0 / 38px 44px, color-mix(in srgb, var(--ink) 4%, transparent); }
+.bdc-bunting { position: absolute; top: 0; left: -10px; right: -10px; height: 46px; display: flex; justify-content: space-between; }
+.bdc-bunting::before { content: ''; position: absolute; top: 6px; left: 0; right: 0; height: 14px; border-top: 2px solid rgba(255, 255, 255, .55); border-radius: 50%; }
+.bdc-bunting i { width: 34px; height: 40px; margin-top: 8px; clip-path: polygon(0 0, 100% 0, 50% 100%); background: hsl(calc(var(--i) * 47) 85% 68%); filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .3)); translate: 0 calc(sin(var(--i) * 25deg) * 4px); }
+.bdc-row { display: flex; flex-wrap: wrap; gap: 1.2rem 1.4rem; justify-content: center; align-items: flex-end; padding: 1.4rem .4rem 0; min-height: 210px; position: relative; z-index: 1; }
+.bdc-pick { border: 0; padding: 0; background: none; cursor: pointer; rotate: var(--tilt, 0deg); transform-origin: bottom center; transition: rotate .25s, translate .25s; filter: drop-shadow(4px 10px 10px rgba(0, 0, 0, .45)); }
+.bdc-pick:hover { rotate: 0deg; translate: 0 -8px; }
+.bdc-pick .bdc-front { width: 130px; height: 176px; }
+.bdc-ledge { height: 22px; margin: -6px -.6rem 0; background: linear-gradient(#8a5a3a, #5b3a24); box-shadow: 0 -2px 0 #a8744e inset, 0 8px 14px rgba(0, 0, 0, .35); position: relative; z-index: 0; }
+
+/* the front */
+.bdc-front { --card: #ff4fa3; --card-ink: #fff; position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8%; padding: 10%;
+  background-color: var(--card); color: var(--card-ink); border-radius: 4px; overflow: hidden; text-align: center; container-type: inline-size; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .08); }
+.bdc-p-dots { background-image: radial-gradient(color-mix(in srgb, var(--card-ink) 28%, transparent) 18%, transparent 20%); background-size: 18px 18px; }
+.bdc-p-stripes { background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--card-ink) 18%, transparent) 0 8px, transparent 8px 18px); }
+.bdc-p-confetti { background-image: radial-gradient(circle, #ffd84d 0 2.5px, transparent 3px), radial-gradient(circle, #7df9d0 0 2px, transparent 2.5px), radial-gradient(circle, #ffffff 0 2px, transparent 2.5px), linear-gradient(45deg, transparent 47%, #6ec6ff 47% 53%, transparent 53%);
+  background-size: 23px 29px, 31px 23px, 19px 37px, 26px 26px; background-position: 0 0, 9px 13px, 15px 5px, 4px 18px; }
+.bdc-p-hearts { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26'%3E%3Cpath d='M13 21C7 17 4 14 4 10.5a4.5 4.5 0 0 1 9-1.5 4.5 4.5 0 0 1 9 1.5C22 14 19 17 13 21z' fill='%23ffffff' fill-opacity='.32'/%3E%3C/svg%3E"); background-size: 26px 26px; }
+.bdc-p-stars { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30'%3E%3Cpath d='M15 4l2.6 6 6.4.6-4.9 4.2 1.5 6.3-5.6-3.4-5.6 3.4 1.5-6.3L6 10.6l6.4-.6z' fill='%23ffd84d' fill-opacity='.6'/%3E%3C/svg%3E"); background-size: 30px 30px; }
+.bdc-words { position: relative; font: 400 15cqw/1 'Bangers', 'Fredoka', sans-serif; letter-spacing: .05em; text-transform: uppercase; overflow-wrap: anywhere; text-shadow: 2px 2px 0 color-mix(in srgb, var(--card) 55%, #000); }
+.bdc-stk { width: 55%; line-height: 0; filter: drop-shadow(0 4px 5px rgba(0, 0, 0, .35)); }
+.bdc-stk :is(img, .stk) { width: 100% !important; height: auto !important; max-width: none; }
+/* a little drawn cake when there's no sticker */
+.bdc-cake { position: relative; width: 50%; aspect-ratio: 1.1; }
+.bdc-cake::before { content: ''; position: absolute; left: 6%; right: 6%; bottom: 0; height: 48%; border-radius: 8px 8px 4px 4px; background: linear-gradient(#fff 0 22%, #ffb3d1 22% 32%, #fff4f8 32%); box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .1); }
+.bdc-cake::after { content: ''; position: absolute; left: 0; right: 0; bottom: -4%; height: 8%; border-radius: 50%; background: rgba(255, 255, 255, .9); }
+.bdc-cake i { position: absolute; bottom: 48%; width: 7%; height: 30%; border-radius: 3px; background: repeating-linear-gradient(45deg, #6ec6ff 0 3px, #fff 3px 6px); }
+.bdc-cake i::before { content: ''; position: absolute; top: -55%; left: 50%; translate: -50% 0; width: 180%; aspect-ratio: .65; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; background: radial-gradient(circle at 50% 70%, #fff6a8, #ffb020 60%, #ff5d2a); animation: bdc-flame 1s ease-in-out infinite alternate; filter: drop-shadow(0 0 4px #ffb020); }
+.bdc-cake i:nth-child(1) { left: 26%; } .bdc-cake i:nth-child(2) { left: 46%; height: 34%; } .bdc-cake i:nth-child(3) { left: 66%; }
+@keyframes bdc-flame { to { scale: .85 1.1; } }
+
+/* the card, open or shut */
+.bdc-card { --card: #ff4fa3; position: relative; width: 210px; height: 286px; perspective: 1200px; cursor: pointer; transition: translate .8s cubic-bezier(.3, .9, .3, 1); }
+.bdc-card.open { translate: 105px 0; }
+.bdc-inner { position: absolute; inset: 0; border-radius: 4px; padding: 20px 18px; display: flex; flex-direction: column; color: #2a1a2e;
+  background: linear-gradient(90deg, rgba(0, 0, 0, .08), transparent 12%), #fffaf4; box-shadow: 0 16px 26px -12px rgba(0, 0, 0, .6); }
+.bdc-msg { flex: 1; font: 400 1.35rem/1.25 'Caveat', cursive; white-space: pre-wrap; overflow-wrap: anywhere; overflow: hidden; }
+.bdc-sign { font: 400 1.3rem/1.1 'Caveat', cursive; text-align: right; display: grid; }
+.bdc-sign b { font: 400 1.7rem/1 'Homemade Apple', 'Caveat', cursive; color: color-mix(in srgb, var(--card) 70%, #2a1a2e); }
+.bdc-from-pfp { position: absolute; left: 14px; bottom: 14px; }
+.bdc-flap { position: absolute; inset: 0; transform-origin: left center; transform-style: preserve-3d; transition: transform 1s cubic-bezier(.45, .05, .2, 1); z-index: 2; }
+.bdc-card.open .bdc-flap { transform: rotateY(-172deg); }
+.bdc-flap > .bdc-front { position: absolute; inset: 0; backface-visibility: hidden; box-shadow: 0 16px 26px -12px rgba(0, 0, 0, .6); }
+.bdc-flap-back { position: absolute; inset: 0; backface-visibility: hidden; transform: rotateY(180deg); border-radius: 4px; display: grid; place-items: center; padding: 20px;
+  background: linear-gradient(-90deg, rgba(0, 0, 0, .1), transparent 14%), #fff4fa; color: #6d5a6e; font: 400 1.5rem/1.1 'Caveat', cursive; text-align: center; }
+
+.bdc-view { display: grid; justify-items: center; padding: 1rem 0; min-width: min(440px, 100%); }
+@media (max-width: 560px) { .bdc-card { width: 150px; height: 204px; } .bdc-card.open { translate: 75px 0; } .bdc-view { min-width: 0; } .bdc-msg { font-size: 1.1rem; } }
+.bdc-view.small .bdc-card { width: 170px; height: 232px; }
+.bdc-view.small .bdc-card.open { translate: 85px 0; }
+.bdc-view.small { min-width: 360px; }
+
+/* editor */
+.bdc-edit { display: grid; grid-template-columns: 1fr auto; gap: 1.2rem; align-items: start; }
+@media (max-width: 760px) { .bdc-edit { grid-template-columns: 1fr; } }
+.bdc-form { display: grid; gap: .55rem; min-width: 0; }
+.bdc-field { display: grid; gap: .25rem; font: 800 .78rem var(--font-body); color: var(--ink2); }
+.bdc-field > input, .bdc-field > textarea { font: 600 .95rem var(--font-body); color: var(--ink); }
+.bdc-from { display: flex; gap: .45rem; flex-wrap: wrap; }
+.bdc-stk-row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.bdc-stk-prev { width: 2.4rem; height: 2.4rem; display: grid; place-items: center; }
+.bdc-stk-prev :is(img, .stk) { max-width: 100%; max-height: 100%; width: 100%; height: auto; }

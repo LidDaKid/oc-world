@@ -1,0 +1,68 @@
+/* wanted poster (js/ocfun/wanted.js): old-west wanted posters + missing flyers on a wooden board */
+
+.wnt-adds { display: flex; gap: .4rem; }
+.wnt-board { display: flex; flex-wrap: wrap; gap: 1.6rem 1.2rem; justify-content: center; align-items: flex-start; padding: 1.6rem .8rem 2rem; border-radius: 14px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, .16) 0 2px, transparent 2px 120px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, .03) 0 1px, transparent 1px 7px),
+    linear-gradient(90deg, #5a3a24, #6e4a2e 20%, #5b3b25 45%, #704b30 70%, #553621);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, .55); }
+.wnt-pick { border: 0; padding: 0; background: none; cursor: pointer; rotate: var(--tilt, 0deg); transition: rotate .25s, translate .25s; filter: drop-shadow(0 10px 12px rgba(0, 0, 0, .55)); }
+.wnt-pick:hover { rotate: 0deg; translate: 0 -5px; }
+.wnt-pic { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wnt-pic-empty { display: grid; place-items: center; background: #d9c39a; }
+.wnt-pfp { width: 70%; height: auto; aspect-ratio: 1; border-radius: 50%; font-size: 2.4rem; }
+
+/* ---- wanted ---- */
+.wnt-old { position: relative; width: 210px; padding: 16px 16px 18px; text-align: center; color: #3b2414; container-type: inline-size;
+  background:
+    radial-gradient(ellipse at 20% 15%, rgba(120, 70, 20, .25), transparent 40%),
+    radial-gradient(ellipse at 85% 80%, rgba(120, 70, 20, .3), transparent 45%),
+    radial-gradient(circle at 70% 25%, rgba(80, 40, 10, .18) 0 4%, transparent 5%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .22 0 0 0 0 .1 0 0 0 .25 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E"),
+    #e8d3a6;
+  box-shadow: inset 0 0 30px rgba(110, 60, 20, .55);
+  clip-path: polygon(0 2%, 6% 0, 18% 1.5%, 30% 0, 46% 1%, 60% 0, 74% 1.6%, 88% 0, 100% 1.4%, 99% 18%, 100% 36%, 98.6% 55%, 100% 74%, 99% 90%, 100% 100%, 84% 98.6%, 70% 100%, 52% 98.8%, 36% 100%, 20% 98.6%, 6% 100%, 0 98%, 1.2% 80%, 0 60%, 1.4% 40%, 0 22%); }
+.wnt-old.big { width: min(320px, 80vw); }
+.wnt-nail { position: absolute; top: 6px; left: 50%; translate: -50% 0; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ddd, #555 60%, #222); box-shadow: 0 1px 2px rgba(0, 0, 0, .6); }
+.wnt-word { margin-top: 4px; font: 400 23cqw/.9 'Rye', 'Playfair Display', serif; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; text-shadow: 1px 1px 0 rgba(255, 240, 210, .5); }
+.wnt-dead { font: 700 7cqw/1.1 'Playfair Display', serif; letter-spacing: .25em; text-transform: uppercase; border-top: 1.2cqw double #3b2414; border-bottom: 1.2cqw double #3b2414; margin: 2cqw 0 4cqw; padding: 1cqw 0; }
+.wnt-frame { aspect-ratio: 1; padding: 3cqw; background: #f1e2c2; border: 1.2cqw solid #3b2414; box-shadow: inset 0 0 12px rgba(80, 40, 10, .4); }
+.wnt-frame .wnt-pic { filter: sepia(.9) contrast(1.15) brightness(.95); }
+.wnt-name { margin-top: 4cqw; font: 900 11cqw/1 'Playfair Display', serif; text-transform: uppercase; letter-spacing: .03em; overflow-wrap: anywhere; }
+.wnt-crime { font: 400 7cqw/1.15 'Special Elite', monospace; margin-top: 2cqw; overflow-wrap: anywhere; }
+.wnt-crime i { font-style: italic; opacity: .8; }
+.wnt-reward { margin-top: 4cqw; display: grid; gap: 1cqw; }
+.wnt-reward span { font: 700 7cqw/1 'Playfair Display', serif; letter-spacing: .35em; text-transform: uppercase; }
+.wnt-reward b { font: 900 15cqw/1 'Playfair Display', serif; color: #6e1d0f; overflow-wrap: anywhere; }
+
+/* ---- missing ---- */
+.wnt-flyer { --paper: #f7f5ee; position: relative; width: 200px; padding: 18px 14px 0; text-align: center; color: #151318; container-type: inline-size;
+  background: linear-gradient(100deg, rgba(0, 0, 0, .04), transparent 40%, rgba(0, 0, 0, .05)), var(--paper); box-shadow: 0 1px 0 rgba(0, 0, 0, .1); }
+.wnt-flyer.big { width: min(310px, 80vw); }
+.wnt-tape { position: absolute; top: -8px; width: 52px; height: 20px; background: rgba(255, 255, 235, .55); box-shadow: 0 1px 2px rgba(0, 0, 0, .18); backdrop-filter: blur(1px); }
+.wnt-tape.l { left: -12px; rotate: -32deg; }
+.wnt-tape.r { right: -12px; rotate: 30deg; }
+.wnt-staple { position: absolute; top: 7px; left: 50%; translate: -50% 0; width: 18px; height: 4px; border: 1.5px solid #8d8f96; border-bottom: 0; border-radius: 1px; }
+.wnt-missing { font: 900 21cqw/.9 'Nunito', 'Arial Black', sans-serif; letter-spacing: .02em; text-transform: uppercase; color: #d1112c; }
+.wnt-photo { margin: 4cqw 6cqw 3cqw; aspect-ratio: 4 / 5; border: 1cqw solid #151318; background: #ddd; }
+.wnt-photo .wnt-pic { filter: grayscale(.85) contrast(1.2); }
+.wnt-mname { font: 900 11cqw/1 'Nunito', 'Arial Black', sans-serif; text-transform: uppercase; overflow-wrap: anywhere; }
+.wnt-seen { margin-top: 2cqw; font: 600 6cqw/1.2 'Nunito', sans-serif; overflow-wrap: anywhere; }
+.wnt-seen b { text-transform: uppercase; }
+.wnt-about { margin-top: 1.5cqw; font: 500 5.4cqw/1.25 'Nunito', sans-serif; opacity: .85; overflow-wrap: anywhere; }
+.wnt-call { margin: 3cqw 0 3cqw; font: 900 7cqw/1 'Nunito', sans-serif; overflow-wrap: anywhere; }
+.wnt-call b { text-transform: uppercase; color: #d1112c; }
+.wnt-tabs { display: flex; margin: 0 -14px; border-top: 1.2px dashed #777; height: 62px; }
+.wnt-tab { flex: 1; display: grid; place-items: center; border-right: 1.2px dashed #777; font: 700 3.6cqw/1 'Nunito', sans-serif; writing-mode: vertical-rl; rotate: var(--r, 0deg); overflow: hidden; white-space: nowrap; }
+.wnt-tab:last-child { border-right: 0; }
+.wnt-tab.torn { visibility: hidden; }
+
+/* editor */
+.wnt-view { display: grid; place-items: center; padding: .8rem; filter: drop-shadow(0 14px 18px rgba(0, 0, 0, .55)); }
+.wnt-edit { display: grid; grid-template-columns: 1fr auto; gap: 1.2rem; align-items: start; }
+@media (max-width: 720px) { .wnt-edit { grid-template-columns: 1fr; } }
+.wnt-form { display: grid; gap: .55rem; min-width: 0; }
+.wnt-field { display: grid; gap: .25rem; font: 800 .78rem var(--font-body); color: var(--ink2); }
+.wnt-field > input, .wnt-field > textarea { font: 600 .95rem var(--font-body); color: var(--ink); }
+.wnt-picrow { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
